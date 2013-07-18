@@ -1,0 +1,493 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  xmlns:cx="components.*"
+					  width="375" height="225" 
+					  horizontalCenter="0" verticalCenter="0"
+					  creationComplete="init()">
+
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import mx.events.FlexEvent;
+			
+			import services.SweepsAPI;
+			
+			import utils.DebugHelper;
+			import utils.FormatHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( Redeem );				
+			
+			private var iEntries:int = 0.0;
+			private var iWinnings:int = 0.0;
+			private var iIncrement:int = 0.0;
+			private var iCounter:int = 0;
+			private var iIndex:int = 0;
+			
+			private var requestTimer:Timer;
+			private var requestInProcess:Boolean;
+			
+			private static const INCREMENT_ARRAY:Array = [25, 50, 100, 500, 1000, 2500, 5000, 10000];
+			
+			// Initializes the control
+			private function init():void
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+				
+				// Add a keyboard listener
+				addEventListener( KeyboardEvent.KEY_UP, keyHandler );
+				
+				// Default the increment
+				iIncrement = INCREMENT_ARRAY[0];
+				
+				// Set the account entries
+				txtEntries.text = FormatHelper.formatEntriesAndWinnings( iEntries );
+				
+				// Set the account winnings
+				iWinnings = Sweeps.Winnings;						
+				
+				// Initialize the long request indicator
+				initIndicator();
+				
+				// Replace "Redeem" text if Donate mode enabled
+				if( Sweeps.DonateEnabled )
+				{
+					txtRedeem.text = "DONATE";
+				}
+				
+				// Set the page focus
+				btnAccept.setFocus();
+				
+				// Clear Context
+				logger.popContext();				
+			}													
+			
+			// Initializes the long request indicator control
+			private function initIndicator():void
+			{
+				// Log Activity
+				logger.pushContext( "initIndicator", arguments );
+				
+				// Initialize the long request indicator
+				var loader:MovieClip = MovieClip( new assets.Images.loaderSWF() );
+				loader.x = ( this.width - 220 ) / 2;
+				
+				var holder:SpriteUIComponent = new SpriteUIComponent( loader );
+				holder.horizontalCenter = holder.verticalCenter = 0;
+				holder.width = this.width;
+				holder.height = this.height;							
+				
+				grpProcessing.addElement( holder );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Set the scale of the control
+			public function setScale( scale:Number ):void
+			{
+				scaleY = scaleX = scale;
+				x = stage.stageWidth / 2 - ( width * scale ) / 2;
+				y = stage.stageHeight / 2 - ( height * scale ) / 2;				
+			}
+			
+			// Handles the click event of the "Accept" button
+			protected function btnAccept_clickHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnAccept_clickHandler", arguments );
+				
+				processRedeem(); // Process the redeem request
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the click event of the "Cancel" button
+			protected function btnCancel_clickHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnCancel_clickHandler", arguments );
+				
+				// Remove the keyboard listener
+				removeEventListener( KeyboardEvent.KEY_UP, keyHandler );
+				
+				// Dispatch a redeem response event
+				Sweeps.getInstance().closeRedeem( Sweeps.Entries, Sweeps.Winnings );
+				
+				this.visible = false; // Hide the current control
+				
+				// Clear Context
+				logger.popContext();				
+			}					
+			
+			// Handles the click event of the "All" button
+			protected function btnAll_clickHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnAll_clickHandler", arguments );
+				
+				convertAllWinningsToEntries(); // Convert all winnings to entries
+				
+				// Clear Context
+				logger.popContext();				
+			}
+		
+			// Handles the button down event of the "Up" button
+			protected function btnUp_buttonDownHandler( event:FlexEvent ):void
+			{
+				iCounter = iCounter + 1;
+				if( iCounter % 5 == 0 ) { iIndex = iIndex + 1; }
+				
+				iIncrement = iIndex < INCREMENT_ARRAY.length ? INCREMENT_ARRAY[iIndex] : INCREMENT_ARRAY[INCREMENT_ARRAY.length - 1];
+				convertWinningsToEntries( iIncrement ); // Convert winnings to entries
+			}
+		
+			// Handles the button down event of the "Down" button
+			protected function btnDown_buttonDownHandler( event:FlexEvent ):void
+			{
+				iCounter = iCounter + 1;
+				if( iCounter % 5 == 0 ) { iIndex = iIndex + 1; }
+				
+				iIncrement = iIndex < INCREMENT_ARRAY.length ? INCREMENT_ARRAY[iIndex] : INCREMENT_ARRAY[INCREMENT_ARRAY.length - 1];
+				convertEntriesToWinnings( iIncrement ); // Convert entries to winnings
+			}					
+			
+			// Handles the button down event of the "+<Increment>" button(s)
+			protected function btnPlus_buttonDownHandler( event:FlexEvent, increment:int ):void
+			{							
+				convertWinningsToEntries( increment ); // Convert winnings to entries
+			}
+			
+			// Handles the mouse up event of the button
+			protected function mouseUpHandler( event:MouseEvent ):void
+			{		
+				resetCounters(); // Reset the increment counters
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{		
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound				
+			}
+			
+			// Converts winnings to entries
+			private function convertWinningsToEntries( increment:int ):void
+			{
+				if( iWinnings > 0 )
+				{
+					if( iWinnings < increment )
+					{				
+						iEntries = iEntries + iWinnings;
+						iWinnings = 0;							
+					}
+					else
+					{
+						iEntries = iEntries + increment;
+						iWinnings = iWinnings - increment;											
+					}
+					
+					txtEntries.text = FormatHelper.formatEntriesAndWinnings( iEntries );
+					btnDown.enabled = iEntries > 0 ? true : false;
+					lblError.text = "";
+				}
+				else 
+				{ 
+					lblError.text = "Entries cannot exceed total winnings."; 
+					btnUp.enabled = false; 
+					btnPlus_One.enabled = btnPlus_Five.enabled = btnPlus_Ten.enabled = btnPlus_Fifty.enabled = btnPlus_OneHundred.enabled = false;
+					resetCounters(); 
+				}
+			}
+			
+			// Converts all winnings to entries
+			private function convertAllWinningsToEntries():void
+			{				
+				txtEntries.text = FormatHelper.formatEntriesAndWinnings( Sweeps.Winnings );
+				iEntries = Sweeps.Winnings;
+				iWinnings = 0;
+				btnUp.enabled = false;
+				btnPlus_One.enabled = btnPlus_Five.enabled = btnPlus_Ten.enabled = btnPlus_Fifty.enabled = btnPlus_OneHundred.enabled = false;
+				btnDown.enabled = true;
+			}
+			
+			// Converts entries to winnings
+			private function convertEntriesToWinnings( increment:int ):void
+			{
+				if( iEntries > 0 )
+				{
+					if( iEntries < increment )
+					{				
+						iEntries = 0;
+						iWinnings = iWinnings + iEntries;							
+					}
+					else
+					{
+						iEntries = iEntries - increment;
+						iWinnings = iWinnings + increment;											
+					}
+					
+					txtEntries.text = FormatHelper.formatEntriesAndWinnings( iEntries );
+					btnUp.enabled = iWinnings > 0 ? true : false;
+					btnPlus_One.enabled = btnPlus_Five.enabled = btnPlus_Ten.enabled = btnPlus_Fifty.enabled = btnPlus_OneHundred.enabled = iWinnings > 0 ? true : false;
+					lblError.text = "";
+				}
+				else { lblError.text = "Entries must be greater than 0."; btnDown.enabled = false; resetCounters(); }
+			}
+			
+			// Resets the increment counters
+			private function resetCounters():void
+			{
+				iCounter = 0; iIndex = 0; iIncrement = INCREMENT_ARRAY[0];
+			}
+			
+			// Processes the redeem request
+			private function processRedeem():void
+			{
+				// Log Activity
+				logger.pushContext( "processRedeem", arguments );
+				
+				if( isValid() )
+				{		
+					var username:String = Sweeps.Username;
+					var password:String = Sweeps.Password;
+					var redeemAmount:int = Sweeps.Winnings - iWinnings;
+
+					// Remove the keyboard listener
+					removeEventListener( KeyboardEvent.KEY_UP, keyHandler );
+					
+					if( redeemAmount > 0 ) // Check if the redeem amount is valid
+					{
+						// Disable the control's buttons
+						toggleControls( false );
+						
+						// Mark the request as in process
+						requestInProcess = true;
+						
+						// Initialize timer in case request takes longer than expected
+						requestTimer = new Timer( 1000, 1 );
+						requestTimer.addEventListener( TimerEvent.TIMER, requestTimer_Listener );
+						requestTimer.start();
+						
+						// Send the request to the service API and check status
+						SweepsAPI.redeemEntries( username, password, Sweeps.Entries, Sweeps.Winnings, redeemAmount, checkRedeem, handleRedeemError );
+					}
+					else
+					{											
+						// Dispatch a redeem response event
+						Sweeps.getInstance().closeRedeem( Sweeps.Entries, Sweeps.Winnings );
+					}
+				}
+				else 
+				{
+					lblError.text = "Unable to process request.";
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Checks if the parameters are valid
+			private function isValid():Boolean
+			{
+				if( Sweeps.Winnings == 0 ) { return false; }
+				
+				lblError.text = "";
+				return true;
+			}
+			
+			// Checks the status of the redeem
+			private function checkRedeem( entries:int, winnings:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "checkRedeem", arguments );
+				
+				// Enable the control's buttons
+				toggleControls( true );
+				
+				// Mark the request as processed
+				requestInProcess = false;
+				
+				// Remove the request timer
+				if( requestTimer != null )
+				{
+					requestTimer.removeEventListener( TimerEvent.TIMER, requestTimer_Listener );
+					requestTimer.stop();
+					requestTimer = null;
+				}
+				
+				// Hide the long request indicator and show the redeem options 
+				lblWait.visible = lblWait.includeInLayout = false;
+				grpProcessing.visible = grpProcessing.includeInLayout = false;
+				vgRedeem.visible = vgRedeem.includeInLayout = true;
+				
+				// Dispatch a redeem response event
+				Sweeps.getInstance().closeRedeem( entries, winnings );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles redeem errors
+			private function handleRedeemError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemError", arguments );
+				
+				// Enable the control's buttons
+				toggleControls( true );
+				
+				// Mark the request as processed
+				requestInProcess = false;
+				
+				// Remove the request timer
+				if( requestTimer != null )
+				{
+					requestTimer.removeEventListener( TimerEvent.TIMER, requestTimer_Listener );
+					requestTimer.stop();
+					requestTimer = null;
+				}
+				
+				// Hide the long request indicator and show the redeem options 
+				lblWait.visible = lblWait.includeInLayout = false;
+				grpProcessing.visible = grpProcessing.includeInLayout = false;
+				vgRedeem.visible = vgRedeem.includeInLayout = true;
+				
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean = false;
+				var pIsError:Boolean = false;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsError = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this request.\n\nPlease try again.";
+						pIsError = true;
+						break;
+				}
+				
+				// Display a popup indicating an error occurred
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, pIsError, pIsLogout );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Enables/Disables the user controls
+			private function toggleControls( enable:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "toggleControls", arguments );
+				
+				btnDown.enabled = enable;
+				btnUp.enabled = enable;
+				btnAll.enabled = enable;
+				
+				btnPlus_One.enabled = enable;
+				btnPlus_Five.enabled = enable;
+				btnPlus_Ten.enabled = enable;
+				btnPlus_Fifty.enabled = enable;
+				btnPlus_OneHundred.enabled = enable;				
+				
+				btnAccept.enabled = enable;
+				btnCancel.enabled = enable;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Displays an indicator in the event that the request takes longer than expected
+			private function requestTimer_Listener( event:TimerEvent ):void 
+			{
+				// Log Activity
+				logger.pushContext( "requestTimer_Listener", arguments );
+				
+				// Remove the request timer
+				requestTimer.removeEventListener( TimerEvent.TIMER, requestTimer_Listener );
+				requestTimer.stop();
+				requestTimer = null;
+				
+				// Check if the request is still in process
+				if( requestInProcess )
+				{
+					lblWait.visible = lblWait.includeInLayout = true;
+					grpProcessing.visible = grpProcessing.includeInLayout = true;
+					vgRedeem.visible = vgRedeem.includeInLayout = false;					
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the keyboard 'Key Up' event
+			private function keyHandler( event:KeyboardEvent ):void 
+			{
+				switch( event.keyCode )
+				{
+					case Keyboard.ENTER:
+						processRedeem(); // Process the redeem request
+						break;
+					
+					case Keyboard.UP:
+						convertWinningsToEntries( iIncrement ); // Convert winnings to entries
+						break;
+					
+					case Keyboard.DOWN:
+						convertEntriesToWinnings( iIncrement ); // Convert entries to winnings
+						break;
+				}				
+			}					
+		]]>
+	</fx:Script>
+	
+	<s:BitmapImage source="{Images.messageBox}"></s:BitmapImage>
+	<s:Group width="100%" height="100%" horizontalCenter="0">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>
+		<s:Label id="txtRedeem" text="BUY" styleName="Title" paddingTop="7"></s:Label>
+		<s:Label id="lblError" styleName="Error" visible="true" paddingTop="15"></s:Label>
+		<s:Label id="lblWait" styleName="Label" text="Processing. Please wait..." paddingTop="25" includeInLayout="false" visible="false"></s:Label>
+		<s:Group id="grpProcessing" horizontalCenter="0" verticalCenter="0" minWidth="220" minHeight="9" color="0x0000FF" includeInLayout="false" visible="false"></s:Group>
+		<s:VGroup id="vgRedeem" paddingTop="10" gap="5" horizontalAlign="center">			
+			<s:Label id="lblEntries" styleName="Label" text="Entries:" paddingRight="150"></s:Label>							
+			<s:HGroup verticalAlign="middle" gap="5">
+				<cx:ImageButton id="btnDown" skinClass="skins.ButtonSkin" imageSkin="{Images.btnSmall_up}" imageSkinOver="{Images.btnSmall_over}" imageSkinDown="{Images.btnSmall_down}" imageSkinDisabled="{Images.btnSmall_disabled}" imageIcon="{Images.iconMinus}" mouseUp="mouseUpHandler(event)" mouseOut="mouseUpHandler(event)" buttonDown="btnDown_buttonDownHandler(event)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<s:TextInput id="txtEntries" styleName="TextBox" width="150" editable="false" textAlign="right"></s:TextInput>
+				<cx:ImageButton id="btnUp" skinClass="skins.ButtonSkin" imageSkin="{Images.btnSmallAlt_up}" imageSkinOver="{Images.btnSmallAlt_over}" imageSkinDown="{Images.btnSmallAlt_down}" imageSkinDisabled="{Images.btnSmallAlt_disabled}" imageIcon="{Images.iconPlus}" mouseUp="mouseUpHandler(event)" mouseOut="mouseUpHandler(event)" buttonDown="btnUp_buttonDownHandler(event)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<cx:ImageButton id="btnAll" skinClass="skins.ButtonSkin" label="All" imageSkin="{Images.btnSmallAlt_up}" imageSkinOver="{Images.btnSmallAlt_over}" imageSkinDown="{Images.btnSmallAlt_down}" imageSkinDisabled="{Images.btnSmallAlt_disabled}" click="btnAll_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+			</s:HGroup>
+			<s:HGroup verticalAlign="middle" gap="5" paddingTop="5">
+				<cx:ImageButton id="btnPlus_One" skinClass="skins.ButtonSkin" label="+1" imageSkin="{Images.btnSmall_up}" imageSkinOver="{Images.btnSmall_over}" imageSkinDown="{Images.btnSmall_down}" imageSkinDisabled="{Images.btnSmall_disabled}" buttonDown="btnPlus_buttonDownHandler(event, 100)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<cx:ImageButton id="btnPlus_Five" skinClass="skins.ButtonSkin" label="+5" imageSkin="{Images.btnSmall_up}" imageSkinOver="{Images.btnSmall_over}" imageSkinDown="{Images.btnSmall_down}" imageSkinDisabled="{Images.btnSmall_disabled}" buttonDown="btnPlus_buttonDownHandler(event, 500)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<cx:ImageButton id="btnPlus_Ten" skinClass="skins.ButtonSkin" label="+10" imageSkin="{Images.btnMedium_up}" imageSkinOver="{Images.btnMedium_over}" imageSkinDown="{Images.btnMedium_down}" imageSkinDisabled="{Images.btnMedium_disabled}" buttonDown="btnPlus_buttonDownHandler(event, 1000)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<cx:ImageButton id="btnPlus_Fifty" skinClass="skins.ButtonSkin" label="+50" imageSkin="{Images.btnMedium_up}" imageSkinOver="{Images.btnMedium_over}" imageSkinDown="{Images.btnMedium_down}" imageSkinDisabled="{Images.btnMedium_disabled}" buttonDown="btnPlus_buttonDownHandler(event, 5000)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<cx:ImageButton id="btnPlus_OneHundred" skinClass="skins.ButtonSkin" label="+100" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" buttonDown="btnPlus_buttonDownHandler(event, 10000)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>				
+			</s:HGroup>
+		</s:VGroup>
+	</s:Group>				
+	<s:HGroup gap="20" paddingBottom="0" horizontalCenter="0" bottom="20">
+		<cx:ImageButton id="btnAccept" skinClass="skins.ButtonSkin" label="Accept" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" click="btnAccept_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+		<cx:ImageButton id="btnCancel" skinClass="skins.ButtonSkin" label="Cancel" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" click="btnCancel_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+	</s:HGroup>
+	
+</s:SkinnableContainer>

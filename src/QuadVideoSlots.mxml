@@ -1,0 +1,3110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:cx="components.*"
+					  xmlns:QuadVideoSlots="components.QuadVideoSlots.*"
+					  minWidth="800" minHeight="600" width="800" height="600" 
+					  backgroundColor="#000000"
+					  initialize="init( event )"
+					  creationComplete="creationComplete( event )" 
+					  implements="interfaces.IDisposable, interfaces.IDebuggable"
+					  creationPolicy="none" xmlns:VideoSlots="components.VideoSlots.*">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.DataTimer;
+			import assets.Images;
+			import assets.SkinManager;
+			import assets.SoundManager;
+			
+			import components.GradientLabel;
+			import components.Progress;
+			import components.ProgressiveJackpot;
+			import components.QuadVideoSlots.MummysMoneyBonusGame;
+			import components.QuadVideoSlots.PathFinderBonusGame;
+			import components.QuadVideoSlots.QuadVideoSlotsIntro;
+			import components.QuadVideoSlots.WinningIconAnimation;
+			import components.QuadVideoSlots.WinningIconGraphic;
+			import components.SpriteUIComponent;
+			
+			import flash.utils.getTimer;
+			
+			import mx.core.IVisualElement;
+			import mx.events.FlexEvent;
+			import mx.events.StyleEvent;
+			
+			import objects.ErrorMessage;
+			import objects.LineWin;
+			import objects.PlayGameResponse;
+			import objects.ReelIcon;
+			import objects.ReelPosition;
+			
+			import services.SweepsAPI;
+			
+			import utils.ArrayHelper;
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( QuadVideoSlots );			
+			
+			// Game initialization
+			private var achievementsLoaded:Boolean = false;
+			private var assetsLoaded:Boolean = false;
+			private var gameLoaded:Boolean = false;
+			private var loadingBackground:Class;
+			
+			// Game configuration
+			private var arrReels:Array;
+			private var arrBetLines:Array;
+			private var betAmountStep:int;
+			private var betAmounts:Array;
+			private var bonusGameScatterThreshold:int;
+			private var curLines:int = 100;
+			private var maxLines:int = 100;			
+			private var reelIcons:Vector.<ReelIcon>;
+			private var doBlink:Boolean = false;
+			private var doRandomStop:Boolean = false;
+			private var doPlayReelStop:Boolean = true;
+			private var doVerticalWilds:Boolean = false;
+			private var doScatterAnticipations:Boolean = true;
+			
+			private var symbolWild:String = "ReelIcon_A";
+			private var symbolScatter:String = "ReelIcon_K";
+			private var fullScreenWinAnimations:Object;
+			
+			// Game state
+			private var autoPlay:Boolean = false;
+			private var areReelTargetPositionsSet:Boolean = false;
+			private var inAction:Boolean = false;
+			private var isSpinning:Boolean = false;
+			private var serverEntries:int = 0;
+			private var serverWinnings:int = 0;
+			private var baseWin:int = 0;
+			private var bonusWin:int = 0;
+			private var scatterWin:int = 0;
+			private var serverOutput:Array;
+			private var spinsList:Array;
+			private var isQuickStop:Boolean = false;
+			private var scatterCount:int = 0;
+			private var achievementsEarned:Array;
+			private var wonBonusGame:Boolean = false;
+			private var lineWins:Vector.<LineWin>;
+			private var nudgeTimedOut:Boolean = false;
+			
+			// Timers and References
+			private var displayBonusGameTimeout:uint = uint.MIN_VALUE;
+			private var autoSpinTimeout:uint = uint.MIN_VALUE;
+			private var spinStopTimer:Timer;
+			private var msAPIStart:Number;
+			private var displayWinTimer:DataTimer;
+			private var nudgeTimer:Timer;
+			
+			// Sound Channels
+			private var winningsChnl:SoundChannel;
+			private var winningsBdChnl:SoundChannel;
+			private var spinStartSound:SoundChannel;
+			private var backgroundSound:SoundChannel;
+			
+			// Component and Component References
+			private var scIntro:QuadVideoSlotsIntro;
+			private var scBonus:PathFinderBonusGame;
+			private var vReelList:Vector.<Vector.<QuadVideoSlotReel>>;
+			private var lblInfoPage:GradientLabel;
+			private var cssStyleDispatcher:IEventDispatcher;
+			private var scatterAntSound:SoundChannel;
+			
+			private var fontFamily:String;
+			private var fontSize:Number;
+			private var fontColors:Array = [];
+			
+			/** Returns the current bet lines */
+			public function getBetLines():int
+			{
+				return curLines;
+			}			
+			
+			/** Returns the current bet amount */
+			protected function getBetAmount():int
+			{
+				return betAmounts[betAmountStep];
+			}
+			
+			/** Returns the default bet amount */
+			private function getDefaultBetAmount():int
+			{
+				return getBetAmount();
+			}
+			
+			/** Returns the total bet amount */
+			protected function getTotalBet():int
+			{
+				return getBetAmount() * curLines;
+			}
+			
+			/** Returns the surcharge amount */
+			protected function getSkillSurcharge():int
+			{
+				return Sweeps.SkilltopiaEnabled ? 1 : 0;
+			}
+			
+			protected function getArrayReelPositions( reelOutput:Array, spinReels:Vector.<Vector.<QuadVideoSlotReel>> ):Array
+			{
+				// Log Activity
+				logger.pushContext( "getArrayReelPositions", arguments );
+				
+				var spin1Output:Array = [];
+				var spin1Reels:Vector.<Vector.<QuadVideoSlotReel>> = null;
+				var spin2Output:Array = [];
+				var spin2Reels:Vector.<Vector.<QuadVideoSlotReel>> = null;
+				var tempOutput:Array = [];
+				var i:int;
+				
+				if( doBlink )
+				{
+					var results1:Vector.<Vector.<ReelPosition>> = getResults( 0, true );
+					var results2:Vector.<Vector.<ReelPosition>> = getResults( 1, true );
+					var results3:Vector.<Vector.<ReelPosition>> = getResults( 2, true );
+					var results4:Vector.<Vector.<ReelPosition>> = getResults( 3, true );
+					
+					var intendedResults1:Vector.<Vector.<ReelPosition>> = getResults( 0, true, true, serverOutput[0] );
+					var intendedResults2:Vector.<Vector.<ReelPosition>> = getResults( 1, true, true, serverOutput[1] );
+					var intendedResults3:Vector.<Vector.<ReelPosition>> = getResults( 2, true, true, serverOutput[2] );
+					var intendedResults4:Vector.<Vector.<ReelPosition>> = getResults( 3, true, true, serverOutput[3] );
+					
+					var applicableResults:Array = [results1];
+					curLines > 25 && applicableResults.push( results2 );
+					curLines > 50 && applicableResults.push( results3 );
+					curLines > 75 && applicableResults.push( results4 );				
+					
+					var scatters:Array = checkResultsForScatters.apply( null, [results1, results2, results3, results4] );
+					var intendedBasePayout:Boolean = calculateWin.apply( null, ArrayHelper.getMerged( ["BASE"], applicableResults ) ) > 0;
+					var intendedScatterPayout:Boolean = calculateWin.apply( null, ArrayHelper.getMerged( ["SCATTER"], applicableResults ) ) > 0;
+					var intendedScatterBonus:Boolean = scatters.length >= bonusGameScatterThreshold;
+					
+					// If the player is supposed to get a bonus game, force both spins (nudge) to be correct reels
+					if( intendedScatterBonus )
+					{
+						spin1Output = reelOutput;
+						spin1Reels = spinReels;
+					}					
+					else
+					{
+						for( var themeIndex:int = 0; themeIndex < 4; themeIndex++ )
+						{
+							var output:Array = reelOutput[themeIndex].slice( 0 );
+							var reels:Vector.<QuadVideoSlotReel> = spinReels[themeIndex].slice( 0 );
+							var isValid:Boolean = false;
+							
+							// Build an array of all the possible nudge choices, discarding the original outcome
+							var possibleNudgeChoices:Array = [];					
+							for( var j:int = 0; j < arrReels[themeIndex][0].length; j++ )
+							{
+								possibleNudgeChoices.push( j );
+							}	
+							possibleNudgeChoices.splice( possibleNudgeChoices.indexOf( output[0] ), 1 );
+							ArrayHelper.randomize( possibleNudgeChoices );
+							
+							// Randomize the first reel until we are not producing a winning spin and no scatters are present
+							while( isValid == false )
+							{
+								// Set this as valid until proven otherwise
+								isValid = true;						
+								
+								// If we can't find something valid after so many tries, err on the side of caution and give them their original results
+								if( possibleNudgeChoices.length == 0 )
+								{
+									// Log this in case we run into any errors later
+									logger.warn( "Could not find suitable alternative for nudge reel in Skilltopa after exhausting all tries: " + reelOutput.toString() );
+									
+									// Force the output for all themes
+									spin1Output = reelOutput;
+									spin1Reels = spinReels;
+									isValid = true;
+									themeIndex = 4; // Skip to the end of the for loop
+									continue; // Skip to the end of the while loop
+								}
+								
+								// Randomly change the nudge reel's target slot
+								output[0] = possibleNudgeChoices.pop();
+								
+								// Get the resulting ouputs
+								var newResults:Vector.<Vector.<ReelPosition>> = getResults( themeIndex, doVerticalWilds, true, output );
+								
+								// Check to be sure this output isn't a winner
+								isValid = calculateWin.apply( null, ArrayHelper.getMerged( ["BOTH"], [newResults] ) ) == 0;	
+								
+								// Merge this output with the other ouputs
+								if( isValid )
+								{
+									spin1Output.push( output );
+									spin1Reels = spinReels;
+								}
+							}
+						}
+					}
+					
+					spin2Output = [];
+					spin2Output.push( reelOutput[0].slice( 0, 1 ) );
+					spin2Output.push( reelOutput[1].slice( 0, 1 ) );
+					spin2Output.push( reelOutput[2].slice( 0, 1 ) );
+					spin2Output.push( reelOutput[3].slice( 0, 1 ) );
+					
+					spin2Reels = new Vector.<Vector.<QuadVideoSlotReel>>();
+					spin2Reels.push( spinReels[0].slice( 0, 1 ) );
+					spin2Reels.push( spinReels[1].slice( 0, 1 ) );
+					spin2Reels.push( spinReels[2].slice( 0, 1 ) );
+					spin2Reels.push( spinReels[3].slice( 0, 1 ) );
+					
+					tempOutput.push( { ReelOutput: spin1Output, SpinReels: spin1Reels } );	
+					tempOutput.push( { ReelOutput: spin2Output, SpinReels: spin2Reels } );		
+				}
+				else
+				{
+					tempOutput.push( { ReelOutput: reelOutput, SpinReels: spinReels } );
+				}
+				
+				// Clear Context
+				logger.popContext();
+				
+				return tempOutput;
+			}
+			
+			protected function getResults( themeIndex:int, forceWilds:Boolean = false, virtual:Boolean = false, reelPositions:Array =  null ):Vector.<Vector.<ReelPosition>>
+			{
+				// Log Activity
+				logger.pushContext( "getResults", arguments );
+				
+				// Gets an array of 3 values for each reel, which represent the 3 icons on screen
+				var r0:Vector.<ReelPosition> = virtual ? vReelList[themeIndex][0].getVirtualReel( reelPositions[0] ) : vReelList[themeIndex][0].getVisibleReel();
+				var r1:Vector.<ReelPosition> = virtual ? vReelList[themeIndex][1].getVirtualReel( reelPositions[1] ) : vReelList[themeIndex][1].getVisibleReel();
+				var r2:Vector.<ReelPosition> = virtual ? vReelList[themeIndex][2].getVirtualReel( reelPositions[2] ) : vReelList[themeIndex][2].getVisibleReel();
+				var r3:Vector.<ReelPosition> = virtual ? vReelList[themeIndex][3].getVirtualReel( reelPositions[3] ) : vReelList[themeIndex][3].getVisibleReel();
+				var r4:Vector.<ReelPosition> = virtual ? vReelList[themeIndex][4].getVirtualReel( reelPositions[4] ) : vReelList[themeIndex][4].getVisibleReel();
+				
+				// Check if vertical wilds are enabled
+				if( doVerticalWilds && forceWilds )
+				{					
+					r2 = checkReelForIcon( r2, "", true, false ) > 0 ? fillReelWithWild( themeIndex, r2 ) : r2;
+					r3 = checkReelForIcon( r3, "", true, false ) > 0 ? fillReelWithWild( themeIndex, r3 ) : r3;
+					r4 = checkReelForIcon( r4, "", true, false ) > 0 ? fillReelWithWild( themeIndex, r4 ) : r4;
+				}
+				
+				// Creates an array of 3 inner arrays, each representing one row of icons on screen
+				// Each inner arrays' columns then have their own array, with index 0 being the winning icon object
+				// and index 1 being a null reference, will be used later to represent the animation
+				var results:Vector.<Vector.<ReelPosition>> = new Vector.<Vector.<ReelPosition>>();
+				results.push( Vector.<ReelPosition>( [r0[0], r1[0], r2[0], r3[0], r4[0]] ) );
+				results.push( Vector.<ReelPosition>( [r0[1], r1[1], r2[1], r3[1], r4[1]] ) );
+				results.push( Vector.<ReelPosition>( [r0[2], r1[2], r2[2], r3[2], r4[2]] ) );
+				
+				// Clear Context
+				logger.popContext();				
+				
+				return results;
+			}
+			
+			protected function fillReelWithWild( themeIndex:int, reel:Vector.<ReelPosition> ):Vector.<ReelPosition>
+			{		
+				// Log Activity
+				logger.pushContext( "fillReelWithWild", arguments );
+				
+				for( var i:int = 0; i < reel.length; i++ )
+				{
+					reel[i].Icon = symbolWild + themeIndex.toString();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+				
+				return reel;
+			}			
+			
+			protected function checkReelForIcon( reel:Vector.<ReelPosition>, icon:String, wild:Boolean = false, scatter:Boolean = false ):int
+			{
+				var numIcons:int = 0;
+				var reelIcon:ReelIcon;
+				
+				for( var i:int = 0; i < reel.length; i++ )
+				{
+					reelIcon = getReelIcon( reel[i].Icon );
+					if( reelIcon.name == icon || ( icon == "" && reelIcon.isWild == wild && reelIcon.isScatter == scatter ) )
+					{
+						numIcons++;
+					}
+				}
+				
+				return numIcons;							
+			}
+			
+			protected function checkResultsForScatters( ...results ):Array
+			{
+				// Log Activity
+				logger.pushContext( "checkResultsForScatters", results );
+				
+				if( results == null )
+				{
+					return [];
+				}
+				
+				var scatterLocations:Array = [];
+				
+				for( var i:int = 0; i < results.length; i++ )
+				{
+					var res:Vector.<Vector.<ReelPosition>> = results[i] as Vector.<Vector.<ReelPosition>>;					
+					if( res != null )
+					{
+						for( var row:int = 0; row < res.length; row++ )
+						{
+							for( var col:int = 0; col < res[row].length; col++ )
+							{
+								if( getReelIcon( res[row][col].Icon ).isScatter )
+								{
+									scatterLocations.push( [i, row, col]  );
+								}
+							}
+						}
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+				
+				return scatterLocations;
+			}
+			
+			protected function checkScoreForIcon( line:Vector.<ReelPosition>, iconName:String ):int
+			{
+				var sameCount:int = 0;
+				var winIcon:ReelIcon = getReelIcon( iconName );
+				var tempIcon:ReelIcon;
+				
+				for( var i:int = 0; i < line.length; i++ )
+				{
+					tempIcon = getReelIcon( line[i].Icon );
+					if( ( tempIcon == winIcon || tempIcon.isWild ) && !winIcon.isScatter )
+					{
+						sameCount++;
+					}
+					else
+					{
+						break;
+					}
+				}
+				
+				if( sameCount > 0 && !winIcon.isScatter  )
+				{
+					return winIcon.payouts[sameCount - 1];
+				}
+				else
+				{
+					return 0;
+				}
+			}
+			
+			protected function checkScoreForLine( themeIndex:int, lineNumber:int, line:Vector.<ReelPosition> ):int
+			{
+				var winIcon:ReelIcon = getReelIcon( line[0].Icon );
+				var wildIcon:ReelIcon = winIcon.isWild ? winIcon : null;
+				var winAmount:int = checkScoreForIcon( line, winIcon.name );
+				var containsWilds:Boolean = false;
+				var i:int;
+				
+				if( winIcon.isWild )
+				{
+					var tmpIcon:ReelIcon;
+					var altIcon:ReelIcon;
+					containsWilds = true;
+					
+					for( i = 0; i < line.length; i++ )
+					{
+						tmpIcon = getReelIcon( line[i].Icon );
+						if( !tmpIcon.isWild )
+						{
+							altIcon = tmpIcon;
+							break;
+						}					
+					}
+					
+					if( altIcon != null )
+					{
+						var altWinAmount:int = checkScoreForIcon( line, altIcon.name );
+						if( altWinAmount > winAmount )
+						{
+							winIcon = altIcon;
+							winAmount = altWinAmount;
+						}
+					}					
+				}
+				else
+				{
+					for( i = 0; i < line.length; i++ )
+					{
+						tmpIcon = getReelIcon( line[i].Icon );
+						containsWilds = tmpIcon.isWild;
+						if( containsWilds ){ wildIcon = tmpIcon; break; }
+					}
+				}
+				
+				// If we've won any thing, save out the line number and how many icons matched
+				// by finding the index of our winning amount in the payouts of the winning icon
+				if( winAmount > 0 )
+				{										
+					lineWins.push( new LineWin(lineNumber, winIcon.payouts.indexOf( winAmount ) + 1, winIcon.name, themeIndex, containsWilds, containsWilds ? wildIcon.name : "" ) );
+				}
+				
+				return winAmount;
+			}
+			
+			protected function calculateWin( winType:String, ...results ):int
+			{
+				// Log Activity
+				logger.pushContext( "calculateWin", [winType].concat( results ) );
+				
+				if( results == null )
+				{
+					// Clear Context
+					logger.popContext();					
+					return 0;
+				}
+				
+				var calculatedBaseWin:int = 0;	
+				var calculatedScatterWin:int = 0;
+				var calculatedWin:int = 0;
+				
+				var i:int = 0, j:int = 0, x:int = 0, row:int = 0, col:int = 0;
+				var resLine:Vector.<ReelPosition>, betLine:Array;
+				
+				switch( winType.toUpperCase() )
+				{
+					case "BASE": 						
+						// Clear our winning lines
+						lineWins = new Vector.<LineWin>();
+						
+						// Determine Lines Score						
+						for( i = 0; i < results.length; i++ )
+						{
+							for( j = 0; j < arrBetLines.length; j++ )
+							{
+								resLine = new Vector.<ReelPosition>();
+								betLine = arrBetLines[j] as Array;
+								
+								for( x = 0; x < betLine.length; x++ )
+								{
+									row = betLine[x][0];
+									col = betLine[x][1];
+									resLine.push( results[i][row][col] );
+								}
+								
+								calculatedBaseWin += checkScoreForLine( i, j + 1, resLine );
+							}
+						}
+						break;
+					
+					case "SCATTER": 
+						// Determine Scatter Score
+						var scatters:Array = checkResultsForScatters.apply( null, results );
+						calculatedScatterWin += scatters.length > 0 ? getReelIcon( "ReelIcon_K1" ).payouts[scatters.length - 1] : 0;
+						break;
+					
+					default:		
+						// Determine Lines Score
+						calculatedBaseWin = calculateWin.apply( null, ArrayHelper.getMerged( ["BASE"], results ) );
+						
+						// Determine Scatter Score
+						calculatedScatterWin = calculateWin.apply( null, ArrayHelper.getMerged( ["SCATTER"], results ) );										
+						break;
+				}
+				
+				// Determine the Score
+				calculatedWin = calculatedBaseWin + calculatedScatterWin;
+				
+				// Clear Context
+				logger.popContext();				
+				
+				return calculatedWin;				
+			}
+			
+			protected function getWinPercentage( winMultiplier:int, additionalWinAmount:int = 0 ):Number
+			{				
+				// Build an array of all win multipliers from each icon's list of multipliers
+				var winAmounts:Array = [];
+				var i:int;
+				var j:int;
+				var x:int;
+				
+				// Copy all the icon payouts into one array
+				for( i = 0; i < reelIcons.length; i++ )
+				{
+					winAmounts.push.apply( null, reelIcons[i].payouts );
+				}
+				
+				// Build an array of possible win amounts, starting with our win amount and adding each bet amount * each multiplier
+				var winAmount:int = ( getBetAmount() * winMultiplier ) + additionalWinAmount;
+				var possibleWins:Array = [ winAmount ];
+				for( i = 0; i < betAmounts.length; i++ )
+				{
+					for( x = 0; x < winAmounts.length; x++ )
+					{
+						// Only add distinct win amounts
+						var possibleWin:int = betAmounts[i] * winAmounts[x];
+						if( possibleWins.indexOf( possibleWin ) < 0 )
+						{
+							possibleWins.push( possibleWin );
+						}
+					}
+				}
+				possibleWins.sort( Array.NUMERIC );
+				
+				// Return our win percentage
+				return ( possibleWins.indexOf( winAmount ) + 1 ) / possibleWins.length;
+			}
+			
+			protected function getReelIcon( iconName:String ):ReelIcon
+			{
+				for( var i:int = 0; i < reelIcons.length; i++ )
+				{
+					if( reelIcons[i].name == iconName )
+					{
+						return reelIcons[i];
+					}
+				}
+				
+				return null;
+			}
+			
+			// Handles the 'initialize' event
+			private function init( event:FlexEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+				
+				// Initialize misc config values
+				bonusGameScatterThreshold = 4;
+				
+				// Initialize the bet amounts
+				betAmounts = [1];
+				
+				// Initialize the bet lines
+				arrBetLines = 
+					[
+						[[1,0], [1,1], [1,2], [1,3], [1,4]], //1
+						[[0,0], [0,1], [0,2], [0,3], [0,4]], //2
+						[[2,0], [2,1], [2,2], [2,3], [2,4]], //3
+						[[0,0], [1,1], [2,2], [1,3], [0,4]], //4
+						[[2,0], [1,1], [0,2], [1,3], [2,4]], //5
+						[[1,0], [0,1], [0,2], [0,3], [1,4]], //6
+						[[1,0], [2,1], [2,2], [2,3], [1,4]], //7
+						[[0,0], [0,1], [1,2], [2,3], [2,4]], //8
+						[[2,0], [2,1], [1,2], [0,3], [0,4]], //9
+						[[1,0], [2,1], [1,2], [0,3], [1,4]], //10
+						[[1,0], [0,1], [1,2], [2,3], [1,4]], //11
+						[[0,0], [1,1], [1,2], [1,3], [0,4]], //12
+						[[2,0], [1,1], [1,2], [1,3], [2,4]], //13
+						[[0,0], [1,1], [0,2], [1,3], [0,4]], //14
+						[[2,0], [1,1], [2,2], [1,3], [2,4]], //15
+						[[1,0], [1,1], [0,2], [1,3], [1,4]], //16
+						[[1,0], [1,1], [2,2], [1,3], [1,4]], //17
+						[[0,0], [0,1], [2,2], [0,3], [0,4]], //18
+						[[2,0], [2,1], [0,2], [2,3], [2,4]], //19
+						[[0,0], [2,1], [2,2], [2,3], [0,4]], //20					
+						[[2,0], [0,1], [0,2], [0,3], [2,4]], //21
+						[[0,0], [0,1], [1,2], [0,3], [0,4]], //22
+						[[2,0], [2,1], [1,2], [2,3], [2,4]], //23
+						[[1,0], [0,1], [1,2], [0,3], [1,4]], //24
+						[[1,0], [2,1], [1,2], [2,3], [1,4]], //25
+					];				
+				
+				// Initialize the payout rules
+				reelIcons = new Vector.<ReelIcon>(); 
+				reelIcons.push( new ReelIcon( "ReelIcon_A1", [0, 0, 0, 750, 5000], true, false ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_A2", [0, 0, 0, 750, 5000], true, false ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_A3", [0, 0, 0, 750, 5000], true, false ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_A4", [0, 0, 0, 750, 5000], true, false ) );				
+				reelIcons.push( new ReelIcon( "ReelIcon_B", [0, 0, 0, 250, 750] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_C", [0, 0, 0, 200, 500] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_D", [0, 0, 0, 175, 350] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_E", [0, 0, 0, 125, 325] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_F", [0, 0, 0, 100, 300] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_G", [0, 0, 0, 80, 175] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_H", [0, 0, 0, 75, 150] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_I", [0, 0, 0, 65, 125] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_J", [0, 0, 0, 50, 100] ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_K1", [0, 0, 0, 0, 0], true, true ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_K2", [0, 0, 0, 0, 0], true, true ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_K3", [0, 0, 0, 0, 0], true, true ) );
+				reelIcons.push( new ReelIcon( "ReelIcon_K4", [0, 0, 0, 0, 0], true, true ) );				
+				
+				switch( Sweeps.GameName )
+				{
+					case "MummysMoney":
+						arrReels = [
+							// Theme 1
+							[
+								["J","E","I","F","H","J","E","G","D","I","F","J","G","H","F","A","I","J","C","H","F","G","I","E","J","B","G","J"],
+								["J","D","B","E","H","J","C","G","I","B","E","J","C","A","G","F","H","I","E","D","J","G","H","I","F","D","J","B","C","H","I"],
+								["C","F","K","H","J","G","C","E","I","B","D","G","K","J","H","E","F","I","J","D","C","E","I","H","F","A","D","I","G","H","J","B","K"],
+								["C","H","A","G","I","H","E","B","F","I","J","E","H","G","C","J","I","D","E","H","F","G","D","I","J","F","C","E","B","J","I"],
+								["I","B","C","H","E","G","I","D","H","E","C","G","B","J","F","E","C","A","G","D","J","F","C","I","G","B","J","E","F","H","D"]
+							],
+							// Theme 2
+							[
+								["J","E","I","F","H","J","E","G","D","I","F","J","G","H","F","A","I","J","C","H","F","G","I","E","J","B","G","J"],
+								["J","D","B","E","H","J","C","G","I","B","E","J","C","A","G","F","H","I","E","D","J","G","H","I","F","D","J","B","C","H","I"],
+								["C","F","K","H","J","G","C","E","I","B","D","G","K","J","H","E","F","I","J","D","C","E","I","H","F","A","D","I","G","H","J","B","K"],
+								["C","H","A","G","I","H","E","B","F","I","J","E","H","G","C","J","I","D","E","H","F","G","D","I","J","F","C","E","B","J","I"],
+								["I","B","C","H","E","G","I","D","H","E","C","G","B","J","F","E","C","A","G","D","J","F","C","I","G","B","J","E","F","H","D"],
+							]
+							,
+							// Theme 3
+							[
+								["J","E","I","F","H","J","E","G","D","I","F","J","G","H","F","A","I","J","C","H","F","G","I","E","J","B","G","J"],
+								["J","D","B","E","H","J","C","G","I","B","E","J","C","A","G","F","H","I","E","D","J","G","H","I","F","D","J","B","C","H","I"],
+								["C","F","K","H","J","G","C","E","I","B","D","G","K","J","H","E","F","I","J","D","C","E","I","H","F","A","D","I","G","H","J","B","K"],
+								["C","H","A","G","I","H","E","B","F","I","J","E","H","G","C","J","I","D","E","H","F","G","D","I","J","F","C","E","B","J","I"],
+								["I","B","C","H","E","G","I","D","H","E","C","G","B","J","F","E","C","A","G","D","J","F","C","I","G","B","J","E","F","H","D"],
+							]
+							,
+							// Theme 4
+							[
+								["J","E","I","F","H","J","E","G","D","I","F","J","G","H","F","A","I","J","C","H","F","G","I","E","J","B","G","J"],
+								["J","D","B","E","H","J","C","G","I","B","E","J","C","A","G","F","H","I","E","D","J","G","H","I","F","D","J","B","C","H","I"],
+								["C","F","K","H","J","G","C","E","I","B","D","G","K","J","H","E","F","I","J","D","C","E","I","H","F","A","D","I","G","H","J","B","K"],
+								["C","H","A","G","I","H","E","B","F","I","J","E","H","G","C","J","I","D","E","H","F","G","D","I","J","F","C","E","B","J","I"],
+								["I","B","C","H","E","G","I","D","H","E","C","G","B","J","F","E","C","A","G","D","J","F","C","I","G","B","J","E","F","H","D"],
+							]						
+						].map( function( arrTheme:Array, idxTheme:int, arr:Array ):Array {
+							return arrTheme.map( function( arrReel:Array, idxReel:int, arr:Array ):Array {
+								return arrReel.map( function( icon:String, idxIcon:int, arr:Array ):String {
+									return "ReelIcon_" + icon + ( ["A","K"].indexOf( icon ) >= 0 ? idxTheme + 1 : "" );
+								});
+							});						
+						});
+						
+						fullScreenWinAnimations = {
+							"ReelIcon_A1" : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_A2" : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_A3" : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_A4" : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_B"  : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_C"  : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_K1" : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_K2" : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_K3" : { "width": 800, "height": 560, "isRandom": false },
+							"ReelIcon_K4" : { "width": 800, "height": 560, "isRandom": false },
+							"RandomWin_1" : { "width": 800, "height": 200, "isRandom": true }
+						};
+						
+						loadingBackground = Images.MummysMoney_Loading_Screen;
+						break;
+				}
+				
+				// Reset any game features based on Skilltopia
+				if( Sweeps.SkilltopiaEnabled )
+				{					
+					doScatterAnticipations = false;
+					doBlink = true;
+					doPlayReelStop = false;
+					doRandomStop = true;
+				}
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Handles the 'init complete' event
+			private function creationComplete( event:FlexEvent ):void
+			{		
+				// Log Activity
+				logger.pushContext( "creationComplete", arguments );
+				
+				// Start the progress meter
+				Sweeps.getInstance().startProgressMeter( loadingBackground );
+				
+				// Load the application skin
+				cssStyleDispatcher = styleManager.loadStyleDeclarations( Sweeps.AssetsLocation + "/QuadVideoSlots/" + Sweeps.GameAsset, false );
+				cssStyleDispatcher.addEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.addEventListener( StyleEvent.COMPLETE, stylesLoaded );
+				cssStyleDispatcher.addEventListener( StyleEvent.ERROR, stylesError );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'progress' event of the style SWF
+			private function stylesProgress( event:StyleEvent ):void
+			{
+				Sweeps.getInstance().updateProgressMeter( Math.floor(100 * event.bytesLoaded/event.bytesTotal) );
+			}
+			
+			// Handles the 'complete' event of the style SWF
+			private function stylesLoaded( event:StyleEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "stylesLoaded", arguments );
+				
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );
+				assetsLoaded = true;
+				
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'error' event of the style SWF
+			private function stylesError( event:StyleEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "stylesError" ).error.apply( null, arguments );
+				
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+				
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();
+
+				// Display a popup indicating an error occurred
+				Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an error while trying to complete this request.\n\nPlease try again.", false, false );
+				
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );				
+				
+				// Return to the main menu
+				Sweeps.getInstance().quit();
+			}
+			
+			// Notifies the game our achivements have loaded
+			public function setAchievementsLoaded():void
+			{
+				// Log Activity
+				logger.pushContext( "setAchievementsLoaded", arguments );
+				
+				achievementsLoaded = true;
+				
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loades the deffered content and starts the game
+			private function continueLoadingGame():void
+			{			
+				// Log Activity
+				logger.pushContext( "continueLoadingGame", arguments );
+				
+				if( gameLoaded ) 
+				{
+					// Clear Context
+					logger.popContext();					
+					return; 
+				}
+				gameLoaded = true;
+				
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();
+				
+				// Create any deffered components
+				createDeferredContent();
+				
+				// Store the physical reel refereces
+				vReelList = new <Vector.<QuadVideoSlotReel>>
+					[ 
+						new <QuadVideoSlotReel>[reel1_0, reel1_1, reel1_2, reel1_3, reel1_4],
+						new <QuadVideoSlotReel>[reel2_0, reel2_1, reel2_2, reel2_3, reel2_4],
+						new <QuadVideoSlotReel>[reel3_0, reel3_1, reel3_2, reel3_3, reel3_4],
+						new <QuadVideoSlotReel>[reel4_0, reel4_1, reel4_2, reel4_3, reel4_4] 
+					];
+				
+				// Load game specific fonts, symbol names, etc
+				switch( Sweeps.GameName )
+				{
+					case "MummysMoney":
+						Font.registerFont( SkinManager.getSkinAsset( styleManager, "bradyBunch" ) );
+						fontFamily = "bradyBunch";
+						fontSize = 32;
+						fontColors = [0xF8A136, 0xEA560D];
+						scIntro = new QuadVideoSlotsIntro( scIntro_onStopHandler );
+						scBonus = new MummysMoneyBonusGame();
+						
+						// Set the button panel skin image
+						btnPanel.btn1.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "btn1" ) );
+						btnPanel.btn1.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "btn1" ) );
+						btnPanel.btn1.setStyle( "imageSkinDown", SkinManager.getSkinAsset( styleManager, "btn1_Down" ) );
+						btnPanel.btn1.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "btn1_Disabled" ) );
+						
+						btnPanel.btn2.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "btn2" ) );
+						btnPanel.btn2.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "btn2" ) );
+						btnPanel.btn2.setStyle( "imageSkinDown", SkinManager.getSkinAsset( styleManager, "btn2_Down" ) );
+						btnPanel.btn2.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "btn2_Disabled" ) );
+						
+						btnPanel.btn3.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "btn3" ) );
+						btnPanel.btn3.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "btn3" ) );
+						btnPanel.btn3.setStyle( "imageSkinDown", SkinManager.getSkinAsset( styleManager, "btn3_Down" ) );
+						btnPanel.btn3.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "btn3_Disabled" ) );						
+						
+						btnPanel.btn4.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "btn4" ) );
+						btnPanel.btn4.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "btn4" ) );
+						btnPanel.btn4.setStyle( "imageSkinDown", SkinManager.getSkinAsset( styleManager, "btn4_Down" ) );
+						btnPanel.btn4.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "btn4_Disabled" ) );
+						
+						btnPanel.btn6.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "btn6" ) );
+						btnPanel.btn6.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "btn6" ) );
+						btnPanel.btn6.setStyle( "imageSkinDown", SkinManager.getSkinAsset( styleManager, "btn6_Down" ) );
+						btnPanel.btn6.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "btn6_Disabled" ) );
+						
+						btnPanel.btnNudgeLeft.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "btnNudgeLeft" ) );
+						btnPanel.btnNudgeLeft.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "btnNudgeLeft" ) );
+						btnPanel.btnNudgeLeft.setStyle( "imageSkinDown", SkinManager.getSkinAsset( styleManager, "btnNudgeLeft_Down" ) );
+						btnPanel.btnNudgeLeft.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "btnNudgeLeft_Disabled" ) );
+						
+						btnPanel.btnNudgeRight.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "btnNudgeRight" ) );
+						btnPanel.btnNudgeRight.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "btnNudgeRight" ) );
+						btnPanel.btnNudgeRight.setStyle( "imageSkinDown", SkinManager.getSkinAsset( styleManager, "btnNudgeRight_Down" ) );
+						btnPanel.btnNudgeRight.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "btnNudgeRight_Disabled" ) );
+						
+						btnPanel.imgNudgeTimer.setStyle( "imageSkin", SkinManager.getSkinAsset( styleManager, "imgNudgeTimer_Disabled" ) );
+						btnPanel.imgNudgeTimer.setStyle( "imageSkinOver", SkinManager.getSkinAsset( styleManager, "imgNudgeTimer" ) );
+						btnPanel.imgNudgeTimer.setStyle( "imageSkinDisabled", SkinManager.getSkinAsset( styleManager, "imgNudgeTimer_Disabled" ) );						
+						break;
+				}
+				
+				// Set the styles of the text
+				lblInfoPage = new GradientLabel("lblInfoPage", 204, 97, "3/3", fontFamily, 32, "center", fontColors);
+				lblInfoPage.horizontalCenter = 0;
+				lblInfoPage.label.setStyle("verticalAlign", "middle");
+				grpInfoPage.addElement(lblInfoPage);
+				
+				// Set the bet amount
+				displayBetAmount();
+				
+				// Add the bonus game to the proper group
+				grpBonusGame.addElement( scBonus );
+				
+				// Play the intro
+				grpIntro.addElement( scIntro );
+				scIntro.play();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function scIntro_onStopHandler( intro:QuadVideoSlotsIntro ):void
+			{
+				// Log Activity
+				logger.pushContext( "scIntro_onStopHandler", arguments );
+				
+				scIntro.dispose();
+				grpIntro.removeElement( scIntro );	
+				this.removeElement( grpIntro );
+				
+				introComplete();
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			protected function introComplete():void
+			{
+				// Log Activity
+				logger.pushContext( "introComplete", arguments );
+				
+				// Initialize the reels
+				var i:int, j:int;
+				var reelOutput:Array = [[4,8,5,4,29],[20,2,24,0,29],[11,7,8,4,7],[11,18,13,5,26]];
+				
+				for( i = 0; i < vReelList.length; i++ )
+				{
+					for( j = 0; j < vReelList[i].length; j++ )
+					{
+						vReelList[i][j].initReel( arrReels[i][j] );
+						vReelList[i][j].setVisibleReel( reelOutput[i][j] );
+					}
+				}
+				
+				// Set the image sources
+				imgSkin.source = SkinManager.getSkinAsset( styleManager, "Skin" );
+				imgTitle.source = SkinManager.getSkinAsset( styleManager, "Title" );
+				imgInfoSkin.source = SkinManager.getSkinAsset( styleManager, "InfoSkin" );
+				imgBackToGame.source = SkinManager.getSkinAsset( styleManager, "BackToGame" );
+				imgBackToGameOverlay.source = SkinManager.getSkinAsset( styleManager, "BackToGame_over" );
+				imgPaytableTitle.source = SkinManager.getSkinAsset( styleManager, "InfoPaytableTitle" );
+				imgInfoNavigator.source = SkinManager.getSkinAsset( styleManager, "InfoNavigator" );
+				imgInfoNavigator_Previous.source = SkinManager.getSkinAsset( styleManager, "InfoPrevious" );
+				imgInfoNavigator_Next.source = SkinManager.getSkinAsset( styleManager, "InfoNext" );
+				imgInfoBetLines.source = SkinManager.getSkinAsset( styleManager, "InfoBetLines" );
+				imgInfoBonusGame.source = SkinManager.getSkinAsset( styleManager, "InfoBonusGame" );
+				imgReelBackdrop1.source = SkinManager.getSkinAsset( styleManager, "ReelBackdrop1" );
+				imgReelBackdrop2.source = SkinManager.getSkinAsset( styleManager, "ReelBackdrop2" );
+				imgReelBackdrop3.source = SkinManager.getSkinAsset( styleManager, "ReelBackdrop3" );
+				imgReelBackdrop4.source = SkinManager.getSkinAsset( styleManager, "ReelBackdrop4" );
+				imgReelBorder1.source = SkinManager.getSkinAsset( styleManager, "ReelBorder1" );
+				imgReelBorder2.source = SkinManager.getSkinAsset( styleManager, "ReelBorder2" );
+				imgReelBorder3.source = SkinManager.getSkinAsset( styleManager, "ReelBorder3" );
+				imgReelBorder4.source = SkinManager.getSkinAsset( styleManager, "ReelBorder4" );
+				
+				// Initialize the bet lines
+				betLines1.initBetLines( 25 );
+				betLines2.initBetLines( 25 );
+				betLines3.initBetLines( 25 );
+				betLines4.initBetLines( 25 );
+				
+				// Initialize the pay table images
+				var reelIcon_A1:ReelIcon = getReelIcon( "ReelIcon_A1" );
+				var reelIcon_A2:ReelIcon = getReelIcon( "ReelIcon_A2" );
+				var reelIcon_A3:ReelIcon = getReelIcon( "ReelIcon_A3" );
+				var reelIcon_A4:ReelIcon = getReelIcon( "ReelIcon_A4" );
+				var reelIcon_B:ReelIcon = getReelIcon( "ReelIcon_B" );
+				var reelIcon_C:ReelIcon = getReelIcon( "ReelIcon_C" );
+				var reelIcon_D:ReelIcon = getReelIcon( "ReelIcon_D" );
+				var reelIcon_E:ReelIcon = getReelIcon( "ReelIcon_E" );
+				var reelIcon_F:ReelIcon = getReelIcon( "ReelIcon_F" );
+				var reelIcon_G:ReelIcon = getReelIcon( "ReelIcon_G" );
+				var reelIcon_H:ReelIcon = getReelIcon( "ReelIcon_H" );
+				var reelIcon_I:ReelIcon = getReelIcon( "ReelIcon_I" );
+				var reelIcon_J:ReelIcon = getReelIcon( "ReelIcon_J" );
+				var reelIcon_K1:ReelIcon = getReelIcon( "ReelIcon_K1" );
+				var reelIcon_K2:ReelIcon = getReelIcon( "ReelIcon_K2" );
+				var reelIcon_K3:ReelIcon = getReelIcon( "ReelIcon_K3" );
+				var reelIcon_K4:ReelIcon = getReelIcon( "ReelIcon_K4" );
+				paytableIconGraphic1_1.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_A1.name ), fontFamily, fontSize, fontColors, "", reelIcon_A1.name, reelIcon_A1.payouts );
+				paytableIconGraphic1_2.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_A2.name ), fontFamily, fontSize, fontColors, "", reelIcon_A2.name, null );
+				paytableIconGraphic1_3.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_A3.name ), fontFamily, fontSize, fontColors, "", reelIcon_A3.name, null );
+				paytableIconGraphic1_4.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_A4.name ), fontFamily, fontSize, fontColors, "", reelIcon_A4.name, null );
+				paytableIconGraphic2_1.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_K1.name ), fontFamily, fontSize, fontColors, "", reelIcon_K1.name, null );
+				paytableIconGraphic2_2.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_K2.name ), fontFamily, fontSize, fontColors, "", reelIcon_K2.name, null );
+				paytableIconGraphic2_3.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_K3.name ), fontFamily, fontSize, fontColors, "", reelIcon_K3.name, null );
+				paytableIconGraphic2_4.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_K4.name ), fontFamily, fontSize, fontColors, "", reelIcon_K4.name, null );
+				paytableIconGraphic3.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_D.name ), fontFamily, fontSize, fontColors, "", reelIcon_D.name, reelIcon_D.payouts );
+				paytableIconGraphic4.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_E.name ), fontFamily, fontSize, fontColors, "", reelIcon_E.name, reelIcon_E.payouts );
+				paytableIconGraphic5.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_F.name ), fontFamily, fontSize, fontColors, "", reelIcon_F.name, reelIcon_F.payouts );
+				paytableIconGraphic6.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_G.name ), fontFamily, fontSize, fontColors, "", reelIcon_G.name, reelIcon_G.payouts );
+				paytableIconGraphic7.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_H.name ), fontFamily, fontSize, fontColors, "", reelIcon_H.name, reelIcon_H.payouts );
+				paytableIconGraphic8.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_I.name ), fontFamily, fontSize, fontColors, "", reelIcon_I.name, reelIcon_I.payouts );
+				paytableIconGraphic9.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_J.name ), fontFamily, fontSize, fontColors, "", reelIcon_J.name, reelIcon_J.payouts );
+				paytableIconGraphic10.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_B.name ), fontFamily, fontSize, fontColors, "", reelIcon_B.name, reelIcon_B.payouts );
+				paytableIconGraphic11.initGraphic( SkinManager.getSkinAsset( styleManager, reelIcon_C.name ), fontFamily, fontSize, fontColors, "", reelIcon_C.name, reelIcon_C.payouts );					
+				
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );
+				
+				// Enable the button panel
+				btnPanel.enabled = true;	
+				
+				// Play the background audio
+				backgroundSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Background_Audio"), backgroundSound, true, true, 50, int.MAX_VALUE, 250, 25 );
+				
+				// Setup our timers
+				displayWinTimer = new DataTimer( 3000, 1500, 0, null, displayWinsCycle, true );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function spin():void
+			{
+				// Log Activity
+				logger.pushContext( "spin", arguments );
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoSpinTimeout );
+				autoSpinTimeout = uint.MIN_VALUE;				
+				
+				// Immediately return if we're already spinning
+				if( isSpinning )
+				{ 
+					// Clear Context
+					logger.popContext();					
+					return; 
+				}
+				
+				// Set the nudge variable
+				nudgeTimedOut = false;
+				
+				// Reset the prize display
+				resetPrizeWin();
+				resetPrize();
+				
+				// Check to see if we have enough credits to pay for this spin/bet
+				if( getTotalBet() + getSkillSurcharge() <= Sweeps.Entries )
+				{
+					// Decrement our entries amount
+					Sweeps.getInstance().displayBalance( Sweeps.Entries - ( getTotalBet() + getSkillSurcharge() ), Sweeps.Winnings );
+					
+					// Call the spin start handler
+					spinStarted();
+					
+					// Initialize the reels to spin
+					areReelTargetPositionsSet = false;	
+					for( var i:int = 0; i < vReelList.length; i++ )
+					{
+						for( var j:int = 0; j < vReelList[i].length; j++ )
+						{
+							if( !doBlink )
+							{
+								vReelList[i][j].spin( 1, 180 + ( i * 20 ) + ( j * 10 ), 300, false );
+							}
+							else
+							{
+								vReelList[i][j].blink( 1, 600, MathHelper.randomNumber( 1, 4 ) * 100 );
+							}
+						}
+					}
+					
+					// Check if in DEBUG Mode
+					if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+					{
+						// Update our progressive jackpot
+						SweepsAPI.progressiveBalanceDemo += Math.ceil( getTotalBet() * ProgressiveJackpot.JACKPOT_BET_PERCENTAGE );
+						Sweeps.getInstance().displayProgressiveBalance( SweepsAPI.progressiveBalanceDemo, true );
+						Sweeps.getInstance().spinProgressiveReel( -1 );
+						
+						// Save our achievements earned for this spin
+						achievementsEarned = null;
+						
+						// Default our current win amount
+						serverEntries = Sweeps.Entries;
+						serverWinnings = Sweeps.Winnings;						
+						baseWin = 0;
+						scatterWin = 0;
+						bonusWin = [15, 15, 40, 40, 80, 80, 160, 160, 200, 200, 500, 500][MathHelper.randomNumber( 0, 11 )] * curLines;
+						
+						// Set our reel positions for this spin
+						var reelOutput:Array = [];
+						for( i = 0; i < vReelList.length; i++ )
+						{
+							reelOutput.push( [] );
+							for( j = 0; j < vReelList[i].length; j++ )
+							{
+								reelOutput[i].push( MathHelper.randomNumber( 0, arrReels[i][j].length - 1 ) );	
+							}
+						}
+//						reelOutput = [[13, 19, 2, 28, 0],[13, 24, 2, 28, 0],[12, 19, 2, 28, 0],[13, 19, 2, 28, 0]];
+						serverOutput = reelOutput;
+						var listCopy:Vector.<Vector.<QuadVideoSlotReel>> = new <Vector.<QuadVideoSlotReel>>
+							[ 
+								vReelList[0].slice( 0 ),
+								vReelList[1].slice( 0 ),
+								vReelList[2].slice( 0 ),
+								vReelList[3].slice( 0 ) 
+							];
+						spinsList = getArrayReelPositions( reelOutput, listCopy );
+						
+						// Initialize our timer
+						spinStopTimer = new Timer( 500, 1 );
+						spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+						spinStopTimer.start();
+						
+						// Enable the stop button
+						if( !autoPlay ) 
+						{
+							setTimeout( function():void { btnPanel.togglePlayStopEnabled( true ); }, 200 );
+						}
+					}
+					else
+					{
+						// Save the current ms
+						msAPIStart = getTimer();
+						
+						// Call the 'Play Game' API event to get our results
+						SweepsAPI.playGame( 
+							Sweeps.Username,
+							Sweeps.Password,
+							Sweeps.GameID,
+							Sweeps.GameType,
+							getBetAmount(), 
+							curLines,
+							getSkillSurcharge(),
+							handlePlayGameSuccess,
+							handlePlayGameError
+						);
+					}
+				}
+				else
+				{
+					// If we're on auto play, make sure to stop it.
+					stopAutoPlay();
+					
+					// Check to see if we have enough winnings that we could redeem to complete this spin
+					if( getTotalBet()  + getSkillSurcharge() <= ( Sweeps.Entries + Sweeps.Winnings ) )
+					{
+						// Check to see if auto-redeem enabled
+						if( Sweeps.AutoRedeemEnabled && Sweeps.Winnings >= 100 )
+						{							
+							var redeemAmount:int = ( ( ( getTotalBet() + getSkillSurcharge() ) - Sweeps.Entries ) <= 100 ) ? 100 : ( getTotalBet() + getSkillSurcharge() ) - Sweeps.Entries;
+							
+							// Send the request to the service API and handle response
+							SweepsAPI.redeemEntries( Sweeps.Username, Sweeps.Password, Sweeps.Entries, Sweeps.Winnings, redeemAmount, handleRedeemSuccess, handleRedeemError );
+						}
+						else
+						{
+							// Reset the button panel
+							spinEnded();
+							
+							Sweeps.getInstance().loadRedeemQuick();													
+						}
+					}
+					else
+					{
+						// Reset the button panel
+						spinEnded();
+						
+						Sweeps.getInstance().createPopUp( "Insufficient Entries", "You do not have enough entries to complete this spin.", false, false );
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();		
+			}
+			
+			// Handles success for the SweepsAPI.redeemEntries call
+			private function handleRedeemSuccess( entries:int, winnings:int ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemSuccess", arguments );
+				
+				// Refresh the account balances
+				Sweeps.getInstance().displayBalance( entries, winnings );
+				
+				// Re-spin
+				spin();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles error for the SweepsAPI.redeemEntries call
+			private function handleRedeemError( errorCode:int, error:String ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemError" ).error.apply( null, arguments );
+				
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean = false;
+				var pIsError:Boolean = false;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsError = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this request.\n\nPlease try again.";
+						pIsError = true;
+						break;
+				}
+				
+				// Reset the button panel
+				spinEnded();
+				
+				// Create a popup
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, pIsError, pIsLogout );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles successes for the SweepsAPI.playGame call			
+			private function handlePlayGameSuccess( response:PlayGameResponse ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameSuccess", arguments );
+				
+				if( response.ReelOutput != null )
+				{
+					// Updates the progressive balance && spins the reel
+					Sweeps.getInstance().displayProgressiveBalance( response.ProgressiveBalance, response.ProgressiveWin <= 0 );
+					Sweeps.getInstance().spinProgressiveReel( response.ProgressiveWin );
+					
+					// Stop auto play if we've won the progressive
+					if( response.ProgressiveWin > 0 )
+					{
+						stopAutoPlay();
+					}
+					
+					// Save our achievements earned for this spin
+					achievementsEarned = response.Achievements;					
+					
+					// Set our current win amount
+					baseWin = response.WinAmount;
+					bonusWin = response.BonusAmount;
+					scatterWin = response.ScatterAmount;
+					
+					// Setup our balances updated event
+					serverEntries = response.Entries;
+					serverWinnings = response.Winnings - ( bonusWin * getBetAmount() );
+					
+					// Split our reel positions into individual outputs
+					var tempOutput:Array = [];
+					tempOutput.push(response.ReelOutput.slice(0, 5));
+					tempOutput.push(response.ReelOutput.slice(5, 10));
+					tempOutput.push(response.ReelOutput.slice(10, 15));
+					tempOutput.push(response.ReelOutput.slice(15, 20));
+					
+					// Set our reel positions for this spin
+					serverOutput = tempOutput;
+					var listCopy:Vector.<Vector.<QuadVideoSlotReel>> = new <Vector.<QuadVideoSlotReel>>
+						[ 
+							vReelList[0].slice( 0 ),
+							vReelList[1].slice( 0 ),
+							vReelList[2].slice( 0 ),
+							vReelList[3].slice( 0 ) 
+						];
+					spinsList = getArrayReelPositions( tempOutput, listCopy );
+					
+					// Set the reel positions spin
+					var msAPIElapsed:Number = getTimer() - msAPIStart;	
+					spinStopTimer = new Timer( msAPIElapsed < 500 ? 500 - msAPIElapsed : 0, 1 );
+					spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+					spinStopTimer.start();
+					
+					// Enable the stop button
+					if( !autoPlay ) 
+					{
+						btnPanel.togglePlayStopEnabled( true );
+					}
+				}
+				else
+				{
+					handlePlayGameError( SweepsAPI.ERROR_CODE_UNKNOWN, "Invalid Reel Output" );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles errors for the SweepsAPI.playGame call
+			private function handlePlayGameError( errorCode:int, error:String ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameError" ).error.apply( null, arguments );
+				
+				// We've likely had an error and need to alert the player
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsLogout = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this spin.\n\nPlease try again.";
+						pIsLogout = true;
+						break;
+				}
+				
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, false, pIsLogout );
+				
+				// If we're on auto play, make sure to stop it.
+				stopAutoPlay();		
+				
+				// Set our reel positions for this spin
+				serverOutput = [[4,8,5,4,29],[20,2,24,0,29],[11,7,8,4,7],[11,18,13,5,26]];
+				var listCopy:Vector.<Vector.<QuadVideoSlotReel>> = new <Vector.<QuadVideoSlotReel>>
+					[ 
+						vReelList[0].slice( 0 ),
+						vReelList[1].slice( 0 ),
+						vReelList[2].slice( 0 ),
+						vReelList[3].slice( 0 ) 
+					];
+				spinsList = getArrayReelPositions( serverOutput, listCopy );
+				
+				// Set the reels to stop on a non-win
+				baseWin = 0;
+				bonusWin = 0;
+				scatterWin = 0;
+				spinStopTimer = new DataTimer( 500, 1 );
+				spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+				spinStopTimer.start();	
+			}
+			
+			protected function reSpin():void
+			{
+				// Log Activity
+				logger.pushContext( "reSpin", arguments );
+				
+				// Initialize the reels to spin
+				var spinReels:Vector.<Vector.<QuadVideoSlotReel>> = spinsList[0].SpinReels;
+				areReelTargetPositionsSet = doBlink;
+				
+				var nudgeDirection:String = MathHelper.randomNumber( 0, 1 ) == 0 ? "LEFT" : "RIGHT";
+				
+				// ReSpin or preNudge the target reels
+				for( var x:int = 0; x < spinReels.length; x++ )
+				{
+					if( !doBlink )
+					{
+						spinReels[x][0].spin( 1, 180 );
+					}
+					else
+					{
+						spinReels[x][0].preNudge( spinsList[0].ReelOutput[x][0], nudgeDirection );
+					}
+				}
+				
+				// Restart the timer
+				if( !doBlink )
+				{
+					spinStopTimer = new DataTimer( 500, 1 );
+					spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+					spinStopTimer.start();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/** Handles the nudge of the reels */
+			private function nudge( direction:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "nudge", arguments );
+				
+				// Make sure we're still in the appropriate state
+				if( !inAction || !isSpinning || !doBlink )
+				{
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				// Stop the nudge timer
+				stopNudgeCountdown();
+				
+				// Disable the nudge controls
+				btnPanel.toggleEnabled( false );
+				btnPanel.displayNudgeTime( -1 );
+				
+				// Nudge the first reel in the list
+				var spinReels:Vector.<Vector.<QuadVideoSlotReel>> = spinsList[0].SpinReels;
+				for( var i:int = 0; i < spinReels.length; i++ )
+				{
+					spinReels[i][0].nudge( direction );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/** Starts the nudge timer countdown */
+			private function startNudgeCountdown():void
+			{
+				// Log Activity
+				logger.pushContext( "startNudgeCountdown", arguments );
+				
+				btnPanel.displayNudgeTime( 20 );
+				nudgeTimer = new Timer( 1000, 20 );
+				nudgeTimer.addEventListener( TimerEvent.TIMER, nudgeTimer_Timer );
+				nudgeTimer.addEventListener( TimerEvent.TIMER_COMPLETE, nudgeTimer_Complete );
+				nudgeTimer.start();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/** Handles the timer event of the nudge timer */
+			private function nudgeTimer_Timer( event:TimerEvent ):void
+			{
+				btnPanel.displayNudgeTime( nudgeTimer.repeatCount - nudgeTimer.currentCount );
+			}
+			
+			/** Handles the timer complete event of the nudge timer */
+			private function nudgeTimer_Complete( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "nudgeTimer_Complete", arguments );
+				
+				// Disable the nudge buttons
+				btnPanel.toggleNudgeEnabled( false );
+				btnPanel.displayNudgeTime( -1 );
+				
+				// Cleanup the nudge timer
+				nudgeTimedOut = true;
+				stopNudgeCountdown();
+				
+				// Nudge the reel into losing positions
+				var spinReels:Vector.<Vector.<QuadVideoSlotReel>> = spinsList[0].SpinReels;
+				for( var i:int = 0; i < spinReels.length; i++ )
+				{
+					spinReels[i][0].nudge( "LOSING" );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/** Stops the nudge countdown */
+			private function stopNudgeCountdown():void
+			{
+				// Log Activity
+				logger.pushContext( "stopNudgeCountdown", arguments );
+				
+				if( nudgeTimer != null )
+				{
+					nudgeTimer.stop();
+					nudgeTimer.removeEventListener( TimerEvent.TIMER, nudgeTimer_Timer );
+					nudgeTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, nudgeTimer_Complete );
+					nudgeTimer = null;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function spinStarted():void
+			{
+				// Log Activity
+				logger.pushContext( "spinStarted", arguments );
+				
+				scatterCount = 0;				
+				isSpinning = true;
+				
+				Sweeps.getInstance().setInAction( true );
+				
+				// Play the spinning started sound	
+				spinStartSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Spin_Start" ), 0, 1 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function checkWin():void
+			{
+				// Log Activity
+				logger.pushContext( "checkWin", arguments );
+				
+				var choseCorrectly:Boolean = true;
+				var calculatedBaseWin:int = 0;	
+				var calculatedScatterWin:int = 0;			
+				
+				var results1:Vector.<Vector.<ReelPosition>> = getResults( 0, true );
+				var results2:Vector.<Vector.<ReelPosition>> = getResults( 1, true );
+				var results3:Vector.<Vector.<ReelPosition>> = getResults( 2, true );
+				var results4:Vector.<Vector.<ReelPosition>> = getResults( 3, true );
+				
+				var intendedResults1:Vector.<Vector.<ReelPosition>> = getResults( 0, true, true, serverOutput[0] );
+				var intendedResults2:Vector.<Vector.<ReelPosition>> = getResults( 1, true, true, serverOutput[1] );
+				var intendedResults3:Vector.<Vector.<ReelPosition>> = getResults( 2, true, true, serverOutput[2] );
+				var intendedResults4:Vector.<Vector.<ReelPosition>> = getResults( 3, true, true, serverOutput[3] );
+				
+				var applicableResults:Array = [results1];
+				curLines > 25 && applicableResults.push( results2 );
+				curLines > 50 && applicableResults.push( results3 );
+				curLines > 75 && applicableResults.push( results4 );
+				
+				// Determine Lines Score
+				calculatedBaseWin = calculateWin.apply( null, ArrayHelper.getMerged( ["BASE"], applicableResults ) );
+				
+				// Determine Scatter Score
+				calculatedScatterWin = calculateWin.apply( null, ArrayHelper.getMerged( ["SCATTER"], applicableResults ) );
+				
+				// Determine Bonus Game
+				wonBonusGame = checkResultsForScatters.apply( null, [results1, results2, results3, results4] ).length >= 4;
+				
+				// Reset the win amounts if in DEBUG mode
+				if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+				{
+					baseWin = calculatedBaseWin;
+					scatterWin = calculatedScatterWin;
+				}
+				
+				// If we're in skillstopia mode, check to see if the user made the right selection
+				if( Sweeps.SkilltopiaEnabled )
+				{
+					if( intendedResults1[1][0].Position != results1[1][0].Position )
+					{
+						choseCorrectly = false;
+					}
+				}
+				
+				if( Sweeps.SkilltopiaEnabled && nudgeTimedOut )
+				{
+					SweepsAPI.submitBadChoice( Sweeps.Username, Sweeps.Password, true, Sweeps.Entries, Sweeps.Winnings,
+						function( entries:int, winnings:int ):void
+						{
+							serverEntries = entries;
+							serverWinnings = winnings;
+							spinEnded();	
+						}, 
+						function ( errorCode:int, error:String ):void 
+						{
+							// Log Activity
+							logger.pushContext( "submitBadChoiceError" ).error.apply( null, arguments );
+							
+							Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an issue while trying to complete this spin.\n\nPlease try again.", false, true );
+							
+							// If we're on auto play, make sure to stop it.
+							stopAutoPlay();		
+							spinEnded();
+						});
+				}
+					// Check to see if we've won anything or if we've calculated that we should've won something
+				else if( ( baseWin + scatterWin > 0 ) || ( calculatedBaseWin + calculatedScatterWin > 0 ) || wonBonusGame )
+				{					
+					// If the user won anything, but chose incorrectly then we have an error
+					// Verify our calculations match the API results
+					if( baseWin != calculatedBaseWin || scatterWin != calculatedScatterWin )
+					{						
+						// Only send an error if we're not in skilltopia or we are and we chose correctly 
+						if( !Sweeps.SkilltopiaEnabled || ( Sweeps.SkilltopiaEnabled && ( choseCorrectly || calculatedBaseWin != 0 || calculatedScatterWin != 0 ) ) )
+						{
+							var errMsg:ErrorMessage = new ErrorMessage("QuadVideoSlots:Calculated and Supplied Winnings do not match.", "", "", "" );
+							errMsg.append( "REVEAL INFO", "Bet (Base/Lines/Total): " + getBetAmount().toString() + "/" + curLines.toString() + "/" + getTotalBet().toString() );
+							errMsg.append( "REVEAL INFO", "Reel Positions (Server/Client): " + serverOutput.toString() + "/" + [ results1[1], results2[1], results3[1], results4[1] ].toString() );
+							errMsg.append( "REVEAL INFO", "Calculated Winnings (Base/Scatter): " + calculatedBaseWin + "/" + calculatedScatterWin );
+							errMsg.append( "REVEAL INFO", "Supplied Winnings (Base/Scatter):  " + baseWin + "/" + scatterWin );						
+							
+							if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API ) 
+							{
+								throw new Error( errMsg.toString() );
+							}
+							else
+							{
+								SweepsAPI.reportError( errMsg );
+							}
+						}
+						
+						// We didn't win what we were supposed to win, because we didn't choose correctly
+						if( !choseCorrectly )
+						{
+							SweepsAPI.submitBadChoice( Sweeps.Username, Sweeps.Password, false, Sweeps.Entries, Sweeps.Winnings,
+								function ( entries:int, winnings:int ):void
+								{
+									serverEntries = entries;
+									serverWinnings = winnings;								
+									displayPrize( 0 + getSkillSurcharge(), getWinPercentage( 0, getSkillSurcharge() ), displayPrizeCallback );
+								},
+								function ( errorCode:int, error:String ):void 
+								{
+									// Log Activity
+									logger.pushContext( "submitBadChoiceError" ).error.apply( null, arguments );
+									
+									Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an issue while trying to complete this spin.\n\nPlease try again.", false, true );
+									
+									// If we're on auto play, make sure to stop it.
+									stopAutoPlay();		
+									spinEnded();
+								});
+							
+							// Clear Context
+							logger.popContext();							
+							return;
+						}						
+					}
+					
+					// Display any vertical wilds
+					if( doVerticalWilds )
+					{
+						displayVerticalWilds( displayWins, results1, results2, results3, results4 );
+					}
+					else
+					{						
+						displayWins();
+					}
+				}
+				else if( Sweeps.SkilltopiaEnabled )
+				{
+					displayPrize( 0 + getSkillSurcharge(), getWinPercentage( 0, getSkillSurcharge() ), displayPrizeCallback );
+				}
+				else
+				{			
+					// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts
+					Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );
+					
+					if( doVerticalWilds )
+					{
+						displayVerticalWilds( spinEnded, results1, results2, results3, results4 );
+					}
+					else
+					{
+						spinEnded();
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function displayVerticalWilds( callback:Function, ...results ):void
+			{
+				// Log Activity
+				logger.pushContext( "displayVerticalWilds", [callback].concat( results ) );
+				
+				callback();
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function displayWins():void
+			{
+				// Log Activity
+				logger.pushContext( "displayWins", arguments );
+				
+				var i:int;
+				var x:int;
+				var row:int;
+				var col:int;
+				var themeIndex:int;
+				var winningLines:Array = [[],[],[],[]];
+				var highWin:LineWin;
+				var reelGroup:Group;				
+				var iconGraphic:WinningIconGraphic;
+				var tmpReelPos:ReelPosition;
+				
+				var arrResults:Array = [];
+				arrResults.push( getResults( 0, true ) );
+				arrResults.push( getResults( 1, true ) );
+				arrResults.push( getResults( 2, true ) );
+				arrResults.push( getResults( 3, true ) );
+				var scatters:Array = checkResultsForScatters.apply( null, arrResults );
+				
+				// Show the scatter icons if necessary
+				if( scatterWin > 0 || wonBonusGame )
+				{
+					for( i = 0; i < scatters.length; i++ )
+					{
+						// Create the animation for this icon, and position it on the screen
+						themeIndex = scatters[i][0];
+						row = scatters[i][1];
+						col = scatters[i][2];
+						
+						reelGroup = Group( grpLayerReels.getElementAt( themeIndex ) );
+						tmpReelPos = arrResults[themeIndex][row][col];
+						iconGraphic = new WinningIconGraphic( symbolScatter + ( themeIndex + 1 ) );
+						iconGraphic.x = reelGroup.x + reelGroup.getElementAt( col ).x;
+						iconGraphic.y = reelGroup.y + reelGroup.getElementAt( col ).y + ( scatters[i][1] * 63 );
+						
+						// Add a reference to our WinningIconGraphic
+						tmpReelPos.WinAnimation = iconGraphic;
+						
+						// Add the element to the screen
+						grpReelIconAnimations.addElement( iconGraphic );
+					}
+				}					
+				
+				// Loop through the winning lines
+				for( i = 0; i < lineWins.length; i++ )
+				{
+					// Get the actual line number, icon, number of matching icons and themeIndex
+					var lineNumber:int = lineWins[i].LineNumber;
+					var winCount:int = lineWins[i].WinCount;
+					var winIcon:String = lineWins[i].Icon;
+					themeIndex = lineWins[i].ThemeIndex;
+					
+					// Save the highest winning lineWin so we can animate its icon on the big screen
+					if( highWin == null || winCount > highWin.WinCount || ( winCount == highWin.WinCount && getReelIcon( winIcon ).payouts[winCount - 1] > getReelIcon( highWin.Icon ).payouts[highWin.WinCount - 1] ) )
+					{
+						highWin = lineWins[i];
+					}
+					
+					// Get the row/col positions of the 5 icons that makeup this line
+					var betLine:Array = ( arrBetLines[lineNumber - 1] as Array );	
+					
+					// Of the 5 icons for this line, loop through the ones that are matching
+					for( x = 0; x < winCount; x++ )
+					{						
+						// Get the row/col position for this icon and the icon itself (wild or other)
+						row = betLine[x][0];
+						col = betLine[x][1];
+						tmpReelPos = arrResults[themeIndex][row][col];
+						
+						// If we don't already have a reference for this icon in our array
+						if( tmpReelPos.WinAnimation == null )
+						{
+							// Create the animation for this icon, and position it on the screen
+							reelGroup = Group( grpLayerReels.getElementAt( themeIndex ) );
+							iconGraphic = new WinningIconGraphic( tmpReelPos.Icon );
+							iconGraphic.x = reelGroup.x + reelGroup.getElementAt( x ).x;
+							iconGraphic.y = reelGroup.y + reelGroup.getElementAt( x ).y + ( row * 63 );
+							
+							// Add a reference to our WinningIconGraphic
+							tmpReelPos.WinAnimation = iconGraphic;
+							
+							// Add the element to the screen
+							grpReelIconAnimations.addElement( iconGraphic );
+						}						
+					}					
+					
+					winningLines[themeIndex].push( lineNumber );
+				}
+				
+				// Loop through all the icons and start them playing
+				for( i = 0; i < grpReelIconAnimations.numElements; i++ )
+				{
+					( grpReelIconAnimations.getElementAt( i ) as WinningIconGraphic ).restartAnimations();
+				}	
+				
+				// Set up an timeout to start the bonus game - or - cycle each win line individually 
+				if( winningLines.length > 1 && !wonBonusGame )
+				{
+					displayWinTimer.data = { results: arrResults, currentIndex: 0 };
+					displayWinTimer.reset();
+					displayWinTimer.start();
+				}
+				
+				// Display all the winning lines
+				betLines1.showLines( winningLines[0] );
+				betLines2.showLines( winningLines[1] );
+				betLines3.showLines( winningLines[2] );
+				betLines4.showLines( winningLines[3] );
+				
+				// Animation the highest winning icon
+				if( highWin != null || scatterWin > 0 )
+				{
+					var highWinAnimation:String = "";
+					
+					// Swap out our high win with our scatter win if it's worth more
+					if( highWin == null || scatterWin > getReelIcon( highWin.Icon ).payouts[highWin.WinCount - 1] )
+					{
+						// Pick a random scatter
+						themeIndex = scatters[MathHelper.randomNumber( 0, scatters.length - 1 )][0];
+						var scatterIcon:String = "ReelIcon_K" + ( themeIndex + 1 );
+						
+						// Make sure we have this scatter animation
+						if( typeof fullScreenWinAnimations[scatterIcon] != "undefined" )
+						{
+							highWinAnimation = scatterIcon;
+						}
+					}
+					else if( highWin.WinCount >= 4 )
+					{
+						// Make sure we have this icon animation
+						if( typeof fullScreenWinAnimations[highWin.Icon] != "undefined" )
+						{
+							highWinAnimation = highWin.Icon;
+						}
+							// Otherwise, see if the win contained a wild and use that animation
+						else if( highWin.ContainsWilds && typeof fullScreenWinAnimations[highWin.WildIcon] != "undefined" )
+						{
+							highWinAnimation = highWin.WildIcon;
+						}
+							// Fall back to a random animation
+						else
+						{
+							var randoms:Array = [];
+							for(var name:String in fullScreenWinAnimations)
+							{
+								if( fullScreenWinAnimations.hasOwnProperty( name ) && fullScreenWinAnimations[name].isRandom )
+								{
+									randoms.push( name );
+								}
+							}
+							highWinAnimation = randoms[MathHelper.randomNumber( 0, randoms.length - 1)];
+						}
+					}
+					
+					// If we have an animation, play it
+					if( highWinAnimation != "" )
+					{
+						var ani:WinningIconAnimation = new WinningIconAnimation( highWinAnimation + "_Animation", function( ref:WinningIconAnimation ):void {
+							ani.dispose();
+							grpIconAnimation.removeAllElements();
+						} );
+						
+						grpIconAnimation.addElement( ani );
+						ani.width = fullScreenWinAnimations[highWinAnimation].width;
+						ani.height = fullScreenWinAnimations[highWinAnimation].height;
+						ani.x = MathHelper.randomNumber( 0, 800 - ani.width );
+						ani.y = ani.height == 560 ? 0 : MathHelper.randomNumber( 0, 480 - ani.height );
+						ani.play();
+					}
+				}
+				
+				// Display the prize
+				displayPrize( ( getBetAmount() * ( baseWin + scatterWin ) ) + getSkillSurcharge(), getWinPercentage( baseWin + scatterWin, getSkillSurcharge() ), displayPrizeCallback );
+				
+				// Immediately re-enable the button panel during normal gameplay
+				if( !wonBonusGame && !autoPlay )
+				{
+					spinEnded( false );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function displayWinsCycle( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "displayWinsCycle", arguments );
+				
+				// Make sure we have a valid timer reference
+				if( displayWinTimer == null )
+				{
+					displayWinTimer = event.target as DataTimer;
+				}
+				
+				// If we don't have any data, stop our timer
+				if( displayWinTimer != null && displayWinTimer.data == null )
+				{
+					displayWinTimer.reset();
+					
+					resetPrize();
+					resetPrizeWin();
+				}
+				
+				// Setup some variables for use later
+				var lineNumber:int;
+				var winCount:int;
+				var themeIndex:int;
+				var betLine:Array;
+				var row:int;
+				var col:int;
+				var i:int;
+				var x:int;			
+				var results:Array = displayWinTimer.data.results;
+				var currentIndex:int = displayWinTimer.data.currentIndex;
+				var tmpIconGraphic:WinningIconGraphic;
+				
+				// Hide all winning animations
+				for( i = 0; i < grpReelIconAnimations.numElements; i++ )
+				{
+					tmpIconGraphic = grpReelIconAnimations.getElementAt( i ) as WinningIconGraphic;
+					if( tmpIconGraphic != null )
+					{
+						tmpIconGraphic.visible = false;
+					}
+				}
+				
+				// Hide all the betLines
+				betLines1.hideAllLines();
+				betLines2.hideAllLines();
+				betLines3.hideAllLines();
+				betLines4.hideAllLines();
+				
+				// Show the winning animations for this line
+				for( i = 0; i < results.length; i++ )
+				{
+					lineNumber = lineWins[currentIndex].LineNumber;
+					winCount = lineWins[currentIndex].WinCount;	
+					themeIndex = lineWins[currentIndex].ThemeIndex;
+					betLine = arrBetLines[lineNumber - 1] as Array;					
+					( [betLines1, betLines2, betLines3, betLines4][themeIndex] as QuadVideoSlotsBetLines ).showLines( [lineNumber] );
+					
+					for( x = 0; x < winCount; x++ )
+					{
+						row = betLine[x][0];
+						col = betLine[x][1];
+						tmpIconGraphic = results[themeIndex][row][col].WinAnimation;
+						if( tmpIconGraphic != null )
+						{
+							tmpIconGraphic.visible = true;
+						}
+					}
+					
+					
+					// Clear our timeout and the call it again with the next index			
+					displayWinTimer.data.currentIndex = currentIndex == lineWins.length - 1 ? 0 : currentIndex + 1;					
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}				
+			
+			protected function displayPrize( winAmount:int, winPercentage:Number, callback:Function ):void
+			{
+				// Log Activity
+				logger.pushContext( "displayPrize", arguments );
+				
+				// Check to make sure we've actually won something and if not, exit the function
+				if( winAmount == 0 )
+				{
+					callback();
+					
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				// Set the duration
+				var duration:Number = 6 * 1000 * winPercentage;
+				
+				// Play the winning sounds
+				winningsChnl = SoundManager.playSound( assets.Sounds["Add_Winnings"], 0, 0 );
+				winningsBdChnl = SoundManager.playSound( assets.Sounds["Add_Winnings_Backdrop"], 0, 0 );
+				
+				// Animate the winning amount display
+				ddWinAmount.animateDisplayAmount( winAmount, duration, function( dd:DigitDisplay ):void 
+				{
+					// Stop the sounds
+					if( winningsChnl != null && winningsBdChnl != null )
+					{
+						winningsChnl.stop(); 
+						winningsChnl = null;
+						winningsBdChnl.stop();
+						winningsBdChnl = null;
+					}
+					
+					if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API ) 
+					{ 
+						serverEntries = Sweeps.Entries;
+						serverWinnings = Sweeps.Winnings + winAmount;
+					}
+					
+					// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts which we set in the spin() method
+					Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );
+					
+					// Call the callback, letting the callee know we're done
+					callback();
+				} );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function displayPrizeCallback():void
+			{
+				// Log Activity
+				logger.pushContext( "displayPrizeCallback", arguments );
+				
+				if( wonBonusGame )
+				{
+					// Check to be sure we should actually load the bonus game
+					if( bonusWin <= 0 )
+					{
+						var errMsg:ErrorMessage = new ErrorMessage( "QuadVideoSlots:Attemping to load bonus game with no bonus winnings.", "", "", "" );
+						
+						if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API ) 
+						{
+							throw new Error( errMsg.toString() );
+						}
+						else
+						{
+							SweepsAPI.reportError( errMsg );
+						}
+						
+						wonBonusGame = false;
+						spinEnded();
+
+						// Clear Context
+						logger.popContext();						
+						return;
+					}			
+					
+					// Stop the background audio
+					backgroundSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Background_Audio"), backgroundSound, false, true, 0, 1, 250, 25 );			
+					
+					// Load the bonus game
+					displayBonusGameTimeout = setTimeout( loadBonusGame, 1000 );	
+				}
+				else
+				{
+					spinEnded();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			protected function loadBonusGame():void
+			{
+				// Log Activity
+				logger.pushContext( "loadBonusGame", arguments );
+				
+				// Hide the progressive jackpot
+				Sweeps.getInstance().toggleProgressive( false );
+				
+				// Clear the timeout
+				clearTimeout( displayBonusGameTimeout );
+				displayBonusGameTimeout = uint.MIN_VALUE;
+				
+				// Disable the button panel
+				btnPanel.toggleEnabled( false, true );
+				
+				// Reset the bonus game indicator
+				wonBonusGame = false;						
+				
+				// Make the bonus game visible and restart it
+				scBonus.onStop = scBonus_onStopHandler;
+				grpBonusGame.visible = true;
+				scBonus.resetAndPlay();
+				scBonus.setParameters( getTotalBet(), bonusWin / curLines, bonusWin * getBetAmount() );	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the bonus game 'Stop' event
+			protected function scBonus_onStopHandler( bonusGame:PathFinderBonusGame ):void
+			{
+				// Log Activity
+				logger.pushContext( "scBonus_onStopHandler", arguments );
+				
+				// Update our balances
+				Sweeps.getInstance().displayBalance( Sweeps.Entries, Sweeps.Winnings + ( bonusWin * getBetAmount() ) );
+				
+				// Cancel Auto Play and call Spin Ended
+				stopAutoPlay();
+				spinEnded(); 
+				
+				// Hide the bonus game
+				grpBonusGame.visible = false;	
+				
+				// Show the progressive jackpot
+				Sweeps.getInstance().toggleProgressive( true );
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			protected function spinEnded( prizeDisplayEnded:Boolean = true ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinEnded", arguments );
+				
+				isSpinning = false; // Flip our isSpinning flag
+				
+				// Re-enable our button panel
+				if( !autoPlay ) 
+				{ 
+					inAction = false; // Flip the inAction flag
+					
+					// Enable our button panel
+					btnPanel.togglePlayStopEnabled( false );
+					btnPanel.toggleEnabled( true );
+					
+					// Play the background audio
+					backgroundSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Background_Audio"), backgroundSound, true, true, 50, int.MAX_VALUE, 250, 25 );
+					
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( !prizeDisplayEnded );
+				}
+				
+				// Check Auto Play
+				autoSpinTimeout = setTimeout( checkAutoSpin, 500 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function checkAutoSpin():void
+			{
+				// Log Activity
+				logger.pushContext( "checkAutoSpin", arguments );
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoSpinTimeout );
+				autoSpinTimeout = uint.MIN_VALUE;
+				
+				if( autoPlay && !isSpinning )
+				{
+					spin();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// ***************************************************************/
+			//  Accessory Functions -
+			//  These modify state or UI, but do not control game flow
+			// ***************************************************************/
+			
+			protected function displayBetAmount():void
+			{
+				// Log Activity
+				logger.pushContext( "displayBetAmount", arguments );
+				
+				ddBetAmount.displayAmount = getTotalBet() + getSkillSurcharge();
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			protected function resetPrize():void
+			{
+				// Log Activity
+				logger.pushContext( "resetPrize", arguments );
+				
+				if( ddWinAmount != null )
+				{
+					ddWinAmount.displayAmount = 0;
+				}
+				
+				if( betLines1 != null )
+				{
+					betLines1.hideAllLines();
+				}
+				
+				if( betLines2 != null )
+				{
+					betLines2.hideAllLines();
+				}
+				
+				if( betLines3 != null )
+				{
+					betLines3.hideAllLines();
+				}
+				
+				if( betLines4 != null )
+				{
+					betLines4.hideAllLines();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function resetPrizeWin():void
+			{
+				// Log Activity
+				logger.pushContext( "resetPrizeWin " ).debug.apply( null, arguments );
+				
+				var iconGraphic:WinningIconGraphic;
+				var i:int;
+				
+				// Remove winning animations - (Icon Layer 1)
+				if( grpReelIconAnimations != null )
+				{
+					for( i = 0; i < grpReelIconAnimations.numElements; i++ )
+					{
+						iconGraphic = grpReelIconAnimations.getElementAt( i ) as WinningIconGraphic;
+						if( iconGraphic != null )
+						{
+							iconGraphic.dispose();
+						}
+					}
+					
+					grpReelIconAnimations.removeAllElements();
+				}
+				
+				// Remove HQ animations
+				if( grpIconAnimation != null )
+				{
+					if( grpIconAnimation.numElements == 1 )
+					{
+						var winHQ:WinningIconAnimation = grpIconAnimation.getElementAt( 0 ) as WinningIconAnimation;
+						if( winHQ != null )
+						{
+							winHQ.stop();
+						}
+					}
+				}				
+				
+				// Clear the display timer if it's been created
+				if( displayWinTimer != null )
+				{
+					displayWinTimer.data = null;
+					displayWinTimer.reset();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function stopAutoPlay():void
+			{
+				// Log Activity
+				logger.pushContext( "stopAutoPlay", arguments );
+				
+				autoPlay = false;
+				btnPanel.stopAutoPlay();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// ***************************************************************/
+			// Component Event Listeners
+			// ***************************************************************/
+			protected function spinStopTimer_Listener( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinStopTimer_Listener", arguments );
+				
+				// Cleanup
+				spinStopTimer.removeEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+				spinStopTimer = null;
+				
+				// Make sure this code can't execute if we're not in a spin or if we've cleared the timer's data
+				if( !inAction || !isSpinning )
+				{
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				// Retrieve the reel results
+				var i:int;
+				var j:int;
+				var reelOutput:Array = spinsList[0].ReelOutput;
+				var spinReels:Vector.<Vector.<QuadVideoSlotReel>> = spinsList[0].SpinReels;
+				
+				// Set the target positions of the reels
+				if( !areReelTargetPositionsSet )
+				{
+					// Set the reel target positions
+					for( i = 0; i < spinReels.length; i++ )
+					{
+						for( j = 0; j < spinReels[i].length; j++ )
+						{
+							spinReels[i][j].setTargetPosition( reelOutput[i][j] );
+						}
+					}
+					
+					areReelTargetPositionsSet = true;
+				}
+				
+				// Determine if we should stop all the reels randomly, or stagger them
+				if( !doRandomStop )
+				{
+					// Stop the first reels
+					for( i = 0; i < spinReels.length; i++ )
+					{
+						spinReels[i][0].stop( 0 );
+					}					
+				}
+				else
+				{
+					// Stop all the reels, passing in a random amount of additional spins
+					for( i = 0; i < spinReels.length; i++ )
+					{
+						for( j = 0; j < spinReels[i].length; j++ )
+						{
+							spinReels[i][j].stop( isQuickStop ? 0 : MathHelper.randomNumber( 0, 2 ) );
+						}						
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles initializing the scatter anticipation graphic
+			private function doScatterAnticipation( reel:QuadVideoSlotReel ):void
+			{
+				// Log Activity
+				logger.pushContext( "doScatterAnticipation", arguments );
+				
+				// Create and position the scatter graphic
+				var scatterAntGraphic:SpriteUIComponent = AnimationManager.getAnimatedImage( styleManager, Sweeps.GameID, "Sprite_E", 40, 0, 0, true );
+				scatterAntGraphic.visible = true;
+				grpLayerAnticipations.addElement( scatterAntGraphic );			
+				scatterAntGraphic.x = Group( reel.parent as IVisualElement ).x + reel.x - 9;
+				scatterAntGraphic.y = Group( reel.parent as IVisualElement ).y + reel.y - 4;
+				
+				// Play the sound
+				if( scatterAntSound )
+				{
+					scatterAntSound.stop();
+				}
+				scatterAntSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Scatter_Anticipation" ), 0, 1 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function reel_playAudioHandler( reel:QuadVideoSlotReel ):void
+			{
+				// Log Activity
+				logger.pushContext( "reel_playAudioHandler", arguments );
+				
+				var res:Vector.<ReelPosition> = reel.getVisibleReel();	
+				var reelOutput:Array = spinsList[0].ReelOutput;
+				var spinReels:Vector.<Vector.<QuadVideoSlotReel>> = spinsList[0].SpinReels;
+				var groupIndex:int;
+				var reelIndex:int;
+				
+				spinReels.map( function( grp:Vector.<QuadVideoSlotReel>, index:int, v:*):void {
+					if( grp.indexOf( reel ) >= 0 )
+					{
+						groupIndex = index;
+						reelIndex = grp.indexOf( reel );
+					}
+				});
+				
+				if( doPlayReelStop && groupIndex == 3 )
+				{					
+					SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Spin_Stop" ), 150, 1 );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function reel_spinStoppedHandler( reel:QuadVideoSlotReel, fullStop:Boolean = true ):void
+			{
+				// Log Activity
+				logger.pushContext( "reel_spinStoppedHandler", arguments );
+				
+				// Get a reference to the reel and its results
+				var res:Vector.<ReelPosition> = reel.getVisibleReel();	
+				var reelOutput:Array = spinsList[0].ReelOutput;
+				var spinReels:Vector.<Vector.<QuadVideoSlotReel>> = spinsList[0].SpinReels;
+				var groupIndex:int;
+				var reelIndex:int;
+				
+				spinReels.map( function( grp:Vector.<QuadVideoSlotReel>, index:int, v:*):void {
+					if( grp.indexOf( reel ) >= 0 )
+					{
+						groupIndex = index;
+						reelIndex = grp.indexOf( reel );
+					}
+				});
+				
+				// If this isn't a full stop, tell the next reel to start it's stopping sequence
+				if( !fullStop )
+				{	
+					// Tell the next reel in the list to stop
+					if( reelIndex + 1 < spinReels[groupIndex].length )
+					{
+						spinReels[groupIndex][reelIndex + 1].stop( 0 );	
+					}	
+					
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				// Remove this reel from the list of spinning reels
+				spinReels[groupIndex].splice( reelIndex, 1 );
+				
+				// If we're done spinning, determine if we should respin or not
+				if( spinReels.filter( function( grp:Vector.<QuadVideoSlotReel>, index:int, v:*):Boolean { return grp.length > 0; }).length == 0 ){
+					
+					// Disable the Spin Stop Button
+					btnPanel.togglePlayStopEnabled( false );
+					
+					// Reset our quick stop
+					isQuickStop = false;	
+					
+					// Remove the first set of reel positions
+					spinsList.shift();
+					
+					// Check to see if we have more reel positions (we need to respin)
+					if( spinsList.length > 0 )
+					{
+						reSpin();
+					}
+					else
+					{
+						// Check the wins and destroy the anticipation graphic						
+						if( grpLayerAnticipations.numElements > 0 )
+						{
+							// Stop the anticipation sound ( if it exists );
+							if( scatterAntSound )
+							{
+								scatterAntSound.stop();
+							}
+							
+							// Remove the anticipation graphic
+							while( grpLayerAnticipations.numElements > 0 )
+							{
+								var scatterAntGraphic:SpriteUIComponent = SpriteUIComponent( grpLayerAnticipations.getElementAt( 0 ) );
+								scatterAntGraphic.visible = false;
+								scatterAntGraphic.dispose();
+								grpLayerAnticipations.removeElement( scatterAntGraphic );
+								scatterAntGraphic = null;
+							}
+						}
+						
+						// Check to see if we won
+						if( achievementsEarned == null )
+						{
+							checkWin();
+						}
+						else
+						{
+							Sweeps.getInstance().addNewBadges( achievementsEarned, checkWin );
+						}						
+					}
+				}
+				else
+				{
+					// Stop the reel spin audio
+					if( spinReels[groupIndex].length == 1 )
+					{
+						spinStartSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Spin_Start"), spinStartSound, false, true, 0, 1, 10 );
+					}				
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}		
+			
+			/** 
+			 * Handles the "nudgeReady" event of each reel
+			 */
+			protected function reel_nudgeReadyHandler( reel:QuadVideoSlotReel ):void
+			{
+				// Log Activity
+				logger.pushContext( "reel_nudgeReadyHandler", arguments );
+				
+				var spinReels:Vector.<Vector.<QuadVideoSlotReel>> = spinsList[0].SpinReels;
+				var groupIndex:int;
+				var reelIndex:int;				
+				
+				spinReels.map( function( grp:Vector.<QuadVideoSlotReel>, index:int, v:*):void {
+					if( grp.indexOf( reel ) >= 0 )
+					{
+						groupIndex = index;
+						reelIndex = grp.indexOf( reel );
+					}
+				});				
+				
+				// Wait for the last reel
+				if( groupIndex == 3 && reelIndex == spinReels[groupIndex].length - 1 )
+				{
+					// Toggle the buttonPanel
+					btnPanel.toggleNudgeEnabled( true );
+					
+					// Setup the anticipation graphic and start the countdown
+					for( var i:int = 0; i < spinReels.length; i++ )
+					{
+						doScatterAnticipation( spinReels[i][0] );
+					}				
+					startNudgeCountdown();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/**
+			 * Handles the click event of the "Auto Play" button
+			 */
+			protected function btnPanel_onAutoPlayHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onAutoPlayHandler", arguments );
+				
+				grpInfo.visible = false;
+				autoPlay = true;
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoSpinTimeout );
+				autoSpinTimeout = uint.MIN_VALUE;
+				
+				// Execute a spin if we're not already spinning
+				if( !inAction )
+				{
+					// Force the winnings and audio to stop if you spin again before they're done
+					if( ddWinAmount.isAnimating )
+					{
+						ddWinAmount.endAnimation();
+					}
+										
+					inAction = true; // Flip the inAction flag
+					btnPanel.toggleEnabled( false ); // Disable the buttons
+					spin(); // Execute the spin
+				}
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			/**
+			 * Handles the click event of the "Stop" button
+			 */ 
+			protected function btnPanel_onStopHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onStopHandler", arguments );
+				
+				grpInfo.visible = false;
+				autoPlay = false;
+				
+				// If the game is not in action, or if the auto spin timeout is active ( which would leave inAction set to true)
+				if( !inAction || autoSpinTimeout > uint.MIN_VALUE )
+				{ 
+					inAction = false;
+					btnPanel.toggleEnabled( true );
+					
+					// Clear any autoplay timeouts
+					clearTimeout( autoSpinTimeout );
+					autoSpinTimeout = uint.MIN_VALUE;
+					
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( false );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			/**
+			 * Handles the click event of the "Info" button
+			 */
+			protected function btnPanel_onInfoHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onInfoHandler", arguments );
+				
+				lblInfoPage.text = "1/3";
+				imgInfoNavigator_Previous.visible = false;
+				imgInfoNavigator_Next.visible = true;
+				
+				grpInfo1.visible = true;
+				grpInfo2.visible = grpInfo3.visible = false;
+				grpInfo.visible = !grpInfo.visible;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/**
+			 * Handles the click event of the "Bet" button
+			 */
+			protected function btnPanel_onBetAddHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onBetAddHandler", arguments );
+				
+				grpInfo.visible = false;
+				
+				betAmountStep = MathHelper.mod( betAmountStep + 1, betAmounts.length - 1 );
+				
+				btnPanel.betAmount = getBetAmount() + getSkillSurcharge();
+				btnPanel.displayBetAmount();
+				displayBetAmount();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/** 
+			 * Handles the click event of the "Nudge" button(s) 
+			 */
+			protected function btnPanel_onNudgeHandler( buttonPanel:ButtonPanel, direction:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onNudgeHandler", arguments );
+				
+				grpInfo.visible = false;
+				if( inAction && isSpinning )
+				{
+					btnPanel.toggleNudgeEnabled( false );
+					nudge( direction );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/**
+			 * Handles the click event of the "Lines" button
+			 */
+			protected function btnPanel_onLineAddHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onLineAddHandler", arguments );
+				
+				// Hide the info panel
+				grpInfo.visible = false;
+				
+				// Reset the prize display
+				resetPrizeWin();
+				resetPrize();
+				
+				curLines = curLines + 25 > maxLines ? 25 : curLines + 25;				
+				reel2_0.toggleGrayscale( curLines > 25 ? false : true, [ symbolScatter + "2" ] );
+				reel2_1.toggleGrayscale( curLines > 25 ? false : true, [ symbolScatter + "2" ] );
+				reel2_2.toggleGrayscale( curLines > 25 ? false : true, [ symbolScatter + "2" ] );
+				reel2_3.toggleGrayscale( curLines > 25 ? false : true, [ symbolScatter + "2" ] );
+				reel2_4.toggleGrayscale( curLines > 25 ? false : true, [ symbolScatter + "2" ] );
+				
+				reel3_0.toggleGrayscale( curLines > 50 ? false : true, [ symbolScatter + "3" ] );
+				reel3_1.toggleGrayscale( curLines > 50 ? false : true, [ symbolScatter + "3" ] );
+				reel3_2.toggleGrayscale( curLines > 50 ? false : true, [ symbolScatter + "3" ] );
+				reel3_3.toggleGrayscale( curLines > 50 ? false : true, [ symbolScatter + "3" ] );
+				reel3_4.toggleGrayscale( curLines > 50 ? false : true, [ symbolScatter + "3" ] );
+				
+				reel4_0.toggleGrayscale( curLines > 75 ? false : true, [ symbolScatter + "4" ] );				
+				reel4_1.toggleGrayscale( curLines > 75 ? false : true, [ symbolScatter + "4" ] );
+				reel4_2.toggleGrayscale( curLines > 75 ? false : true, [ symbolScatter + "4" ] );
+				reel4_3.toggleGrayscale( curLines > 75 ? false : true, [ symbolScatter + "4" ] );
+				reel4_4.toggleGrayscale( curLines > 75 ? false : true, [ symbolScatter + "4" ] );				
+				
+				btnPanel.displayBetLines( curLines );
+				displayBetAmount();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			/**
+			 * Handles the click event of the "Spin" button
+			 */
+			protected function btnPanel_onSpinHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onSpinHandler", arguments );
+				
+				grpInfo.visible = false;
+				
+				if( !inAction )
+				{
+					// Force the winnings and audio to stop if you spin again before they're done
+					if( ddWinAmount.isAnimating )
+					{
+						ddWinAmount.endAnimation();
+					}
+										
+					inAction = true; // Flip the inAction flag
+					btnPanel.toggleEnabled( false, !autoPlay ); // Disable the buttons					
+					spin(); // Execute the spin
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}					
+			
+			/**
+			 * Handles the "On Spin Stop" event of btnPanel
+			 */
+			protected function btnPanel_onSpinStopHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onSpinStopHandler", arguments );
+				
+				btnPanel.togglePlayStopEnabled( false );				
+//				isQuickStop = true;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the click event of the "Back To Game" button
+			protected function imgBackToGame_clickHandler( event:MouseEvent ):void
+			{				
+				// Log Activity
+				logger.pushContext( "imgBackToGame_clickHandler", arguments );
+				
+				lblInfoPage.text = "1/3";
+				imgInfoNavigator_Previous.visible = false;
+				imgInfoNavigator_Next.visible = true;
+				
+				grpInfo1.visible = true;
+				grpInfo2.visible = grpInfo3.visible = false;
+				grpInfo.visible = !grpInfo.visible;
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Handles the mouse over of the "Back To Game" button
+			protected function imgBackToGame_mouseOverHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "imgBackToGame_mouseOverHandler", arguments );
+				
+				if( !imgBackToGameOverlay.visible ) { imgBackToGameOverlay.visible = true; }	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the mouse out of the "Back To Game" button
+			protected function imgBackToGame_mouseOutHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "imgBackToGame_mouseOutHandler", arguments );
+				
+				if( imgBackToGameOverlay.visible ) { imgBackToGameOverlay.visible = false; }
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the click event of the "Info Navigator (Next)" button
+			protected function imgInfoNavigator_Next_clickHandler( event:MouseEvent ):void
+			{				
+				// Log Activity
+				logger.pushContext( "imgInfoNavigator_Next_clickHandler", arguments );
+				
+				if( grpInfo1.visible ) 
+				{ 
+					lblInfoPage.text = "2/3";
+					grpInfo1.visible = false; 
+					grpInfo2.visible = true;
+					imgInfoNavigator_Previous.visible = true;
+				}
+				else if( grpInfo2.visible ) 
+				{ 
+					lblInfoPage.text = "3/3";
+					grpInfo2.visible = false; 
+					grpInfo3.visible = true;
+					imgInfoNavigator_Next.visible = false; 
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}		
+			
+			// Handles the click event of the "Info Navigator (Previous)" button
+			protected function imgInfoNavigator_Previous_clickHandler( event:MouseEvent ):void
+			{			
+				// Log Activity
+				logger.pushContext( "imgInfoNavigator_Previous_clickHandler", arguments );
+				
+				if( grpInfo3.visible ) 
+				{ 
+					lblInfoPage.text = "2/3";
+					grpInfo2.visible = true; 
+					grpInfo3.visible = false;
+					imgInfoNavigator_Next.visible = true;
+				}
+				else if( grpInfo2.visible ) 
+				{ 
+					lblInfoPage.text = "1/3";
+					grpInfo1.visible = true; 
+					grpInfo2.visible = false;
+					imgInfoNavigator_Previous.visible = false; 
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{		
+				// Log Activity
+				logger.pushContext( "mouseDownHandler", arguments );
+				
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 1 ); // Play the button click sound
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// ***************************************************************/
+			// Interface Impelementations
+			// ***************************************************************/
+			
+			public function getDebugInfo():String
+			{
+				var str:String = "";
+				str += "VARIABLE DUMP\n";
+				str += "betAmounts: " + betAmounts + "\n";
+				str += "betAmountStep: " + betAmountStep + "\n";
+				str += "curLines: " + curLines + "\n";
+				str += "maxLines: " + maxLines + "\n";
+				str += "baseWin:" + baseWin + "\n";
+				str += "bonusWin: " + bonusWin + "\n";
+				str += "scatterWin: " + scatterWin + "\n";
+				str += "lineWins: " + lineWins + "\n";
+				str += "inAction: " + inAction + "\n";
+				str += "isSpinning: " + isSpinning + "\n";
+				str += "bonusGameScatterThreshold: " + bonusGameScatterThreshold + "\n";
+				str += "wonBonusGame: " + wonBonusGame + "\n";
+				str += "doVerticalWilds: " + doVerticalWilds + "\n";			
+				str += "doScatterAnticipations: " + doScatterAnticipations + "\n";
+				str += "serverOutput: " + serverOutput + "\n";
+				str += "serverEntries: " + serverEntries + "\n";
+				str += "serverWinnings: " + serverWinnings + "\n";
+				str += "achievementsEarned: " + achievementsEarned + "\n";
+				str += "areReelTargetPositionsSet: " + areReelTargetPositionsSet + "\n";
+				str += "doBlink: " + doBlink + "\n";			
+				str += "doPlayReelStop: " + doPlayReelStop + "\n";
+				str += "doRandomStop: " + doRandomStop + "\n";
+				str += "nudgeTimedOut: " + nudgeTimedOut + "\n";				
+				str += "achievementsLoaded: " + achievementsLoaded + "\n";
+				str += "assetsLoaded: " + assetsLoaded + "\n";
+				str += "gameLoaded: " + gameLoaded + "\n";				
+				str += "scatterCount: " + scatterCount + "\n";
+				str += "spinsList: " + spinsList + "\n";
+				
+				return str;
+			}
+			
+			public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				
+				// Remove the style dispatcher
+				if( cssStyleDispatcher != null )
+				{
+					cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+					cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );
+					cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+					cssStyleDispatcher = null;
+				}
+				
+				// Check to make sure the assets were loaded
+				if( assetsLoaded ) 
+				{
+					// Unload the styles
+					try
+					{
+						styleManager.unloadStyleDeclarations( Sweeps.AssetsLocation + "/QuadVideoSlots/" + Sweeps.GameAsset, false );
+					}
+					catch( e:* ){ /* do nothing */ }
+				}
+				
+				// Check to make sure the game was loaded
+				if( gameLoaded )
+				{				
+					resetPrizeWin();
+					resetPrize();
+				}
+				
+				if( reel1_0 != null ) { reel1_0.dispose(); }
+				if( reel1_1 != null ) { reel1_1.dispose(); }
+				if( reel1_2 != null ) { reel1_2.dispose(); }
+				if( reel1_3 != null ) { reel1_3.dispose(); }
+				if( reel1_4 != null ) { reel1_4.dispose(); }
+				
+				if( reel2_0 != null ) { reel2_0.dispose(); }
+				if( reel2_1 != null ) { reel2_1.dispose(); }
+				if( reel2_2 != null ) { reel2_2.dispose(); }
+				if( reel2_3 != null ) { reel2_3.dispose(); }
+				if( reel2_4 != null ) { reel2_4.dispose(); }
+				
+				if( reel3_0 != null ) { reel3_0.dispose(); }
+				if( reel3_1 != null ) { reel3_1.dispose(); }
+				if( reel3_2 != null ) { reel3_2.dispose(); }
+				if( reel3_3 != null ) { reel3_3.dispose(); }
+				if( reel3_4 != null ) { reel3_4.dispose(); }
+				
+				if( reel4_0 != null ) { reel4_0.dispose(); }
+				if( reel4_1 != null ) { reel4_1.dispose(); }
+				if( reel4_2 != null ) { reel4_2.dispose(); }
+				if( reel4_3 != null ) { reel4_3.dispose(); }
+				if( reel4_4 != null ) { reel4_4.dispose(); }				
+				
+				if( btnPanel != null )
+				{
+					btnPanel.dispose();
+				}				
+				
+				if( scIntro != null )
+				{
+					scIntro.dispose();
+					scIntro = null;
+				}
+				
+				if( scBonus != null )
+				{
+					grpBonusGame.removeAllElements();					
+					scBonus.onStop = null;
+					scBonus.dispose();
+					scBonus = null;
+				}				
+				
+				if( spinStopTimer != null )
+				{
+					spinStopTimer = null;
+				}
+				
+				if( displayWinTimer != null )
+				{
+					displayWinTimer.dispose();
+					displayWinTimer = null;
+				}
+				
+				if( autoSpinTimeout != uint.MIN_VALUE )
+				{
+					clearTimeout( autoSpinTimeout );
+					autoSpinTimeout = uint.MIN_VALUE;
+				}
+				
+				if( displayBonusGameTimeout != uint.MIN_VALUE )
+				{
+					clearTimeout( displayBonusGameTimeout );
+					displayBonusGameTimeout = uint.MIN_VALUE;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Group id="grpLayerSkins">
+		<s:BitmapImage id="imgSkin" width="800" height="560" x="0" y="0" />
+		<s:BitmapImage id="imgReelBackdrop1" width="385" height="220" x="22" y="26" />
+		<s:BitmapImage id="imgReelBackdrop2" width="385" height="220" x="393" y="26" />
+		<s:BitmapImage id="imgReelBackdrop3" width="385" height="220" x="22" y="229" />
+		<s:BitmapImage id="imgReelBackdrop4" width="385" height="220" x="393" y="229" />
+	</s:Group>	
+	
+	<s:Group id="grpLayerReels">
+		<s:Group id="grpReels1" width="385" height="220" x="24" y="26">
+			<QuadVideoSlots:QuadVideoSlotReel id="reel1_0" width="61" height="189" x="18" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel1_1" width="61" height="189" x="90" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel1_2" width="61" height="189" x="162" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel1_3" width="61" height="189" x="234" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel1_4" width="61" height="189" x="306" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+		</s:Group>
+		
+		<s:Group id="grpReels2" width="385" height="220" x="395" y="26">
+			<QuadVideoSlots:QuadVideoSlotReel id="reel2_0" width="61" height="189" x="18" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel2_1" width="61" height="189" x="90" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel2_2" width="61" height="189" x="162" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel2_3" width="61" height="189" x="234" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel2_4" width="61" height="189" x="306" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+		</s:Group>
+		
+		<s:Group id="grpReels3" width="385" height="220" x="24" y="229">
+			<QuadVideoSlots:QuadVideoSlotReel id="reel3_0" width="61" height="189" x="18" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel3_1" width="61" height="189" x="90" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel3_2" width="61" height="189" x="162" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel3_3" width="61" height="189" x="234" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel3_4" width="61" height="189" x="306" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+		</s:Group>
+		
+		<s:Group id="grpReels4" width="385" height="220" x="395" y="229">
+			<QuadVideoSlots:QuadVideoSlotReel id="reel4_0" width="61" height="189" x="18" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel4_1" width="61" height="189" x="90" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel4_2" width="61" height="189" x="162" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel4_3" width="61" height="189" x="234" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+			<QuadVideoSlots:QuadVideoSlotReel id="reel4_4" width="61" height="189" x="306" y="15" onPlayAudio="reel_playAudioHandler" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+		</s:Group>		
+	</s:Group>
+	
+	<s:Group id="grpLayerBorders">
+		<s:BitmapImage id="imgReelBorder1" width="385" height="220" x="22" y="26" />
+		<s:BitmapImage id="imgReelBorder2" width="385" height="220" x="393" y="26" />
+		<s:BitmapImage id="imgReelBorder3" width="385" height="220" x="22" y="229" />
+		<s:BitmapImage id="imgReelBorder4" width="385" height="220" x="393" y="229" />
+	</s:Group>
+	
+	<s:Group id="grpLayerAnticipations">
+		
+	</s:Group>
+	
+	<s:Group id="grpLayerBetLines">
+		<QuadVideoSlots:QuadVideoSlotsBetLines id="betLines1" width="385" height="220" x="22" y="26" />
+		<QuadVideoSlots:QuadVideoSlotsBetLines id="betLines2" width="385" height="220" x="393" y="26" />
+		<QuadVideoSlots:QuadVideoSlotsBetLines id="betLines3" width="385" height="220" x="22" y="229" />
+		<QuadVideoSlots:QuadVideoSlotsBetLines id="betLines4" width="385" height="220" x="393" y="229" />
+	</s:Group>
+	
+	<s:Group id="grpReelIconAnimations">
+		
+	</s:Group>	
+	
+	<s:Group id="grpLayerAccents">
+		<s:BitmapImage id="imgTitle" width="100" height="75" x="350" y="2" />
+		<cx:DigitDisplay id="ddBetAmount" width="150" height="17" x="238" y="445" displayAmount="0" fontSize="18" />
+		<cx:DigitDisplay id="ddWinAmount" width="150" height="17" x="575" y="445" displayAmount="0" fontSize="18" />
+	</s:Group>
+	
+	<s:Group id="grpIconAnimation">
+		
+	</s:Group>
+	
+	<s:Group id="grpBonusGame" visible="false">
+		
+	</s:Group>
+	
+	<s:Group id="grpInfo" visible="false">
+		<s:BitmapImage id="imgInfoSkin" width="800" height="560" x="0" y="0" />	
+		
+		<s:Group id="grpInfo1" width="750" height="445" y="10" horizontalCenter="0" color="0x000000">
+			<s:Group id="grpPaytableText" width="750" height="445">
+				<s:BitmapImage id="imgPaytableTitle" horizontalCenter="0" y="0" />	
+			</s:Group>
+			<s:Group id="grpPaytableImages" width="750" height="445" y="100">
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic1_4" scaleX=".9" scaleY=".9" x="0" y="0" />
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic1_3" scaleX=".9" scaleY=".9" x="65" y="0" />
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic1_2" scaleX=".9" scaleY=".9" x="150" y="0" />
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic1_1" scaleX=".9" scaleY=".9" x="230" y="0" />
+				
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic2_1" scaleX=".9" scaleY=".9" x="450" y="0" />
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic2_2" scaleX=".9" scaleY=".9" x="500" y="0" />
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic2_3" scaleX=".9" scaleY=".9" x="550" y="0" />
+				<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic2_4" scaleX=".9" scaleY=".9" x="600" y="0" />
+				
+				<s:HGroup width="100%" y="100" gap="20" paddingRight="5" paddingLeft="5" horizontalAlign="center">
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic3" scaleX=".8" scaleY=".8" />
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic4" scaleX=".8" scaleY=".8" />
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic5" scaleX=".8" scaleY=".8" />
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic6" scaleX=".8" scaleY=".8" />					
+				</s:HGroup>				
+				<s:HGroup width="100%" y="195" gap="20" paddingRight="5" paddingLeft="5" horizontalAlign="center">
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic7" scaleX=".7" scaleY=".7" />
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic8" scaleX=".7" scaleY=".7" />
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic9" scaleX=".7" scaleY=".7" />
+				</s:HGroup>
+				<s:HGroup width="100%" y="260" gap="20" paddingRight="75" paddingLeft="5" horizontalAlign="center">
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic10" scaleX=".9" scaleY=".9" />				
+					<QuadVideoSlots:PaytableIconGraphic id="paytableIconGraphic11" scaleX=".9" scaleY=".9" />
+				</s:HGroup>	
+			</s:Group>						
+		</s:Group>
+		
+		<s:Group id="grpInfo2" width="750" height="445" y="10" horizontalCenter="0" color="0x000000" visible="false">
+			<s:BitmapImage id="imgInfoBetLines" width="696" height="377" horizontalCenter="0" y="0" />
+		</s:Group>
+		
+		<s:Group id="grpInfo3" width="800" height="560" x="0" y="0" color="0x000000" visible="false">
+			<s:BitmapImage id="imgInfoBonusGame" width="800" height="560" x="0" y="0" />
+		</s:Group>
+		
+		<s:Group id="grpPaytableNavigation" width="750" height="445">
+			<mx:Image id="imgBackToGame" buttonMode="true" x="25" y="360" click="imgBackToGame_clickHandler(event)" mouseOver="imgBackToGame_mouseOverHandler(event)" mouseDown="mouseDownHandler(event)"></mx:Image>
+			<mx:Image id="imgBackToGameOverlay" buttonMode="true" x="25" y="360" click="imgBackToGame_clickHandler(event)" mouseOut="imgBackToGame_mouseOutHandler(event)" mouseDown="mouseDownHandler(event)" visible="false"></mx:Image>
+			<mx:Image id="imgInfoNavigator" buttonMode="true" x="570" y="365" width="204" height="97"></mx:Image>
+			<mx:Image id="imgInfoNavigator_Previous" buttonMode="true" x="570" y="365" width="102" height="97" click="imgInfoNavigator_Previous_clickHandler(event)" mouseDown="mouseDownHandler(event)" visible="false"></mx:Image>
+			<mx:Image id="imgInfoNavigator_Next" buttonMode="true" x="672" y="365" width="102" height="97" click="imgInfoNavigator_Next_clickHandler(event)" mouseDown="mouseDownHandler(event)" visible="true"></mx:Image>			
+			<s:Group id="grpInfoPage" x="570" y="365" width="204" height="150" mouseChildren="false" mouseEnabled="false">
+				
+			</s:Group>
+		</s:Group>
+	</s:Group>
+	
+	<s:Group id="grpIntro" visible="true">
+		
+	</s:Group>	
+	
+	<s:Group id="grpLayer5">
+		<cx:ButtonPanel id="btnPanel" x="0" y="470"
+						enabled="false"
+						defaultBetAmount="{ getDefaultBetAmount() + getSkillSurcharge() }"
+						defaultBetLines="{ getBetLines() }"
+						menuType="{ ButtonPanel.MENU_TYPE_QUAD_VIDEO_SLOTS }"
+						onAutoPlay="btnPanel_onAutoPlayHandler"
+						onInfo="btnPanel_onInfoHandler"
+						onBetAdd="btnPanel_onBetAddHandler"
+						onLineAdd="btnPanel_onLineAddHandler"
+						onSpin="btnPanel_onSpinHandler"
+						onSpinStop="btnPanel_onSpinStopHandler"
+						onStop="btnPanel_onStopHandler"
+						onNudge="btnPanel_onNudgeHandler">
+			
+		</cx:ButtonPanel>
+	</s:Group>
+	
+</s:SkinnableContainer>

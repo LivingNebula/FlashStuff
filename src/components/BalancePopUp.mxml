@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  width="375" height="225" 
+					  horizontalCenter="0" verticalCenter="0"
+					  creationComplete="init(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			
+			import mx.events.FlexEvent;
+			
+			import utils.FormatHelper;
+			
+			// Handles the 'initialize' event
+			public function init( event:FlexEvent ):void 
+			{			
+				txtEntries.text = FormatHelper.formatEntriesAndWinnings( Sweeps.Entries );
+				txtWinnings.text = FormatHelper.formatEntriesAndWinnings( Sweeps.Winnings );
+			}
+			
+			// Set the scale of the control
+			public function setScale( scale:Number ):void
+			{
+				scaleY = scaleX = scale;
+				x = stage.stageWidth / 2 - ( width * scale ) / 2;
+				y = stage.stageHeight / 2 - ( height * scale ) / 2;				
+			}					
+		]]>
+	</fx:Script>
+	
+	<s:BitmapImage source="{Images.messageBox}"></s:BitmapImage>
+	<s:Group width="100%" height="100%" horizontalCenter="0">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>
+		<s:Label id="lblTitle" styleName="Title" paddingTop="7" text="Current Balance"></s:Label>
+		
+		<s:VGroup id="vgBalance" paddingTop="30" gap="5" horizontalAlign="left">
+			<s:Label id="lblEntries" styleName="Label" text="Entries:"></s:Label>
+			<s:TextInput id="txtEntries" styleName="TextBox" width="150" editable="false" textAlign="right"></s:TextInput>
+			<s:Label id="lblWinnings" styleName="Label" text="Winnings:" paddingTop="15"></s:Label>
+			<s:TextInput id="txtWinnings" styleName="TextBox" width="150" editable="false" textAlign="right"></s:TextInput>
+		</s:VGroup>
+			
+	</s:Group>
+
+</s:SkinnableContainer>

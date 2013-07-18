@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					 xmlns:s="library://ns.adobe.com/flex/spark" 
+					 xmlns:mx="library://ns.adobe.com/flex/mx"
+					 xmlns:cx="components.*"
+					 width="375" height="225" 
+					 horizontalCenter="0" verticalCenter="0"
+					 creationComplete="init()">
+	
+	<fx:Declarations>
+		<mx:StringValidator id="reqVUsername" source="{txtUsername}" trigger="{btnAccept}" property="text" required="true" minLength="3" maxLength="50"/>
+		<mx:StringValidator id="reqVPassword" source="{txtPassword}" trigger="{btnAccept}" property="text" required="true" minLength="3" maxLength="50"/>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import interfaces.ILoginHandler;
+			
+			import mx.events.ValidationResultEvent;
+			
+			import services.SweepsAPI;
+
+			private var vResult:ValidationResultEvent;
+			private var handler:ILoginHandler;
+			private var doSkipAuthentication:Boolean = false;
+			
+			public function set loginHandler( value:ILoginHandler ):void
+			{
+				handler = value;
+			}
+			
+			public function set skipAuthentication( value:Boolean ):void
+			{
+				doSkipAuthentication = value;
+			}
+			
+			// Initializes the control
+			private function init():void
+			{
+				imgMessageBox.source = Images.messageBox;
+			}
+			
+			// Handles the click event of the "Accept" button
+			protected function btnAccept_clickHandler( event:MouseEvent ):void
+			{			
+				processLogin();	// Process the login request		
+			}
+			
+			// Handles the click event of the "Quit" button
+			protected function btnQuit_clickHandler( event:MouseEvent ):void
+			{		
+				// Exits the game
+				handler.exit( "User quit." );
+				
+				this.visible = false; // Hide the current control
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{			
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+			}
+			
+			// Processes the login request
+			private function processLogin():void
+			{
+				// Disable the buttons
+				btnAccept.enabled = false;
+				btnQuit.enabled = false;
+								
+				if( isValid() )
+				{				
+					// Obtain the username & password
+					var username:String = txtUsername.text;
+					var password:String = txtPassword.text;
+					
+					if( doSkipAuthentication )
+					{
+						// Automatically accept the login credentials without authenticating
+						checkLogin( true, "" );
+					}
+					else
+					{
+						// Send the request to the service API and check status
+						SweepsAPI.login( username, password, checkLogin, handleLoginError );
+					}
+				}
+				else 
+				{ 
+					checkLogin( false, "Invalid login." );
+				}
+			}
+			
+			// Checks if the parameters are valid
+			private function isValid():Boolean
+			{
+				// Validate the username
+				vResult = reqVUsername.validate(); 							
+				if( vResult.type == ValidationResultEvent.INVALID ) { txtUsername.setFocus(); return false; }
+									
+				// Validate the password 
+				vResult = reqVPassword.validate();
+				if( vResult.type == ValidationResultEvent.INVALID ) { txtPassword.setFocus(); return false; }
+				
+				btnAccept.setFocus();
+				return true;
+			}
+			
+			// Checks the status of the login
+			private function checkLogin( isValid:Boolean, reason:String ):void
+			{
+				// Enable the buttons
+				btnAccept.enabled = true;
+				btnQuit.enabled = true;
+				
+				if( isValid )
+				{			
+					// Accept the login
+					handler.loginSuccess( txtUsername.text, txtPassword.text );
+				}
+				else 
+				{ 
+					// Set the error text
+					lblError.text = "Error: " + reason; 
+					
+					// Fail the login
+					handler.loginFailed( txtUsername.text, txtPassword.text, reason );
+				}
+			}					
+
+			// Handles login errors
+			private function handleLoginError( errorCode:int, error:String ):void 
+			{
+				checkLogin( false, error );
+			}
+			
+			// Sets the page values
+			public function set( Username:String, Password:String ):void
+			{
+				txtUsername.text = Username;
+				txtPassword.text = Password;
+			}
+			
+			// Handles the auto login request
+			public function autoLogin():void
+			{
+				processLogin();	// Process the login request
+			}
+		]]>		
+	</fx:Script>
+	
+	<s:BitmapImage id="imgMessageBox"></s:BitmapImage>
+	<s:Group width="100%" height="100%" horizontalCenter="0">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>
+		<s:Label text="LOGIN" styleName="Title" paddingTop="7"></s:Label>
+		<s:Label id="lblError" styleName="Error" visible="true" paddingTop="10"></s:Label>
+		<s:VGroup id="vgEntry">			
+			<s:Label id="lblUsername" styleName="Label" text="Username:" paddingTop="10"></s:Label>
+			<s:TextInput id="txtUsername" styleName="TextBox" width="150" enter="processLogin()"></s:TextInput>
+			<s:Label id="lblPassword" styleName="Label" text="Password:" paddingTop="10"></s:Label>
+			<s:TextInput id="txtPassword" styleName="TextBox" width="150" displayAsPassword="true" enter="processLogin()"></s:TextInput>
+		</s:VGroup>		
+	</s:Group>				
+	<s:HGroup gap="20" paddingBottom="0" horizontalCenter="0" bottom="20">
+		<cx:ImageButton id="btnAccept" skinClass="skins.ButtonSkin" label="Accept" buttonMode="true" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" click="btnAccept_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+		<cx:ImageButton id="btnQuit" skinClass="skins.ButtonSkin" label="Quit" buttonMode="true" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" click="btnQuit_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+	</s:HGroup>
+	
+</s:SkinnableContainer>

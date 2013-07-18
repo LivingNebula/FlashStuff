@@ -1,0 +1,1565 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:cx="components.*"
+					  xmlns:VideoPoker="components.VideoPoker.*"
+					  minWidth="800" minHeight="600" width="800" height="600" 
+					  backgroundColor="#000000"
+					  creationComplete="creationComplete( event )" 
+					  implements="interfaces.IDisposable"
+					  creationPolicy="none">
+	
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	
+	<fx:Script>
+		<![CDATA[		
+			import assets.Config;
+			
+			import objects.ErrorMessage;
+			
+			import assets.DataTimer;
+			import assets.SkinManager;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import components.Progress;
+			import components.ProgressiveJackpot;
+			
+			import mx.events.FlexEvent;
+			import mx.events.StyleEvent;
+			import mx.skins.halo.HaloBorder;
+			
+			import objects.Card;
+			import objects.Deck;
+			import objects.Hand;
+			import objects.PlayGameResponse;
+			import objects.PokerLogic;
+			
+			import services.SweepsAPI;
+			
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( VideoPoker );			
+
+			private var betAmounts:Array = [20, 30, 50, 100, 200, 300, 500];
+			private var betAmountStep:int = 0;
+			private var winHands:Array = [
+				[     1, 1000, PokerLogic.HAND_ROYAL_FLUSH],
+				[     6,  150, PokerLogic.HAND_STRAIGHT_FLUSH],
+				[   106,   40, PokerLogic.HAND_FOUR_OF_A_KIND],				
+				[   906,   15, PokerLogic.HAND_FULL_HOUSE],
+				[  1906,    7, PokerLogic.HAND_FLUSH],
+				[  3106,    4, PokerLogic.HAND_STRAIGHT],
+				[  9106,    3, PokerLogic.HAND_THREE_OF_A_KIND],
+				[ 19106,    2, PokerLogic.HAND_TWO_PAIR],
+				[ 39106,    1, PokerLogic.HAND_JACKS_OR_BETTER],
+				[ 39506,    0, PokerLogic.HAND_4_OF_5_STRAIGHT_FLUSH],
+				[ 40506,	0, PokerLogic.HAND_4_OF_5_FLUSH],
+				[ 42506,    0, PokerLogic.HAND_4_OF_5_STRAIGHT],
+				[ 45006,	0, PokerLogic.HAND_LOW_PAIR],
+				[100000,    0, PokerLogic.HAND_NONE],				
+			];
+			private var targetWinMultiplier:int = 0;
+			private var targetWinHand:String = "";
+			private var currentHand:Hand;
+			private var deck:Deck;
+			private var hasDealt:Boolean = false;
+			private var hasDrawn:Boolean = false;
+			private var revealing:int = 0;
+			private var serverEntries:int;
+			private var serverWinnings:int;
+			private var achievementsEarned:Array;
+			
+			private var autoPlay:Boolean = false;
+			private var flasher:Timer;
+			private var bonusFlasher:Timer;
+			private var autoDealTimeout:uint = uint.MIN_VALUE;
+			
+			private var achievementsLoaded:Boolean = false;
+			private var assetsLoaded:Boolean = false;	
+			private var gameLoaded:Boolean = false;
+			
+			private var dealStartTimer:DataTimer;
+			private var drawStartTimer:DataTimer;			
+			
+			private var image_skin:Class;
+			private var image_header:Class;
+			private var image_paytable:Class;
+			private var image_bonus:Class;
+			
+			private var cssStyleDispatcher:IEventDispatcher;
+			
+			// Handles the 'init complete' event
+			private function creationComplete( event:FlexEvent ):void
+			{		
+				// Log Activity
+				logger.pushContext( "creationComplete", arguments );
+				
+				// Start the progress meter
+				Sweeps.getInstance().startProgressMeter();
+								
+				// Load the application skin
+				cssStyleDispatcher = styleManager.loadStyleDeclarations( Sweeps.AssetsLocation + "/VideoPoker/" + Sweeps.GameAsset, false );				
+				cssStyleDispatcher.addEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.addEventListener( StyleEvent.COMPLETE, stylesLoaded );
+				cssStyleDispatcher.addEventListener( StyleEvent.ERROR, stylesError );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'progress' event of the style SWF
+			private function stylesProgress( event:StyleEvent ):void
+			{
+				Sweeps.getInstance().updateProgressMeter( Math.floor(100 * event.bytesLoaded/event.bytesTotal) );
+			}
+			
+			// Handles the 'complete' event of the style SWF
+			private function stylesLoaded( event:StyleEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "stylesLoaded", arguments );
+				
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );	
+				assetsLoaded = true;
+				
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Notifies the game our achivements have loaded
+			public function setAchievementsLoaded():void
+			{
+				// Log Activity
+				logger.pushContext( "setAchievementsLoaded", arguments );	
+				
+				achievementsLoaded = true;
+				
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loades the deffered content and starts the game
+			private function continueLoadingGame():void
+			{				
+				// Log Activity
+				logger.pushContext( "continueLoadingGame", arguments );
+				
+				if( gameLoaded ) 
+				{
+					// Clear Context
+					logger.popContext();					
+					return; 
+				}
+				gameLoaded = true;				
+				
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();
+				
+				// Create any deffered components
+				createDeferredContent();
+				
+				// Add card event listeners manually
+				card0.addEventListener( MouseEvent.CLICK, card_clickHandler );
+				card0.onRevealed = card_revealHandler;
+				card1.addEventListener( MouseEvent.CLICK, card_clickHandler );
+				card1.onRevealed = card_revealHandler;
+				card2.addEventListener( MouseEvent.CLICK, card_clickHandler );
+				card2.onRevealed = card_revealHandler;
+				card3.addEventListener( MouseEvent.CLICK, card_clickHandler );
+				card3.onRevealed = card_revealHandler;
+				card4.addEventListener( MouseEvent.CLICK, card_clickHandler );
+				card4.onRevealed = card_revealHandler;				
+				
+				// Setup a listener to display the prize amount
+				flasher = new Timer( 500, 0 );
+				flasher.addEventListener( TimerEvent.TIMER, flasherFired );			
+				
+				// Setup a listener to display the bonus amount
+				bonusFlasher = new Timer( 250, 0 );
+				bonusFlasher.addEventListener( TimerEvent.TIMER, bonusFlasherFired );
+				
+				// Default win amount and current bet amount
+				resetPrize();
+				displayBetAmount();				
+				
+				image_skin = SkinManager.getSkinAsset( styleManager, "Skin" );
+				image_header = SkinManager.getSkinAsset( styleManager, "Header" );
+				image_paytable = SkinManager.getSkinAsset( styleManager, "Paytable" );
+				image_bonus = SkinManager.getSkinAsset( styleManager, "BonusBG" );
+				
+				// Set the UI images' sources to their proper classes
+				imgSkin.source = image_skin;
+				imgHeader.source = image_header;
+				imgPaytable.source = image_paytable;
+				imgBonus.source = image_bonus;
+				
+				card0.cardBack = SkinManager.getSkinAsset( styleManager, "CardBack" );
+				card1.cardBack = SkinManager.getSkinAsset( styleManager, "CardBack" );
+				card2.cardBack = SkinManager.getSkinAsset( styleManager, "CardBack" );
+				card3.cardBack = SkinManager.getSkinAsset( styleManager, "CardBack" );
+				card4.cardBack = SkinManager.getSkinAsset( styleManager, "CardBack" );
+				
+				card0.cardHold = SkinManager.getSkinAsset( styleManager, "Hold" );
+				card1.cardHold = SkinManager.getSkinAsset( styleManager, "Hold" );
+				card2.cardHold = SkinManager.getSkinAsset( styleManager, "Hold" );
+				card3.cardHold = SkinManager.getSkinAsset( styleManager, "Hold" );
+				card4.cardHold = SkinManager.getSkinAsset( styleManager, "Hold" );		
+				
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'error' event of the style SWF
+			private function stylesError( event:StyleEvent ):void
+			{				
+				// Log Activity
+				logger.pushContext( "stylesError" ).error.apply( null, arguments );
+				
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();
+
+				// Display a popup indicating an error occurred
+				Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an error while trying to complete this request.\n\nPlease try again.", false, false );
+				
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );				
+				
+				// Return to the main menu
+				Sweeps.getInstance().quit();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Returns the bet amount
+			private function getBetAmount():int
+			{
+				return betAmounts[betAmountStep];
+			}
+			
+			// Displays the current bet amount in the "Bet" box
+			private function displayBetAmount():void
+			{
+				// Log Activity
+				logger.pushContext( "displayBetAmount", arguments );
+				
+				ddBetAmount.displayAmount = getBetAmount();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Stops auto play
+			private function stopAutoPlay():void
+			{
+				// Log Activity
+				logger.pushContext( "stopAutoPlay", arguments );
+				
+				autoPlay = false;
+				btnPanel.stopAutoPlay();
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Checks to see if we should auto deal again
+			private function checkAutoDeal():void
+			{
+				// Log Activity
+				logger.pushContext( "checkAutoDeal", arguments );
+
+				// Clear any autoplay timeouts
+				clearTimeout( autoDealTimeout );
+				autoDealTimeout = uint.MIN_VALUE;
+				
+				if( autoPlay )
+				{
+					if( hasDealt && !hasDrawn )
+					{
+						draw();
+					}
+					else
+					{
+						deal();
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'firing' event of flasherFired timer
+			private function flasherFired( event:TimerEvent ):void
+			{
+				grpPaytable.visible = !grpPaytable.visible;
+				imgHeader.visible = !imgHeader.visible;
+			}
+			
+			// Handles the 'firing' event of bonusFlasherFired timer
+			private function bonusFlasherFired( event:TimerEvent ):void
+			{
+				imgBonus.visible = !imgBonus.visible;
+			}
+			
+			// Starts a round
+			private function deal():void
+			{
+				// Log Activity
+				logger.pushContext( "deal", arguments );
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoDealTimeout );
+				autoDealTimeout = uint.MIN_VALUE;				
+				
+				// If our timers aren't initialized yet, go ahead and initialize them
+				if( !dealStartTimer || !drawStartTimer )
+				{
+					dealStartTimer = new DataTimer( 100, 100, 5, null, dealStartTimer_Listener, true ); 	// 0ms start delay, 100ms card delay
+					drawStartTimer = new DataTimer( 100, 100, 5, null, drawStartTimer_Listener, true );	// 0ms start delay, 100ms card delay
+				}
+				
+				// Reset the prize displays
+				resetPrize();
+				
+				// Check to see if we have enough credits to pay for this deal/bet
+				if( getBetAmount() <= Sweeps.Entries )
+				{
+					// Decrement our entries amount
+					Sweeps.getInstance().displayBalance( Sweeps.Entries - getBetAmount(), Sweeps.Winnings );
+					
+					// Call the round start handler to disable buttons, etc
+					roundStarted();
+					
+					// Set a revealing count so we can keep tracking if we're still revealing or not
+					revealing = 5;
+					
+					// Reset all the on-screen cards
+					card0.setFaceDown();
+					card1.setFaceDown();
+					card2.setFaceDown();
+					card3.setFaceDown();
+					card4.setFaceDown();
+					
+					// Set our variables to the new state
+					hasDealt = btnPanel.isDealt = true;
+					hasDrawn = false;
+					
+					// Check if in DEBUG Mode
+					if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+					{
+						// Update our progressive jackpot
+						SweepsAPI.progressiveBalanceDemo += Math.ceil( getBetAmount() * ProgressiveJackpot.JACKPOT_BET_PERCENTAGE );
+						Sweeps.getInstance().displayProgressiveBalance( SweepsAPI.progressiveBalanceDemo, true );
+						Sweeps.getInstance().spinProgressiveReel( -1 );
+						
+						// Save our achievements earned for this spin
+						achievementsEarned = null;
+						
+						// Reset our hand, choose a random winning hand and amount	
+						serverEntries = Sweeps.Entries;
+						serverWinnings = Sweeps.Winnings;
+						
+						var winIndex:int = MathHelper.randomNumber(1, winHands.length - 1);
+						targetWinMultiplier = winHands[winIndex][1];
+						targetWinHand = winHands[winIndex][2];
+						
+						// Get cards to satisfy our hand
+						currentHand = PokerLogic.satisfyHand( targetWinHand, MathHelper.randomNumber( 0, 3 ) );
+												
+						// Setup the cards to reveal themselves
+						dealStartTimer.startDelay = 450;
+						dealStartTimer.data = currentHand.playCards;
+						dealStartTimer.start();
+					}
+					else
+					{
+						// Call the 'Play Game' API event to get our results
+						SweepsAPI.playGame( 
+							Sweeps.Username,
+							Sweeps.Password,
+							Sweeps.GameID,
+							Sweeps.GameType,
+							getBetAmount(), 
+							1,
+							0,
+							handlePlayGameSuccess,
+							handlePlayGameError
+						);
+					}
+				}
+				else
+				{
+					// If we're on auto play, make sure to stop it.
+					stopAutoPlay();													
+					
+					// Check to see if we have enough winnings that we could redeem to complete this hand
+					if( getBetAmount() <= ( Sweeps.Entries + Sweeps.Winnings ) )
+					{
+						// Check to see if auto-redeem enabled
+						if( Sweeps.AutoRedeemEnabled && Sweeps.Winnings >= 100 )
+						{
+							var redeemAmount:int = ((getBetAmount() - Sweeps.Entries) <= 100) ? 100 : getBetAmount() - Sweeps.Entries;
+							
+							// Send the request to the service API and handle response
+							SweepsAPI.redeemEntries( Sweeps.Username, Sweeps.Password, Sweeps.Entries, Sweeps.Winnings, redeemAmount, handleRedeemSuccess, handleRedeemError );
+						}
+						else
+						{
+							// Reset the button panel
+							roundEnded();
+							
+							Sweeps.getInstance().loadRedeemQuick();
+						}
+					}
+					else
+					{
+						// Reset the button panel
+						roundEnded();
+						
+						Sweeps.getInstance().createPopUp( "Insufficient Entries", "You do not have enough entries to complete this hand.", false, false );
+					}									
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Handles success for the SweepsAPI.redeemEntries call
+			private function handleRedeemSuccess( entries:int, winnings:int ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemSuccess", arguments );
+				
+				// Refresh the account balances
+				Sweeps.getInstance().displayBalance( entries, winnings );
+				
+				// Re-deal
+				deal();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles error for the SweepsAPI.redeemEntries call
+			private function handleRedeemError( errorCode:int, error:String ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemError" ).error.apply( null, arguments );
+				
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean = false;
+				var pIsError:Boolean = false;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsError = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this request.\n\nPlease try again.";
+						pIsError = true;
+						break;
+				}
+				
+				// Reset the button panel
+				roundEnded();
+				
+				// Create a popup
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, pIsError, pIsLogout );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles success for the SweepsAPI.playGame call
+			private function handlePlayGameSuccess( response:PlayGameResponse ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameSuccess", arguments );
+				
+				if( response.ReelOutput != null )
+				{
+					// Updates the progressive balance && spins the reel
+					Sweeps.getInstance().displayProgressiveBalance( response.ProgressiveBalance, response.ProgressiveWin <= 0 );
+					Sweeps.getInstance().spinProgressiveReel( response.ProgressiveWin );
+					
+					// Stop auto play if we've won the progressive
+					if( response.ProgressiveWin > 0 )
+					{
+						stopAutoPlay();
+					}
+						
+					// Save our achievements earned for this spin
+					achievementsEarned = response.Achievements;					
+					
+					// Set our current win amount
+					targetWinMultiplier = response.WinAmount;
+					serverEntries = response.Entries;
+					serverWinnings = response.Winnings;
+					
+					// Determine what hand we should win
+					for( var i:int = 0; i < winHands.length; i++ )
+					{
+						if( response.ReelOutput <= winHands[i][0] && targetWinMultiplier == winHands[i][1] )
+						{
+							targetWinHand = winHands[i][2];
+							break;
+						}
+					}
+					
+					// Get cards to satisfy our hand
+					currentHand = PokerLogic.satisfyHand( targetWinHand, MathHelper.randomNumber( 0, 3 ) );
+					
+					// Setup the cards to reveal themselves										
+					dealStartTimer.startDelay = 0;
+					dealStartTimer.data = currentHand.playCards;
+					dealStartTimer.start();								
+				}
+				else
+				{
+					handlePlayGameError( SweepsAPI.ERROR_CODE_UNKNOWN, "Invalid Reel Output" );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles errors for the SweepsAPI.playGame call
+			private function handlePlayGameError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameError" ).error.apply( null, arguments );
+				
+				// We've likely had an error and need to alert the player
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsLogout = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this hand.\n\nPlease try again.";
+						pIsLogout = true;
+						break;
+				}
+				
+				// Create a popup
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, false, pIsLogout );
+				
+				// If we're on auto play, make sure to stop it.
+				stopAutoPlay();									
+				
+				// Reset the button panel
+				roundEnded();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "deal start" event of the data timer
+			private function dealStartTimer_Listener( event:TimerEvent ):void 
+			{				
+				// Log Activity
+				logger.pushContext( "dealStartTimer_Listener", arguments );
+				
+				var timer:DataTimer = ( event.target as DataTimer );
+				
+				switch( timer.currentCount )
+				{
+					case 1:
+						card0.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 0 ).toString() ) );
+						break;
+					
+					case 2:
+						card1.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 1 ).toString() ) );
+						break;
+					
+					case 3:
+						card2.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 2 ).toString() ) );
+						break;
+					
+					case 4:
+						card3.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 3 ).toString() ) );
+						break;
+					
+					case 5:
+						card4.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 4 ).toString() ) );
+						timer.reset();
+						break;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Handles the "draw start" event of the data timer
+			private function drawStartTimer_Listener( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "drawStartTimer_Listener", arguments );
+				
+				var timer:DataTimer = ( event.target as DataTimer );
+				var exchangeCards:Array = ( timer.data as Array );
+				
+				switch( exchangeCards[timer.currentCount - 1] )
+				{
+					case 0:
+						card0.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 0 ).toString() ) );
+						break;
+					
+					case 1:
+						card1.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 1 ).toString() ) );
+						break;
+					
+					case 2:
+						card2.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 2 ).toString() ) );
+						break;
+					
+					case 3:
+						card3.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 3 ).toString() ) );
+						break;
+					
+					case 4:
+						card4.reveal( SkinManager.getSkinAsset( styleManager, currentHand.playCards.getCard( 4 ).toString() ) );
+						break;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Draws the 2nd hand of cards in a round
+			private function draw():void
+			{				
+				// Log Activity
+				logger.pushContext( "draw", arguments );
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoDealTimeout );
+				autoDealTimeout = uint.MIN_VALUE;				
+				
+				hasDrawn = true;
+				btnPanel.isDealt = false;
+				var exchangeCards:Array = [], i:int;			
+				
+				// Disable our button panel
+				btnPanel.toggleEnabled( false );
+				
+				// Find out how many card we're exchanging
+				if( !card0.isHeld )
+					currentHand.tempCards.addCard( currentHand.drawCards.drawCard() );
+				
+				if( !card1.isHeld )
+					currentHand.tempCards.addCard( currentHand.drawCards.drawCard() );
+				
+				if( !card2.isHeld )
+					currentHand.tempCards.addCard( currentHand.drawCards.drawCard() );
+				
+				if( !card3.isHeld )
+					currentHand.tempCards.addCard( currentHand.drawCards.drawCard() );
+				
+				if( !card4.isHeld )
+					currentHand.tempCards.addCard( currentHand.drawCards.drawCard() );
+				
+				// Shuffle the temp cards
+				currentHand.tempCards.shuffle();
+				
+				// Splice the new cards back into the hand
+				if( !card0.isHeld )
+					currentHand.playCards.addCardAt( currentHand.tempCards.drawCard(), 0 );
+				
+				if( !card1.isHeld )
+					currentHand.playCards.addCardAt( currentHand.tempCards.drawCard(), 1 );
+				
+				if( !card2.isHeld )
+					currentHand.playCards.addCardAt( currentHand.tempCards.drawCard(), 2 );
+				
+				if( !card3.isHeld )
+					currentHand.playCards.addCardAt( currentHand.tempCards.drawCard(), 3 );
+				
+				if( !card4.isHeld )
+					currentHand.playCards.addCardAt( currentHand.tempCards.drawCard(), 4 );
+				
+				// Reset all the on-screen cards
+				if( !card0.isHeld )
+				{
+					card0.setFaceDown();
+					exchangeCards.push(0);
+					revealing += 1;
+				}
+				
+				if( !card1.isHeld )
+				{
+					card1.setFaceDown();
+					exchangeCards.push(1);
+					revealing += 1;
+				}
+				
+				if( !card2.isHeld )
+				{
+					card2.setFaceDown();
+					exchangeCards.push(2);
+					revealing += 1;
+				}
+				
+				if( !card3.isHeld )
+				{
+					card3.setFaceDown();
+					exchangeCards.push(3);
+					revealing += 1;
+				}
+				
+				if( !card4.isHeld )
+				{
+					card4.setFaceDown();
+					exchangeCards.push(4);
+					revealing += 1;
+				}
+				
+				card0.isHeld = card1.isHeld = card2.isHeld = card3.isHeld = card4.isHeld = false;
+				
+				// If we held ALL cards, check the win from here
+				if( revealing == 0 )
+				{
+					if( achievementsEarned == null )
+					{
+						checkWin();
+					}
+					else
+					{
+						Sweeps.getInstance().addNewBadges( achievementsEarned, checkWin );
+					}
+				}
+				else
+				{
+					logger.debug( revealing, exchangeCards );
+					drawStartTimer.startDelay = 0;
+					drawStartTimer.repeatCount = exchangeCards.length;
+					drawStartTimer.data = exchangeCards;
+					drawStartTimer.start();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Called when the round is started to handle audio and notification events
+			private function roundStarted():void
+			{
+				// Log Activity
+				logger.pushContext( "roundStarted", arguments );
+				
+				// Set our Sweeps inAction value
+				Sweeps.getInstance().setInAction( true );
+				
+				// Disable our button panel
+				btnPanel.toggleEnabled( false );
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Called when the round is completed to handle audio and notification events
+			private function roundEnded():void
+			{			
+				// Log Activity
+				logger.pushContext( "roundEnded", arguments );
+				
+				// Clear some variables
+				btnPanel.isDealt = hasDealt = hasDrawn = false;
+				btnPanel.btn6.label = "REVEAL";	
+				revealing = 0;
+				targetWinMultiplier = 0;
+				targetWinHand = "";
+				
+				// Reset timers
+				drawStartTimer.reset();
+				dealStartTimer.reset();
+				
+				// Re-enable our button panel
+				if( !autoPlay ) 
+				{ 
+					btnPanel.toggleEnabled( true );
+					
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( false );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Suggests which cards to hold
+			private function suggestHold():void
+			{
+				// Log Activity
+				logger.pushContext( "suggestHold", arguments );
+				
+				var i:int;
+				
+				logger.debug( "Winning hand based on visible cards: " + PokerLogic.getWinningHand( currentHand ) );
+				switch( PokerLogic.getWinningHand( currentHand ) )
+				{
+					case PokerLogic.HAND_ROYAL_FLUSH:
+						card0.isHeld = card1.isHeld = card2.isHeld = card3.isHeld = card4.isHeld = true;
+						break;
+					
+					case PokerLogic.HAND_STRAIGHT_FLUSH:
+						card0.isHeld = card1.isHeld = card2.isHeld = card3.isHeld = card4.isHeld = true;
+						break;
+					
+					case PokerLogic.HAND_FOUR_OF_A_KIND:
+						for( i = 0; i < 5; i++ )
+						{
+							if( currentHand.playCards.getCard(i).value == currentHand.highCard.value )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}
+						break;
+					
+					case PokerLogic.HAND_FULL_HOUSE:
+						card0.isHeld = card1.isHeld = card2.isHeld = card3.isHeld = card4.isHeld = true;
+						break;
+					
+					case PokerLogic.HAND_FLUSH:
+						card0.isHeld = card1.isHeld = card2.isHeld = card3.isHeld = card4.isHeld = true;
+						break;
+					
+					case PokerLogic.HAND_STRAIGHT:
+						card0.isHeld = card1.isHeld = card2.isHeld = card3.isHeld = card4.isHeld = true;
+						break;
+					
+					case PokerLogic.HAND_THREE_OF_A_KIND:
+						for( i = 0; i < 5; i++ )
+						{
+							if( currentHand.playCards.getCard(i).value == currentHand.highCard.value )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}						
+						break;
+					
+					case PokerLogic.HAND_TWO_PAIR:
+						for( i = 0; i < 5; i++ )
+						{
+							if( currentHand.playCards.getCard(i).value == currentHand.highCard.value || currentHand.playCards.getCard(i).value == currentHand.highCard2.value )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}						
+						break;
+					
+					case PokerLogic.HAND_JACKS_OR_BETTER:
+						for( i = 0; i < 5; i++ )
+						{
+							if( currentHand.playCards.getCard(i).value == currentHand.highCard.value )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}							
+						break;
+					
+					case PokerLogic.HAND_4_OF_5_FLUSH:
+						for ( i = 0; i < 5; i++ )
+						{
+							if ( currentHand.playCards.getCard(i).suit == currentHand.highCard.suit )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}					
+						break;
+					
+					case PokerLogic.HAND_4_OF_5_STRAIGHT_FLUSH:
+					case PokerLogic.HAND_4_OF_5_STRAIGHT:
+						for ( i = 0; i < 5; i++ )
+						{
+							if ( !( currentHand.highCard.value == currentHand.playCards.getCard(i).value && currentHand.highCard.suit == currentHand.playCards.getCard(i).suit ) )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}					
+						break;
+					
+					case PokerLogic.HAND_LOW_PAIR:
+						for( i = 0; i < 5; i++ )
+						{
+							if( currentHand.playCards.getCard(i).value == currentHand.highCard.value )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}							
+						break;
+					
+					case PokerLogic.HAND_HIGH_CARD:
+						for( i = 0; i < 5; i++ )
+						{
+							if( currentHand.playCards.getCard(i).value == currentHand.highCard.value )
+							{
+								this["card" + i].isHeld = true;
+							}
+						}
+						break;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Checks to see if a given round was a winner
+			private function checkWin():void
+			{
+				// Log Activity
+				logger.pushContext( "checkWin", arguments );
+				
+				var actualWinIndex:int = -1;
+				var actualWinHand:String = "";
+				var actualWinMultiplier:int = 0;
+				
+				// If we should've won something
+				if( targetWinMultiplier > 0 )
+				{
+					// What hand did we win?
+					actualWinHand = PokerLogic.getWinningHand( currentHand );
+					logger.debug( "Should have won [" + targetWinHand + "], actually won [" + actualWinHand + "]" );
+					
+					if( actualWinHand != PokerLogic.HAND_NONE )
+					{
+						// Get the index and win amount of the hand we won
+						for( var i:int = 0; i < winHands.length; i++ )
+						{
+							if( winHands[i][2] == actualWinHand )
+							{
+								actualWinIndex = i;
+								actualWinMultiplier = winHands[i][1];
+								break;
+							}
+						}
+						
+						// If we won a hand, check to see if it matches the hand we should've won
+						if( actualWinHand == targetWinHand || actualWinMultiplier == targetWinMultiplier )
+						{
+							// We won the right hand or at least the right amount, so just display a win for the hand we ended up with
+							displayPrizeHighlight( actualWinIndex );
+							displayPrize( actualWinMultiplier, 0 );							
+						}
+						else if( targetWinMultiplier > actualWinMultiplier )
+						{
+							// We won less than we should have, so display a win for what we did win and then bonus the rest
+							if( actualWinMultiplier > 0 )
+							{
+								displayPrizeHighlight( actualWinIndex );
+							}
+							displayPrize( actualWinMultiplier, targetWinMultiplier - actualWinMultiplier );
+						}
+						else
+						{
+							var errMsg:ErrorMessage = Sweeps.getInstance().getErrorMessageBase( "VIDEOKENO:Calculated and Supplied Winnings do not match.", "", "", "" );
+							errMsg.append( "REVEAL INFO", "Bet" + getBetAmount().toString() );
+							errMsg.append( "REVEAL INFO", "Cards: " + currentHand.toString() );
+							errMsg.append( "REVEAL INFO", "Calculated Winnings (Hand/Win/Bonus): " + actualWinHand + " / " + actualWinMultiplier + " / " + ( targetWinMultiplier - actualWinMultiplier ) );
+							errMsg.append( "REVEAL INFO", "Supplied Winnings (Hand/Win): " + targetWinHand + " / " + targetWinMultiplier );					
+							
+							if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API ) 
+							{
+								throw new Error( errMsg.toString() );
+							}
+							else
+							{
+								SweepsAPI.reportError( errMsg );
+							}
+							
+							// Since we ended up with a hand that pays more than we should've won, ignore it and just bonus them the total amount
+							displayPrize( 0, targetWinMultiplier );
+						}
+					}
+					else
+					{
+						// If we didn't win a hand, but should have - bonus our total amount
+						displayPrize( 0, targetWinMultiplier );
+					}
+				}
+				else
+				{
+					// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts
+					Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );
+					
+					// End the round
+					roundEnded();
+					autoDealTimeout = setTimeout( checkAutoDeal, 1000 );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles highlighting the appropriate row on the pay table
+			private function displayPrizeHighlight( prizeIndex:int ):void
+			{	
+				// Log Activity
+				logger.pushContext( "displayPrizeHighlight", arguments );
+				
+				var highlightIndex:int = prizeIndex;
+				
+				grpPaytable.visible = true;
+				grhPaytableMask.scaleY = 15.77 / 142;
+				grhPaytableMask.y = 2 + ( highlightIndex * 15.77 );
+				
+				flasher.start();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles displaying the prize in the "Win" box on the game
+			private function displayPrize( winMultiplier:int, bonusMultiplier:int = 0 ):void
+			{			
+				// Log Activity
+				logger.pushContext( "displayPrize", arguments );
+				
+				// Fill possible wins
+				var possibleWins:Array = new Array();
+				for( var i:int = 0; i < betAmounts.length; i++ )
+				{
+					for( var x:int = 0; x < winHands.length; x++ )
+					{
+						var possibleWin:int = betAmounts[i] * winHands[x][1];
+						if( possibleWins.indexOf( possibleWin ) < 0 )
+						{
+							possibleWins.push( possibleWin );
+						}
+					}
+				}						
+				
+				var winAmount:int = winMultiplier * getBetAmount();
+				// Add win amount if it doesn't exist in possible wins
+				if( winAmount > 0 && possibleWins.indexOf( winAmount ) < 0 ) {
+					possibleWins.push( winAmount );
+					possibleWins.sort( Array.NUMERIC );
+				}			
+				
+				var bonusAmount:int = bonusMultiplier * getBetAmount();
+				// Add bonus amount if it doesn't exist in possible wins
+				if( bonusAmount > 0 && possibleWins.indexOf( bonusAmount ) < 0 ) {
+					possibleWins.push( bonusAmount );
+					possibleWins.sort( Array.NUMERIC );
+				}					
+				
+				// Sort the possible wins
+				possibleWins.sort( Array.NUMERIC );
+				
+				var baseWinnings:int = Sweeps.Winnings;						
+				var winPercentage:Number = ( possibleWins.indexOf( winAmount ) + 1 ) / possibleWins.length;
+				var bonusWinPercentage:Number = ( possibleWins.indexOf( bonusAmount ) + 1 ) / possibleWins.length;
+				
+				// Play the winning sounds
+				var winningsChnl:SoundChannel = SoundManager.playSound( assets.Sounds["Add_Winnings"], 0, 0 );
+				var winningsBdChnl:SoundChannel = SoundManager.playSound( assets.Sounds["Add_Winnings_Backdrop"], 0, 0 );				
+				
+				// Animate the winning amount display
+				if( winAmount > 0 )
+				{
+					ddWinAmount.animateDisplayAmount( winAmount, 6 * 1000 * winPercentage, animateDisplaysEnded );
+				}
+				else
+				{
+					ddBonusAmount.animateDisplayAmount( bonusAmount, 6 * 1000 * bonusWinPercentage, animateDisplaysEnded );
+				}
+				
+				// Callback function
+				function animateDisplaysEnded( dd:DigitDisplay ):void 
+				{					
+					// Stop the sounds
+					if( winningsChnl != null && winningsBdChnl != null )
+					{
+						winningsChnl.stop(); 
+						winningsBdChnl.stop();
+					}
+					
+					if( dd == ddBonusAmount || bonusAmount <= 0 )
+					{
+						roundEnded();
+						autoDealTimeout = setTimeout( checkAutoDeal, 1000 ); 
+						
+						// Reset the win amounts if in DEBUG mode
+						if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+						{ 
+							serverEntries = Sweeps.Entries;
+							serverWinnings = Sweeps.Winnings + winAmount + bonusAmount; 
+						}
+						
+						// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts
+						Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );	
+					}
+					else
+					{
+						// Start the bonus flasher
+						bonusFlasher.start();
+						
+						// Play the winning sounds
+						winningsChnl = SoundManager.playSound( assets.Sounds["Add_Winnings"], 0, 0 );
+						winningsBdChnl = SoundManager.playSound( assets.Sounds["Add_Winnings_Backdrop"], 0, 0 );	
+						
+						ddBonusAmount.animateDisplayAmount( bonusAmount, 6 * 1000 * bonusWinPercentage, animateDisplaysEnded );						
+					}
+				};
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Resets the "Win" box to 0 and hides the pay table highlight
+			private function resetPrize():void
+			{
+				// Log Activity
+				logger.pushContext( "resetPrize", arguments );
+				
+				flasher.stop();
+				bonusFlasher.stop();
+				imgBonus.visible = false;
+				grpPaytable.visible = false;
+				imgHeader.visible = false;
+				ddWinAmount.displayAmount = 0;
+				ddBonusAmount.displayAmount = 0;
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Handles the "On Auto Play" event of btnPanel
+			protected function btnPanel_onAutoPlayHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onAutoPlayHandler", arguments );
+				
+				autoPlay = true;
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoDealTimeout );
+				autoDealTimeout = uint.MIN_VALUE;
+				
+				// Execute a deal or draw if we're not already revealing			
+				if( !revealing && !ddWinAmount.isAnimating && !ddBonusAmount.isAnimating )
+				{
+					if( hasDealt && !hasDrawn )
+					{
+						draw();
+					}
+					else
+					{
+						deal();
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Stop" event of btnPanel
+			protected function btnPanel_onStopHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onStopHandler", arguments );
+				
+				autoPlay = false;
+				if( revealing == 0 ) 
+				{ 
+					if( !hasDealt )
+					{
+						btnPanel.toggleEnabled( true );
+					}
+					else
+					{
+						btnPanel.toggleEnabled( false, false, false );
+					}
+					
+					// Clear any autoplay timeouts
+					clearTimeout( autoDealTimeout );
+					autoDealTimeout = uint.MIN_VALUE;					
+				
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( hasDealt );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Bet Sub" event of btnPanel
+			protected function btnPanel_onBetSubHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onBetSubHandler", arguments );
+				
+				if( betAmountStep > 0 )
+				{
+					betAmountStep--;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Bet Add" event of btnPanel
+			protected function btnPanel_onBetAddHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onBetAddHandler", arguments );
+				
+				if( betAmountStep < ( betAmounts.length - 1 ) )
+				{
+					betAmountStep++;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Bet One" event of btnPanel
+			protected function btnPanel_onBetOneHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onBetOneHandler", arguments );
+				
+				if( betAmountStep > 0 )
+				{
+					betAmountStep = 0;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Bet Max" event of btnPanel
+			protected function btnPanel_onBetMaxHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onBetMaxHandler", arguments );
+				
+				if( betAmountStep < ( betAmounts.length - 1 ) )
+				{
+					betAmountStep = betAmounts.length - 1;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Deal" event of btnPanel
+			protected function btnPanel_onDealHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onDealHandler", arguments );
+				
+				if( !hasDealt && !hasDrawn )
+				{
+					deal();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Draw" event of btnPanel
+			protected function btnPanel_onDrawHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onDrawHandler", arguments );
+				
+				if( hasDealt && !hasDrawn )
+				{
+					draw();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "click" event of each card
+			protected function card_clickHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "card_clickHandler", arguments );
+				
+				if( hasDealt && !hasDrawn )
+				{
+					var card:PokerCard = event.currentTarget as PokerCard;
+					if( card.isRevealed )
+					{
+						SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Card_Held" ), 0, 0 );
+						card.isHeld = !card.isHeld;
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "reveal" event of each card
+			protected function card_revealHandler( card:PokerCard ):void
+			{
+				// Log Activity
+				logger.pushContext( "card_revealHandler", arguments );
+				
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Card_Flip" ), 0, 0 );
+				revealing--;
+
+				if( !hasDrawn && revealing == 0 )
+				{
+					suggestHold();
+					
+					if( !autoPlay ) {
+						// Re-enable our 'draw' button
+						btnPanel.toggleEnabled( false, false, false ); 
+					}
+					else
+					{						
+						// Set the cards to re-deal if auto play is set
+						autoDealTimeout = setTimeout( checkAutoDeal, 1000 );
+					}
+				}
+				else if( hasDrawn && revealing == 0 )
+				{			
+					if( achievementsEarned == null )
+					{
+						checkWin();
+					}
+					else
+					{
+						Sweeps.getInstance().addNewBadges( achievementsEarned, checkWin );
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				
+				// Remove the style dispatcher
+				if( cssStyleDispatcher != null )
+				{
+					cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+					cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );
+					cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+					cssStyleDispatcher = null;
+				}
+
+				// Check to make sure the assets were loaded
+				if( assetsLoaded ) 
+				{
+					// Unload the styles
+					try
+					{
+						styleManager.unloadStyleDeclarations( Sweeps.AssetsLocation + "/VideoPoker/" + Sweeps.GameAsset, false );
+					}
+					catch( e:* ){ /* do nothing */ }
+				}
+				
+				// Check to make sure the game was loaded
+				if( gameLoaded )
+				{			
+					// Clear the prize win animations in case when quit on a win
+					resetPrize();
+				}
+				
+				if( card0 != null )
+				{
+					card0.removeEventListener( MouseEvent.CLICK, card_clickHandler );
+					card0.dispose();
+					card0 = null;
+				}
+				
+				if( card1 != null )
+				{
+					card1.removeEventListener( MouseEvent.CLICK, card_clickHandler );
+					card1.dispose();
+					card1 = null;
+				}
+				
+				if( card2 != null )
+				{
+					card2.removeEventListener( MouseEvent.CLICK, card_clickHandler );
+					card2.dispose();
+					card2 = null;
+				}
+				
+				if( card3 != null )
+				{
+					card3.removeEventListener( MouseEvent.CLICK, card_clickHandler );
+					card3.dispose();
+					card3 = null;
+				}
+				
+				if( card4 != null )
+				{
+					card4.removeEventListener( MouseEvent.CLICK, card_clickHandler );
+					card4.dispose();
+					card4 = null;
+				}
+				
+				if( btnPanel != null )
+				{
+					btnPanel.dispose();
+					btnPanel = null;
+				}
+				
+				if( dealStartTimer != null )
+				{
+					dealStartTimer.dispose();	
+					dealStartTimer = null;
+				}
+				
+				if( drawStartTimer != null )
+				{
+					drawStartTimer.dispose();
+					drawStartTimer = null;
+				}
+				
+				if( flasher != null )
+				{
+					flasher.removeEventListener( TimerEvent.TIMER, flasherFired );
+					flasher.stop();
+					flasher = null;
+				}
+				
+				if( bonusFlasher != null )
+				{
+					bonusFlasher.removeEventListener( TimerEvent.TIMER, bonusFlasherFired );
+					bonusFlasher.stop();
+					bonusFlasher = null;
+				}
+				
+				// Remove all the elements - Note: this needs to be done to clean up references to card0 -> card4
+				if( grpLayer0 != null )
+				{
+					grpLayer0.removeAllElements();
+				}
+				
+				if( grpLayer1 != null )
+				{
+					grpLayer1.removeAllElements();	
+				}
+				
+				if( grpLayer2 != null )
+				{
+					grpLayer2.removeAllElements();
+				}
+				
+				this.removeAllElements();
+				
+				// Clear Context
+				logger.popContext();				
+			}				
+		]]>
+	</fx:Script>
+	
+	<s:Group id="grpLayer0">
+		<mx:Image id="imgSkin" width="800" height="560" x="0" y="0"></mx:Image>
+		<mx:Image id="imgHeader" width="800" height="120" x="0" y="0" visible="false"></mx:Image>
+		<cx:ButtonPanel id="btnPanel" x="0" y="470" 
+						defaultBetAmount="{getBetAmount()}"
+						menuType="{ ButtonPanel.MENU_TYPE_VIDEO_POKER }"
+						onAutoPlay="btnPanel_onAutoPlayHandler" 
+						onStop="btnPanel_onStopHandler"
+						onBetSub="btnPanel_onBetSubHandler"
+						onBetAdd="btnPanel_onBetAddHandler"
+						onBetOne="btnPanel_onBetOneHandler"
+						onBetMax="btnPanel_onBetMaxHandler"			
+						onDeal="btnPanel_onDealHandler"
+						onDraw="btnPanel_onDrawHandler">			
+		</cx:ButtonPanel>
+	</s:Group>
+	
+	<s:Group id="grpLayer1">
+		<s:Group id="grpPaytable" width="202" height="152" x="62" y="131" visible="false">		
+			<s:BitmapImage id="imgPaytable" width="202" height="152" x="0" y="0" mask="{grhPaytableMask}"></s:BitmapImage>
+			<s:Graphic id="grhPaytableMask" width="202" height="142" x="0" y="0">
+				<s:Rect width="202" height="142">
+					<s:fill>
+						<s:SolidColor color="0x000000" />
+					</s:fill>
+				</s:Rect>
+			</s:Graphic>
+		</s:Group>				  
+		
+		<s:BitmapImage id="imgBonus" x="325" y="139" width="297" height="143" visible="false"></s:BitmapImage>
+		
+		<cx:DigitDisplay id="ddWinAmount" x="631" y="162" width="130" height="33" displayAmount="0" fontSize="36"></cx:DigitDisplay>		
+		<cx:DigitDisplay id="ddBetAmount" x="681" y="242" width="80" height="33" displayAmount="{getBetAmount()}" fontSize="36"></cx:DigitDisplay>			
+		<cx:DigitDisplay id="ddBonusAmount" x="412" y="231" width="130" height="33" displayAmount="0" fontSize="36"></cx:DigitDisplay>
+	</s:Group>
+	
+	<s:Group id="grpLayer2">
+		<VideoPoker:PokerCard id="card0" width="127" height="182" x="75" y="285" />
+		<VideoPoker:PokerCard id="card1" width="127" height="182" x="207" y="285" />
+		<VideoPoker:PokerCard id="card2" width="127" height="182" x="339" y="285" />
+		<VideoPoker:PokerCard id="card3" width="127" height="182" x="471" y="285" />
+		<VideoPoker:PokerCard id="card4" width="127" height="182" x="603" y="285" />		
+	</s:Group>
+	
+</s:SkinnableContainer>

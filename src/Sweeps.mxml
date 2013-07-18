@@ -1,0 +1,2166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:cx="components.*"
+			   backgroundColor="#000000"
+			   backgroundAlpha="0"
+			   width="800" height="600" 
+			   implements="interfaces.ILoginHandler"
+			   preloader="components.Preloader"
+			   applicationComplete="initApp(event)">
+	
+	<s:layout>
+		<s:VerticalLayout horizontalAlign="center"/>
+	</s:layout>
+	
+	<fx:Style source="styles/MainStyles.css"/>	
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Config;
+			import assets.Fonts;
+			import assets.SimpleDataTimer;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import components.AchievementPopUp;
+			import components.AchievementsPanel;
+			import components.BalancePopUp;
+			import components.GameChanger;
+			import components.Login;
+			import components.MainLoader;
+			import components.MainMenu;
+			import components.MainPanel;
+			import components.PopUp;
+			import components.Progress;
+			import components.ProgressiveJackpot;
+			import components.ProgressiveWin;
+			import components.Redeem;
+			import components.RedeemAll;
+			import components.RedeemQuick;
+			import components.Reveal;
+			import components.SpriteUIComponent;
+			
+			import flash.display.Stage;
+			import flash.display.StageAlign;
+			import flash.display.StageDisplayState;
+			import flash.display.StageScaleMode;
+			import flash.events.Event;
+			import flash.events.FullScreenEvent;
+			import flash.external.ExternalInterface;
+			import flash.utils.getTimer;
+			
+			import interfaces.IDebuggable;
+			import interfaces.IDisposable;
+			import interfaces.ILoginHandler;
+			
+			import mx.core.FlexGlobals;
+			import mx.core.IVisualElement;
+			import mx.core.UIComponent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+			
+			import objects.AchievementBadge;
+			import objects.AchievementReward;
+			import objects.ErrorMessage;
+			
+			import services.SweepsAPI;
+			
+			import starling.Game;
+			import starling.StarlingVideoKeno;
+			import starling.core.Starling;
+			import starling.events.Event;
+			
+			import utils.ArrayHelper;
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( Sweeps );			
+			
+			private static var isAudioEnabled:Boolean = true;
+			private static var isFullScreen:Boolean = false;
+			private static var isInAction:Boolean = false;
+			
+			private static var sweepsInstance:Sweeps;
+			private static var username:String = "";
+			private static var password:String = "";
+			private static var internetURL:String = "";
+			private static var applicationLocation:String = "";
+			private static var assetsLocation:String = "";
+			private static var exclusionList:String = "";
+			private static var badgesEnabled:String = "";
+			private static var autoRedeemEnabled:String = "";
+			private static var donateEnabled:String = "";
+			private static var skilltopiaEnabled:String = "";
+			private static var socketEnabled:String = "";
+			private static var directLogin:Boolean = false;			
+			
+			private static var gameID:int = 0;
+			private static var gameName:String = "";
+			private static var gameType:int = 0;
+			private static var gameAsset:String = "";
+			
+			private static var entries:int = 0.0;
+			private static var winnings:int = 0.0;
+			
+			private static var progressiveBalance:int = 0.0;
+			private static var progressiveEnabled:Boolean = false;
+			
+			private static var badgesEarned:Array = [];
+			private static var rewardsEarned:Array = [];
+			
+			private var newAchievementsList:Array;
+			private var newAchievementsCallback:Function;
+			
+			private var gameChangerCallback:Function;
+			
+			private var scale:Number = 1.0;
+			
+			private var soundChannelMenuBackground:SoundChannel;
+			private var isGameLoaded:Boolean = false;
+			private var starlingInstance:Starling;
+			
+			private var scGameChanger:GameChanger;
+			private var scLogin:Login;
+			private var scMainLoader:MainLoader;
+			private var scMainMenu:MainMenu;
+			private var scMainPanel:MainPanel;
+			private var scRedeem:Redeem;
+			private var scRedeemAll:RedeemAll;
+			private var scRedeemQuick:RedeemQuick;
+			private var scReveal:Reveal;
+			private var popUp:PopUp
+			private var scProgressive:ProgressiveJackpot;
+			private var scProgressiveWin:ProgressiveWin;
+			private var scBadges:AchievementsPanel;
+			private var scAchievementPopUp:AchievementPopUp;
+			private var scBalancePopUp:BalancePopUp;
+			private var quitTimer:SimpleDataTimer;
+			private var sweepsLoadTime:Number = flash.utils.getTimer();
+			private var gameLoadTime:Number;
+			private var scProgress:Progress;
+			
+			private static const INTERNET_URL:String 				= "http://www.google.com/";			
+			private static const SWEEPSTOPIA_LOGOUT_FUNCTION:String = "sweepstopiaLogout";			
+			private static const ASSETS_LOCATION:String 			= "assets";
+			private static const IDLE_TIMEOUT:int 					= 9000; // 15 minutes - (Total milliseconds/100)
+			private static const BADGES_ENABLED:Boolean 			= false;
+			private static const AUTO_REDEEM_ENABLED:Boolean 		= false;
+			private static const DONATE_ENABLED:Boolean 			= false;
+			private static const SOCKET_ENABLED:Boolean				= false;
+			private static const SKILLTOPIA_ENABLED:Boolean			= false;
+			
+			public static const DEBUG:Boolean = Config.Debug; 					// Flag for Release/Debug mode - (False: Release | True: Debug)					
+			public static const DEBUG_W_API:Boolean = Config.Debug_w_api;		// Flag to enable API calls in Debug mode								
+			public static const RELEASE_VERSION:String = Config.Build_Version; 	// Release version indicator
+			
+			// Static Getters
+			public static function get AudioEnabled():Boolean
+			{
+				return isAudioEnabled;
+			}
+			
+			public static function get GameID():int
+			{
+				return gameID;
+			}	
+			
+			public static function get GameName():String
+			{
+				return gameName;
+			}
+			
+			public static function get GameType():int
+			{
+				return gameType;
+			}
+			
+			public static function get GameAsset():String
+			{
+				return gameAsset;
+			}
+			
+			public static function get Username():String
+			{
+				return username;
+			}
+			
+			public static function get Password():String
+			{
+				return password;
+			}
+			
+			public static function get Entries():int
+			{
+				return entries;
+			}
+			
+			public static function set Entries( value:int ):void
+			{
+				entries = value;			
+			}
+			
+			public static function get Winnings():int
+			{
+				return winnings;
+			}
+			
+			public static function set Winnings( value:int ):void
+			{
+				winnings = value;			
+			}
+			
+			public static function get ProgressiveBalance():int
+			{
+				return progressiveBalance;
+			}
+			
+			public static function set ProgressiveBalance( value:int ):void
+			{
+				progressiveBalance = value;
+			}
+			
+			public static function get InternetURL():String
+			{
+				return internetURL != "" ? internetURL : INTERNET_URL;
+			}
+			
+			public static function get AssetsLocation():String
+			{
+				if( assetsLocation != "" )
+				{
+					return assetsLocation;
+				}
+				else
+				{
+					return applicationLocation + ASSETS_LOCATION;
+				}
+			}
+			
+			public static function get ExclusionList():Array
+			{
+				var exclusionArray:Array = new Array();
+				if( exclusionList != "" )
+				{
+					try
+					{
+						exclusionArray = exclusionList.split( "," );
+					} 
+					catch( e:Error )
+					{
+						logger.pushContext( "getExclusionsList" ).error( "Error getting Exclusion List: " + e.toString() ).popContext();
+					}
+				}
+				
+				return exclusionArray;
+			}
+			
+			public static function get BadgesEnabled():Boolean
+			{
+				var isBadgesEnabled:Boolean = BADGES_ENABLED;
+				if( badgesEnabled != "" )
+				{
+					try
+					{
+						badgesEnabled = badgesEnabled.toLowerCase();
+						isBadgesEnabled = (badgesEnabled == "true" || badgesEnabled == "1");
+					}
+					catch( e:Error )
+					{
+						logger.pushContext( "getBadgesEnabled" ).error( "Error parsing Badges value: " + e.toString() ).popContext();
+					}
+				}
+				
+				return isBadgesEnabled;
+			}
+			
+			public static function get AutoRedeemEnabled():Boolean
+			{
+				var isAutoRedeemEnabled:Boolean = AUTO_REDEEM_ENABLED;
+				if( autoRedeemEnabled != "" )
+				{
+					try
+					{
+						autoRedeemEnabled = autoRedeemEnabled.toLowerCase();
+						isAutoRedeemEnabled = (autoRedeemEnabled == "true" || autoRedeemEnabled == "1");
+					}
+					catch( e:Error )
+					{
+						logger.pushContext( "getAutoRedeemEnabled" ).error( "Error parsing Auto-Redeem value: " + e.toString() ).popContext();
+					}
+				}
+				
+				return isAutoRedeemEnabled;
+			}
+			
+			public static function get DonateEnabled():Boolean
+			{
+				var isDonateEnabled:Boolean = DONATE_ENABLED;
+				if( donateEnabled != "" )
+				{
+					try
+					{
+						donateEnabled = donateEnabled.toLowerCase();
+						isDonateEnabled = (donateEnabled == "true" || donateEnabled == "1");
+					}
+					catch( e:Error )
+					{
+						logger.pushContext( "getDonateEnabled" ).error( "Error parsing Donate value: " + e.toString() ).popContext();
+					}
+				}
+				
+				return isDonateEnabled;
+			}
+			
+			public static function get SkilltopiaEnabled():Boolean
+			{
+				var isSkilltopEnabled:Boolean = SKILLTOPIA_ENABLED;
+				if( skilltopiaEnabled != "" )
+				{
+					try
+					{
+						skilltopiaEnabled = skilltopiaEnabled.toLowerCase();
+						isSkilltopEnabled = (skilltopiaEnabled == "true" || skilltopiaEnabled == "1");
+					}
+					catch( e:Error )
+					{
+						logger.pushContext( "getSkilltopiaEnabled" ).error( "Error parsing Skilltopia value: " + e.toString() ).popContext();
+					}					
+				}
+				
+				return isSkilltopEnabled;
+			}
+			
+			public static function get SocketEnabled():Boolean
+			{
+				/* Commented out as part of the Socket Functionality Rollback
+				var isSocketEnabled:Boolean = SOCKET_ENABLED;
+				if( socketEnabled != "" )
+				{
+					try
+					{
+						socketEnabled = socketEnabled.toLowerCase();
+						isSocketEnabled = (socketEnabled == "true" || socketEnabled == "1");
+					}
+					catch( e:Error )
+					{
+						logger.error( "getSocketEnabled" ).error( "Error parsing Socket value: " + e.toString() ).popContext();
+					}					
+				}
+				
+				return isSocketEnabled;
+				*/
+				
+				return false;
+			}
+			
+			public static function get AchievementBadgesEarned():Array
+			{
+				return badgesEarned;
+			}
+			
+			public static function get AchievementRewardsEarned():Array
+			{
+				return rewardsEarned;
+			}
+			
+			public static function hasBadge( badgeName:String ):Boolean
+			{
+				return BadgesEnabled && AchievementBadgesEarned.indexOf( badgeName ) >= 0;
+			}
+			
+			public static function hasReward( rewardName:String ):Boolean
+			{
+				return BadgesEnabled && AchievementRewardsEarned.indexOf( rewardName ) >= 0;
+			}
+			
+			public static function getInstance():Sweeps
+			{
+				return sweepsInstance;
+			}
+			
+			public function setInAction( inAction:Boolean ):void
+			{
+				isInAction = inAction;
+				
+				if( scMainPanel != null )
+				{
+					scMainPanel.updateFunctions( inAction );
+				}
+			}				
+			
+			public function startProgressMeter( loadingBackground:Class = null ):void
+			{
+				scProgress = new Progress();
+				scProgress.depth = 99;
+				scProgress.backgroundImage = loadingBackground;		
+				scProgress.title = "Loading " + Config.Game_Label( Sweeps.GameName );
+				scMain.addElement( scProgress );					
+			}
+			
+			public function updateProgressMeter( progress:Number ):void
+			{
+				if( scProgress != null )
+				{
+					scProgress.pbLoader.label = "Loading... " + progress + "%";
+					scProgress.pbLoader.setProgress( progress, 100 );
+				}				
+			}
+			
+			public function stopProgressMeter():void
+			{
+				if( scProgress != null )
+				{
+					scMain.removeElement( scProgress );
+					scProgress.backgroundImage = null;
+					scProgress = null;
+				}
+			}
+			
+			// Initializes the application
+			private function initApp( event:flash.events.Event ):void
+			{
+				// Log Activity
+				DebugHelper.isDebug = Sweeps.DEBUG;
+				logger.pushContext( "initApp", arguments );
+				
+				// Initialize the API
+				SweepsAPI.debug = Sweeps.DEBUG;
+				SweepsAPI.debug_w_api = Sweeps.DEBUG_W_API;
+				SweepsAPI.release_version = Sweeps.RELEASE_VERSION;
+				
+				// Initialize the global listeners
+				createListeners();
+				
+				// Save our reference to this instance, so we can access it statically
+				sweepsInstance = this;
+				
+				// Register our fonts
+				Font.registerFont( assets.Fonts.timesFontNormal );
+				Font.registerFont( assets.Fonts.timesFontBold );
+				Font.registerFont( assets.Fonts.digital7 );
+				Font.registerFont( assets.Fonts.futuraBold );
+				
+				// Make an external JavaScript call to set the browser focus
+				if( ExternalInterface.available )
+				{
+					ExternalInterface.call( "function browserFocus(){ document.getElementById('" + this.id + "').focus(); }" );
+				}
+				
+				// Default the volume 
+				SoundManager.setVolume( SoundManager.DEFAULT_VOLUME );
+				
+				// Default the global styles
+				styleManager.getStyleDeclaration( "global" ).setStyle( "fontSize", 10 );
+				styleManager.getStyleDeclaration( "global" ).setStyle( "fontFamily", "Verdana" );
+				
+				// Default the stage properties
+				stage.scaleMode = StageScaleMode.NO_SCALE;
+				stage.align = StageAlign.TOP_LEFT;
+				
+				// Store the application URL				
+				applicationLocation = FlexGlobals.topLevelApplication.url;
+				if( applicationLocation )
+				{
+					applicationLocation = applicationLocation.slice( 0, applicationLocation.lastIndexOf( "/" ) + 1 );
+				}													
+				
+				// Initalize the 'Login' control
+				createLogin();
+				
+				// Check the initialization variables
+				checkFlashVars();
+				
+				// Establish socket
+				/* Commented out as part of the Socket Functionality Rollback
+				if( Sweeps.SocketEnabled && ( !Sweeps.DEBUG || Sweeps.DEBUG_W_API ) )
+				{
+					SweepsAPI.establishSocketConnection();
+				}
+				*/
+				
+				// Clear Context
+				logger.popContext();
+			}	
+			
+			// Handles uncaught error events
+			protected function uncaughtError( event:UncaughtErrorEvent ):void
+			{											
+				// Wrap in a try/catch to avoid endless loops if something goes seriously wrong
+				try
+				{
+					// Prevent the error from popping up in flash
+					event.preventDefault();
+					
+					// Get the error details
+					var nonSevereErrorCodes:Array = [2032, 2035, 2063];
+					var name:String;
+					var message:String;
+					var stackTrace:String;
+					var typeName:String = mx.utils.ObjectUtil.getClassInfo( event['error'] ).name;
+					var isSevere:Boolean = true;
+					var errMsg:ErrorMessage;
+					
+					// Get the error properties
+					if( event.hasOwnProperty( "error" ) )
+					{
+						if( event.error is Error ) 
+						{ 
+							var err:Error = event.error as Error;
+							if( err )
+							{
+								name = err.name;
+								message = err.toString();
+								stackTrace = err.getStackTrace();
+								isSevere = nonSevereErrorCodes.indexOf( err.errorID ) < 0;
+							}
+						} 
+						else if( event.error is SecurityErrorEvent )
+						{
+							var secErrEv:SecurityErrorEvent = event.error as SecurityErrorEvent;
+							if( secErrEv )
+							{
+								name = typeName;
+								message = secErrEv.toString();
+								message += ( secErrEv.target != null ? "\nTARGET: " + secErrEv.target.toString() : "" );
+								isSevere = nonSevereErrorCodes.indexOf( secErrEv.errorID ) < 0;
+							}
+						}
+						else if( event.error is IOErrorEvent )
+						{
+							var ioErrEv:IOErrorEvent = event.error as IOErrorEvent;
+							if( ioErrEv )
+							{
+								name = typeName;
+								message = ioErrEv.toString();
+								message += ( ioErrEv.target != null ? "\nTARGET: " + ioErrEv.target.toString() : "" );
+								isSevere = nonSevereErrorCodes.indexOf( ioErrEv.errorID ) < 0;
+							}
+						}
+						else if( event.error is ErrorEvent ) 
+						{ 
+							var errEv:ErrorEvent = event.error as ErrorEvent;
+							if( errEv )
+							{
+								name = typeName;
+								message = errEv.toString();
+								message += ( errEv.target != null ? "\nTARGET: " + errEv.target.toString() : "" );
+								isSevere = nonSevereErrorCodes.indexOf( errEv.errorID ) < 0;
+							}
+						} 
+						else 
+						{ 
+							name = typeName;
+							message = event.error.toString(); 
+							stackTrace = "";
+						} 					
+						
+						// Construct the error message
+						errMsg = getErrorMessageBase( "SWEEPS:Unhandled Exception!", name, message, stackTrace );				
+						
+						// Send the error			
+						SweepsAPI.reportError( errMsg, isSevere );
+					}
+				}
+				catch( e:* )
+				{
+					// Do nothing
+				}
+			}
+			
+			public function getErrorMessageBase( title:String, type:String, message:String, stackTrace:String = "" ):ErrorMessage
+			{
+				var errMsg:ErrorMessage;
+				var debuggable:IDebuggable;
+				var gameDebugInfo:String;
+				var timings:String;
+				
+				// Get game debug info
+				if( isGameLoaded )
+				{
+					if( starlingInstance != null )
+					{
+						gameDebugInfo = "";
+					}
+					else
+					{
+						debuggable = scMainLoader.getElementAt( 0 ) as IDebuggable;
+						if( debuggable != null )
+						{
+							gameDebugInfo = debuggable.getDebugInfo();
+						}
+					}
+				}
+				
+				// Get timings
+				timings = "Sweeps Running Time: " + ( getTimer() - sweepsLoadTime ) + "ms\n";
+				if( isGameLoaded )
+				{
+					timings += "Game Running Time: " + ( getTimer() - gameLoadTime ) + "ms\n";
+				}
+				
+				errMsg = new ErrorMessage( title, type, message, stackTrace );
+				errMsg.append( "GAME INFO", "Username: " + Sweeps.Username );
+				errMsg.append( "GAME INFO", "GameName: " + Sweeps.GameName );
+				errMsg.append( "GAME INFO", "GameID: " + Sweeps.GameID.toString() );
+				errMsg.append( "GAME INFO", "Skilltopia: " + SkilltopiaEnabled.toString() );
+				errMsg.append( "GAME DEBUG INFO", gameDebugInfo ); 	
+				errMsg.append( "TIMINGS", timings );
+				
+				return errMsg;
+			}
+			
+			// Creates the global listeners
+			protected function createListeners():void
+			{
+				// Log Activity
+				logger.pushContext( "createListeners", arguments );
+				
+				// Add the fullscreen event handler
+				stage.addEventListener( FullScreenEvent.FULL_SCREEN, fullScreenScale );
+				
+				// Add the resize event handler
+				stage.addEventListener( flash.events.Event.RESIZE, resizeDisplay );
+				
+				// Create the global error handler
+				loaderInfo.uncaughtErrorEvents.addEventListener( UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtError );
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Removes the global listeners
+			protected function removeListeners():void
+			{
+				// Log Activity
+				logger.pushContext( "removeListeners", arguments );
+				
+				// Remove the full screen event handler
+				stage.removeEventListener( FullScreenEvent.FULL_SCREEN, fullScreenScale );
+				
+				// Remove the resize event handler
+				stage.removeEventListener( flash.events.Event.RESIZE, resizeDisplay );
+				
+				// Remove the global error handler
+				loaderInfo.uncaughtErrorEvents.removeEventListener( UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtError );
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Creates the "Login" control
+			protected function createLogin():void
+			{
+				// Log Activity
+				logger.pushContext( "createLogin", arguments );
+				
+				scLogin = new Login();
+				scLogin.loginHandler = this;
+				scLogin.addEventListener( FlexEvent.CREATION_COMPLETE, loginComplete );
+				scMain.addElement( scLogin );
+				directLogin = false;
+				isAudioEnabled = true;
+				SoundManager.setVolume( SoundManager.DEFAULT_VOLUME );
+				
+				// Clear Context
+				logger.popContext();				
+			}					
+			
+			// Removes the "Login" control
+			protected function removeLogin():void
+			{
+				// Log Activity
+				logger.pushContext( "removeLogin", arguments );
+				
+				if( scLogin != null )
+				{					
+					scMain.removeElement( scLogin );
+					scLogin = null;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Creates the "Main Menu" control
+			protected function createMainMenu():void
+			{
+				// Log Activity
+				logger.pushContext( "createMainMenu", arguments );
+				
+				scMainMenu = new MainMenu();
+				scMainMenu.onFullScreen = fullScreenEvent;
+				scMain.addElement( scMainMenu );
+				playAudio( true );
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes the "Main Menu" control
+			protected function removeMainMenu():void
+			{
+				// Log Activity
+				logger.pushContext( "removeMainMenu", arguments );
+				
+				if( scMainMenu != null )
+				{
+					scMain.removeElement( scMainMenu );
+					scMainMenu = null;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Creates the "Main Panel" control
+			protected function createMainPanel():void
+			{
+				// Log Activity
+				logger.pushContext( "createMainPanel", arguments );
+				
+				scMainPanel = new MainPanel();
+				scMainPanel.depth = 100;
+				scMainPanel.y = 540;													
+				scMain.addElement( scMainPanel );
+				scMainPanel.toggleBadges( BadgesEnabled );
+				scMainPanel.toggleBG( AutoRedeemEnabled ? 1 : 0 );
+				scMainPanel.toggleTicker( SocketEnabled );
+				
+				// Add our ticker callback
+				SweepsAPI.addRouteListener( "/ticker/add", onTickerAdd );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes the "Main Panel" control
+			protected function removeMainPanel():void
+			{			
+				// Log Activity
+				logger.pushContext( "removeMainPanel", arguments );
+				
+				if( scMainPanel != null )
+				{
+					scMain.removeElement( scMainPanel );
+					scMainPanel = null;
+				}
+				
+				// Remove our ticker callback
+				SweepsAPI.removeRouteListener( "/ticker/add", onTickerAdd );				
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Creates the "Main Loader" control
+			protected function createMainLoader():void
+			{
+				// Log Activity
+				logger.pushContext( "createMainLoader", arguments );
+				
+				scMainLoader = new MainLoader();				
+				scMain.addElement( scMainLoader );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes the "Main Loader" control
+			protected function removeMainLoader():void
+			{		
+				// Log Activity
+				logger.pushContext( "removeMainLoader", arguments );
+				
+				if( scMainLoader != null )
+				{
+					scMainLoader.dispose();
+					scMain.removeElement( scMainLoader );
+					scMainLoader = null;
+					isGameLoaded = false;
+					playAudio( false ); // Stop any lingering sounds from the game
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Creates the "Progressive Jackpot" control
+			protected function createProgressive():void
+			{
+				// Log Activity
+				logger.pushContext( "createProgressive", arguments );
+				
+				scProgressive = new ProgressiveJackpot();
+				scProgressive.x = 2;
+				scProgressive.y = 0;
+				scProgressive.depth = 9999;
+				scMain.addElement( scProgressive );
+				scProgressive.setBalance( progressiveBalance );	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes the "Progressive Jackpot" control
+			protected function removeProgressive():void
+			{
+				// Log Activity
+				logger.pushContext( "removeProgressive", arguments );
+				
+				if( scProgressive != null )
+				{
+					scMain.removeElement( scProgressive );
+					scProgressive = null;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loads the 'Progressive Win' dialog
+			public function createProgressiveWin():void
+			{			
+				// Log Activity
+				logger.pushContext( "createProgressiveWin", arguments );
+				
+				scProgressiveWin = new ProgressiveWin();
+				scProgressiveWin.x = 0;
+				scProgressiveWin.y = 0;
+				scProgressiveWin.top = 0;
+				scProgressiveWin.alpha = 0.90;
+				scProgressiveWin.depth = 9999;
+				scMain.addElement( scProgressiveWin );
+				
+				scProgressiveWin.setBalance( progressiveBalance );
+				scProgressiveWin.setFocus();
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Closes the 'Progressive Win' dialog
+			public function removeProgressiveWin():void
+			{
+				// Log Activity
+				logger.pushContext( "removeProgressiveWin", arguments );
+				
+				if( scProgressiveWin != null )
+				{
+					// Remove the pop up
+					PopUpManager.removePopUp( scProgressiveWin );
+					scProgressiveWin = null;
+				}
+				
+				// Update the balances from the server so we can reset the progressive balance
+				this.refreshBalanceFromServer();
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Handles successful logins - (Login)
+			public function loginSuccess( user:String, pass:String ):void
+			{
+				logger.pushContext( "loginSuccess", arguments );
+				
+				// Store the username & password
+				username = user;
+				password = pass;																						
+				
+				// Remove the 'Login' control
+				removeLogin();
+				
+				// Initialize the 'Main Menu' control
+				createMainMenu();				
+				
+				// Initialize the 'Main Panel' control 
+				createMainPanel();
+				
+				// Initialize the 'Idle' event handler
+				systemManager.addEventListener( FlexEvent.IDLE, onIdle );
+				
+				// Update the account balance				
+				refreshBalanceFromServer();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles failed logins - (Login)
+			public function loginFailed( user:String, pass:String, reason:String  ):void
+			{
+				logger.pushContext( "loginFailed", arguments );
+				
+				directLogin = false;
+				scLogin.visible = true;	
+				exit( reason );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles complete event - (Login)
+			public function loginComplete( event:FlexEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "loginComplete", arguments );
+				
+				if( scLogin != null )
+				{					
+					scLogin.removeEventListener( FlexEvent.CREATION_COMPLETE, loginComplete );
+					
+					// Check if the username & password were passed in
+					if( directLogin && username != "" && password != "" )
+					{						
+						scLogin.visible = false;
+						scLogin.set( username, password );
+						scLogin.autoLogin();
+					}
+				}
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles exit commands - (Login)
+			public function exit( reason:String ):void
+			{				
+				// Log Activity
+				logger.pushContext( "exit", arguments );
+				
+				// Remove the 'Login' control
+				removeLogin();
+				
+				// Remove the global listeners
+				removeListeners();
+				
+				// Make an external JavaScript call on Exit
+				if( ExternalInterface.available )
+				{
+					ExternalInterface.call( "setTimeout(" + SWEEPSTOPIA_LOGOUT_FUNCTION + ", 1, '" + reason + "')" );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Checks the flash initialization variables
+			protected function checkFlashVars():void
+			{
+				// Log Activity
+				logger.pushContext( "checkFlashVars", arguments );
+				
+				// Retrieve & store the initalization variables	
+				var flashVars:Object = getFlashVars();
+				if( flashVars.username != null && flashVars.username != "" ) { username = flashVars.username; }
+				if( flashVars.password != null && flashVars.password != "" ) { password = flashVars.password; }
+				if( flashVars.internetURL != null && flashVars.internetURL != "" ) { internetURL = flashVars.internetURL; }
+				if( flashVars.assetsLocation != null && flashVars.assetsLocation != "" ) { assetsLocation = flashVars.assetsLocation; }
+				if( flashVars.exclusionList != null && flashVars.exclusionList != "" ) { exclusionList = flashVars.exclusionList; }
+				if( flashVars.badgesEnabled != null && flashVars.badgesEnabled != "" ) { badgesEnabled = flashVars.badgesEnabled; }				
+				if( flashVars.autoRedeemEnabled != null && flashVars.autoRedeemEnabled != "" ) { autoRedeemEnabled = flashVars.autoRedeemEnabled; }
+				if( flashVars.donateEnabled != null && flashVars.donateEnabled != "" ) { donateEnabled = flashVars.donateEnabled; }
+				if( flashVars.skilltopiaEnabled != null && flashVars.skilltopiaEnabled != "" ) { skilltopiaEnabled = flashVars.skilltopiaEnabled; }
+				
+				/* Commented out as part of the Socket Functionality Rollback
+				if( flashVars.socketEnabled != null && flashVars.socketEnabled != "" ) { socketEnabled = flashVars.socketEnabled; }
+				*/
+				
+				// Check if the username & password were passed in
+				if( username != "" && password != "" )
+				{
+					logger.debug( username, password );
+					
+					directLogin = true;					
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Retrieves the flash variables
+			private function getFlashVars():Object
+			{
+				// Log Activity
+				logger.pushContext( "getFlashVars", arguments );
+				
+				var flash_Vars:Object = new Object();
+				try
+				{
+					flash_Vars = FlexGlobals.topLevelApplication.parameters;
+				} 
+				catch( e:Error )
+				{
+					logger.error( "Error getting FlashVars: " + e.toString() );
+				}
+				
+				// Clear Context
+				logger.popContext();
+				
+				return flash_Vars;
+			}					
+			
+			// Loads and plays the requested game - (Main Menu)
+			public function playGame( type:int, id:int, name:String, asset:String ):void
+			{		
+				// Log Activity
+				logger.pushContext( "playGame", arguments );
+				
+				// Store the game details
+				gameID = id;
+				gameName = name;
+				gameType = type;
+				gameAsset = asset;
+				
+				// Initialize the 'Progressive' control
+				if( progressiveEnabled )
+				{
+					createProgressive();
+				}
+				
+				// Hide the main menu & stop the audio
+				scMainMenu.visible = false;
+				playAudio( false );				
+				
+				// Initialize the 'Main Loader' control
+				createMainLoader();				
+				
+				// Load the game
+				loadGame( gameType, gameID );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'Full Screen' event - (Main Menu)
+			protected function fullScreenEvent( menu:MainMenu ):void
+			{
+				// Log Activity
+				logger.pushContext( "fullScreenEvent", arguments );
+				
+				try
+				{
+					switch( stage.displayState )
+					{
+						case StageDisplayState.FULL_SCREEN:
+							// If already in full screen mode, switch to normal mode
+							isFullScreen = false;
+							stage.displayState = StageDisplayState.NORMAL;							
+							break;
+						
+						default:
+							// If not in full screen mode, switch to full screen mode
+							isFullScreen = true;
+							stage.displayState = StageDisplayState.FULL_SCREEN;
+							break;
+					}
+				}
+				catch( error:SecurityError )
+				{
+					createPopUp( "Security Error", "Unable to switch full screen mode.", false, false )
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}										
+			
+			// Loads the 'Reveal' game
+			public function loadRevealGame():void
+			{		
+				// Log Activity
+				logger.pushContext( "loadRevealGame", arguments );
+				
+				scReveal = PopUpManager.createPopUp( this, Reveal, true ) as Reveal;
+				PopUpManager.centerPopUp( scReveal );
+				scReveal.setScale( scale );											
+				scReveal.setFocus();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Quits the 'Reveal' game and updates the entries and winnings balances
+			public function quitRevealGame( newEntries:int, newWinnings:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "quitRevealGame", arguments );
+				
+				displayBalance( newEntries, newWinnings );
+				
+				// Remove the reveal pop up
+				PopUpManager.removePopUp( scReveal );
+				scReveal = null;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Enables the audio
+			public function enableAudio():void
+			{
+				// Toggle the audio on
+				isAudioEnabled = true;							
+				
+				// If there is no GAME loaded currently, toggle our own audio
+				if( !isGameLoaded ) { playAudio( true ); }
+			}
+			
+			// Disables the audio
+			public function disableAudio():void
+			{
+				// Toggle the audio off
+				isAudioEnabled = false;							
+				
+				// If there is no GAME loaded currently, toggle our own audio
+				if( !isGameLoaded ) { playAudio( false ); }
+			}
+			
+			// Quits the currently loaded game if one is loaded, or quits the application
+			public function quit( repeatCount:int = 1, autoCalled:Boolean = false ):void
+			{
+				// Log Activity
+				logger.pushContext( "quit", arguments );
+				
+				// Check if the game is inAction 
+				if( !isInAction )
+				{
+					// Close the badges popup if it exists
+					if( scAchievementPopUp != null )
+					{
+						closeAchievementPopUp( true, scAchievementPopUp.parent == scMain );
+					}
+					
+					// Close the badges panel if it exists
+					if( scBadges != null )
+					{
+						closeBadgesPanel();
+						if( !autoCalled )
+						{
+							return;
+						}
+					}
+					
+					for( var i:int = 0; i < repeatCount; i++ )
+					{
+						if( isGameLoaded )
+						{
+							// Clear the game loaded time
+							gameLoadTime = 0;
+
+							// If we're using starting, stop the game
+							if( starlingInstance != null )
+							{
+								starlingInstance.stop();
+								starlingInstance.dispose();
+								starlingInstance = null;
+							}							
+							
+							// Remove the 'Main Loader' control
+							removeMainLoader();						
+							
+							// Remove the 'Progressive Jackpot' control
+							if( progressiveEnabled )
+							{
+								removeProgressive();
+							}
+							
+							// Remove the 'Game Changer' control
+							gameChangerCallback = null;
+							removeGameChanger( "", true );
+							
+							// Show the 'Main Menu'
+							scMainMenu.visible = true;
+							
+							// Set our inAction value
+							setInAction( false );							
+							
+							// Play the audio
+							playAudio( true );
+						}
+						else
+						{
+							// Remove the idle event handler
+							systemManager.removeEventListener( FlexEvent.IDLE, onIdle );
+							
+							// Close the 'Badges' control if necessary
+							closeBadgesPanel();
+							
+							// Remove the 'Main Menu' control & stop all audio
+							removeMainMenu();
+							playAudio( false );
+							
+							// Remove the 'Main Panel' control
+							removeMainPanel();									
+							
+							// Return the screen to normal mode if in full screen
+							if( stage.displayState == StageDisplayState.FULL_SCREEN ) { stage.displayState = StageDisplayState.NORMAL; }					
+							
+							// Create the 'Login' control
+							createLogin();
+							
+							// Make an external JavaScript call on Logout
+							if( ExternalInterface.available )
+							{
+								ExternalInterface.call( "setTimeout(" + SWEEPSTOPIA_LOGOUT_FUNCTION + ", 1, 'Sweeps.quit called')" );
+							}
+						}
+					}
+				}
+				else if( quitTimer == null )
+				{
+					quitTimer = new SimpleDataTimer( 250 );
+					quitTimer.data = { RepeatCount:repeatCount, AutoCalled:autoCalled };
+					quitTimer.addEventListener( TimerEvent.TIMER, quitTimerHandler );
+					quitTimer.start();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the quit timer event
+			protected function quitTimerHandler( event:TimerEvent ):void
+			{
+				if( !isInAction )
+				{
+					// Log Activity
+					logger.pushContext( "quitTimerHandler", arguments );;
+					
+					// Just in case, make sure quitTimer is a valid reference
+					if( quitTimer == null )
+					{
+						quitTimer = event.target as SimpleDataTimer;
+					}
+					
+					// Remove the event listener
+					quitTimer.removeEventListener( TimerEvent.TIMER, quitTimerHandler );
+					
+					// Obtain the timer data values
+					var repeatCount:int = quitTimer.data.RepeatCount as int;
+					var autoCalled:Boolean = quitTimer.data.AutoCalled as Boolean;
+					
+					// Clear the timer
+					quitTimer.stop();
+					quitTimer = null;
+					
+					// Call the quit function
+					quit( repeatCount, autoCalled );
+					
+					// Clear Context
+					logger.popContext();
+				}
+			}
+			
+			// Loads the 'Redeem' dialog
+			public function loadRedeem():void
+			{		
+				// Log Activity
+				logger.pushContext( "loadRedeem", arguments );
+				
+				scRedeem = PopUpManager.createPopUp( this, Redeem, true ) as Redeem;
+				PopUpManager.centerPopUp( scRedeem );
+				scRedeem.setScale( scale );											
+				scRedeem.setFocus();	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Closes the 'Redeem' dialog
+			public function closeRedeem( newEntries:int, newWinnings:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "closeRedeem", arguments );
+				
+				// Update the balances
+				displayBalance( newEntries, newWinnings );
+				
+				// Remove the redeem pop up
+				PopUpManager.removePopUp( scRedeem );
+				scRedeem = null;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loads the 'Redeem All' dialog
+			public function loadRedeemAll():void
+			{		
+				// Log Activity
+				logger.pushContext( "loadRedeemAll", arguments );
+				
+				scRedeemAll = PopUpManager.createPopUp( this, RedeemAll, true ) as RedeemAll;
+				PopUpManager.centerPopUp( scRedeemAll );
+				scRedeemAll.setScale( scale );											
+				scRedeemAll.setFocus();	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Closes the 'Redeem All' dialog
+			public function closeRedeemAll( newEntries:int, newWinnings:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "closeRedeemAll", arguments );
+				
+				// Update the balances
+				displayBalance( newEntries, newWinnings );
+				
+				// Remove the redeem pop up
+				PopUpManager.removePopUp( scRedeemAll );
+				scRedeemAll = null;
+				
+				// Clear Context
+				logger.popContext();				
+			}					
+			
+			// Loads the 'Redeem Quick' dialog
+			public function loadRedeemQuick():void
+			{		
+				// Log Activity
+				logger.pushContext( "loadRedeemQuick", arguments );
+				
+				scRedeemQuick = PopUpManager.createPopUp( this, RedeemQuick, true ) as RedeemQuick;
+				PopUpManager.centerPopUp( scRedeemQuick );
+				scRedeemQuick.setScale( scale );											
+				scRedeemQuick.setFocus();	
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Closes the 'Redeem Quick' dialog
+			public function closeRedeemQuick( newEntries:int, newWinnings:int ):void
+			{
+				// Log Activity		
+				logger.pushContext( "closeRedeemQuick", arguments );
+				
+				// Update the balances
+				displayBalance( newEntries, newWinnings );
+				
+				// Remove the redeem pop up
+				PopUpManager.removePopUp( scRedeemQuick );
+				scRedeemQuick = null;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loads the 'Game Changer' dialog
+			public function loadGameChanger( callback:Function ):void
+			{		
+				// Log Activity
+				logger.pushContext( "loadGameChanger", arguments );
+				
+				gameChangerCallback = callback;
+				
+				scGameChanger = new GameChanger();
+				scGameChanger.x = 0;
+				scGameChanger.y = 0;
+				scGameChanger.top = 0;
+				scMain.addElement( scGameChanger );
+				scGameChanger.setCallback( removeGameChanger );
+				scGameChanger.setFocus();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes the 'Game Changer' dialog
+			protected function removeGameChanger( skinName:String, forceQuit:Boolean = false ):void
+			{
+				// Log Activity
+				logger.pushContext( "removeGameChanger", arguments );
+				
+				if( scGameChanger != null )
+				{
+					// Remove the 'Game Changer' pop up
+					scMain.removeElement( scGameChanger );
+					scGameChanger = null;
+					
+					if( !forceQuit && gameChangerCallback != null )
+					{
+						gameChangerCallback( skinName );
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Creates a modal pop up
+			public function createPopUp( title:String, message:String, isError:Boolean, isLogout:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "createPopUp", arguments );
+				
+				popUp = PopUpManager.createPopUp( this, PopUp, true ) as PopUp;
+				PopUpManager.centerPopUp( popUp );
+				popUp.title = title;
+				popUp.message = message;
+				popUp.isError = isError;
+				popUp.isLogout = isLogout;
+				popUp.scale = scale;
+				popUp.removePopupCallback = removePopUp;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes the modal popup
+			protected function removePopUp( newEntries:int, newWinnings:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "removePopUp", arguments );
+				
+				// Update the balances
+				displayBalance( newEntries, newWinnings );
+				
+				// Remove the pop up
+				PopUpManager.removePopUp( popUp );
+				popUp = null;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Retrieves the earned achievements
+			public function getAchievements( onSuccess:Function = null ):void
+			{
+				// Log Activity
+				logger.pushContext( "getAchievements", arguments );
+				
+				if( Sweeps.BadgesEnabled )
+				{
+					SweepsAPI.getAchievements( username, password, handleAchievementsSuccess( onSuccess ), handleAchievementsError );
+				}
+				else if( onSuccess != null )
+				{
+					onSuccess( [] );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles achievements success
+			private function handleAchievementsSuccess( onSuccess:Function = null ):Function
+			{				
+				// We're returning a function which will handle the achievements api call back,
+				// but also has access to our passed in onSuccess function through the closure
+				return function( achievements:Array ): void 
+				{
+					// Log Activity
+					logger.pushContext( "handleAchievementsSuccess", arguments );
+					
+					badgesEarned = achievements;
+					rewardsEarned = AchievementReward.getApplicableRewards( badgesEarned );
+					if( onSuccess != null ) {
+						onSuccess( badgesEarned );
+					}
+					
+					// Clear Context
+					logger.popContext();					
+				}
+			}
+			
+			// Handles achievements errors
+			private function handleAchievementsError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleAchievementsError", arguments );
+				
+				// Handle the error from the achievements call
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						createPopUp( "Unauthorized", "We're sorry, but your account can only be logged in to one computer at a time.", false, true );
+						break;
+					
+					default:
+						createPopUp( "Oops!", "We're sorry, but there was an issue while trying to retrieve your badges.\n", true, false );
+						if( isGameLoaded )
+						{
+							isInAction = false;
+							quit( 1, true );
+						}
+						break;					
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Iterates through the supplied array and adds/displays each achievement/badge			
+			public function addNewBadges( badges:Array, callback:Function ):void
+			{
+				// Log Activity
+				logger.pushContext( "addNewBadges", arguments );
+				
+				newAchievementsList = badges;
+				newAchievementsCallback = callback;
+				
+				if( newAchievementsList == null || newAchievementsList.length == 0 || !Sweeps.BadgesEnabled )
+				{
+					newAchievementsList = null;
+					
+					// Determine which rewards we should have based on our current badges,
+					// then use the ArrayHelper to find out which ones we don't already have
+					// Then all addNewAwards to add them one by one, displaying our popup
+					addNewReward( ArrayHelper.getMergedUnique( AchievementReward.getApplicableRewards( badgesEarned ), rewardsEarned ), newAchievementsCallback );
+				}
+				else
+				{				
+					// Grab the next badge from the list, add it to our badges earned and load the popup.
+					var badge:String = newAchievementsList.shift();
+					badgesEarned.push( badge );
+					loadAchievementPopUp( badge, true, false );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Iterates through the supplied array and adds/displays each achivement/reward
+			public function addNewReward( rewards:Array, callback:Function ):void
+			{
+				// Log Activity
+				logger.pushContext( "addNewReward", arguments );
+				
+				newAchievementsList = rewards;
+				newAchievementsCallback = callback;		
+				
+				if( newAchievementsList == null || newAchievementsList.length == 0 || !Sweeps.BadgesEnabled )
+				{
+					newAchievementsList = null;
+					newAchievementsCallback();
+				}
+				else
+				{				
+					// Grab the next reward from the list, add it to our rewards earned and load the popup.
+					var reward:String = newAchievementsList.shift();
+					rewardsEarned.push( reward );
+					loadAchievementPopUp( reward, false, false );
+				}	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loads the 'Badges' dialog
+			public function loadBadgesPanel():void
+			{
+				// Log Activity
+				logger.pushContext( "loadBadgesPanel", arguments );
+				
+				if( scBadges == null )
+				{			
+					scBadges = new AchievementsPanel();
+					scMain.addElement( scBadges );
+				}
+				else
+				{
+					closeBadgesPanel();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Closes the 'Badges' dialog
+			public function closeBadgesPanel():void
+			{
+				// Log Activity
+				logger.pushContext( "closeBadgesPanel", arguments );
+				
+				if( scBadges != null )
+				{
+					scMain.removeElement( scBadges );
+					scBadges = null;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loads the 'Achievements' pop up
+			public function loadAchievementPopUp( achievementName:String, isBadge:Boolean, isMouseOver:Boolean, verticalCenter:int = 0 ):void
+			{		
+				// Log Activity
+				logger.pushContext( "loadAchievementPopUp", arguments );
+				
+				if( scAchievementPopUp == null )
+				{
+					if( isMouseOver )
+					{
+						scAchievementPopUp = new AchievementPopUp();			
+						scAchievementPopUp.verticalCenter = verticalCenter;
+						scMain.addElement( scAchievementPopUp );
+						scAchievementPopUp.setScale( scale );
+						scAchievementPopUp.displayAchievement( achievementName, isBadge, isMouseOver );
+					}
+					else
+					{
+						scAchievementPopUp = PopUpManager.createPopUp( this, AchievementPopUp, true ) as AchievementPopUp;
+						scAchievementPopUp.width = 400;
+						scAchievementPopUp.height = 285;
+						PopUpManager.centerPopUp( scAchievementPopUp );
+						scAchievementPopUp.displayAchievement( achievementName, isBadge, isMouseOver );
+						scAchievementPopUp.setScale( scale );											
+						scAchievementPopUp.setFocus();
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Closes the 'Achievement' pop up
+			public function closeAchievementPopUp( isBadge:Boolean, isMouseOver:Boolean ):void
+			{		
+				// Log Activity
+				logger.pushContext( "closeAchievementPopUp", arguments );
+				
+				if( scAchievementPopUp != null )
+				{
+					if( isMouseOver )
+					{
+						scMain.removeElement( scAchievementPopUp );
+					}
+					else
+					{
+						// Remove the achievement pop up
+						PopUpManager.removePopUp( scAchievementPopUp );
+					}
+					
+					scAchievementPopUp = null;
+					
+					// Load the next achievement in the list if one is available
+					if( !isMouseOver && newAchievementsList != null )
+					{
+						if( isBadge )
+						{
+							addNewBadges( newAchievementsList, newAchievementsCallback );
+						}
+						else
+						{
+							addNewReward( newAchievementsList, newAchievementsCallback );							
+						}
+					}					
+				}	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loads the 'Balance' pop up
+			public function loadBalancePopUp():void
+			{		
+				// Log Activity
+				logger.pushContext( "loadBalancePopUp", arguments );
+				
+				if( scBalancePopUp == null )
+				{
+					scBalancePopUp = new BalancePopUp();			
+					scMain.addElement( scBalancePopUp );
+					scBalancePopUp.setScale( scale );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Closes the 'Balance' pop up
+			public function closeBalancePopUp():void
+			{		
+				// Log Activity
+				logger.pushContext( "closeBalancePopUp", arguments );
+				
+				if( scBalancePopUp != null )
+				{
+					scMain.removeElement( scBalancePopUp );
+					scBalancePopUp = null;
+				}	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Updates the stage scaling for Normal/Full screen mode
+			private function fullScreenScale( event:FullScreenEvent ):void 
+			{    				
+				// Log Activity
+				logger.pushContext( "fullScreenScale", arguments );
+				
+				if( event.fullScreen )
+				{
+					isFullScreen = true;
+					if( stage.stageWidth != width || stage.stageHeight != height )    
+					{                
+						if( width > height )        
+						{           
+							scale = stage.stageHeight / height;        
+						}       
+						else        
+						{          
+							scale = stage.stageWidth / width;        
+						}
+						
+						scaleX = scaleY = scale;
+						x = stage.stageWidth / 2 - ( width * scale ) / 2;             
+						y = stage.stageHeight / 2 - ( height * scale ) / 2;
+					} 
+				}
+				else
+				{
+					isFullScreen = false;
+					scaleX = scaleY = scale = 1.0; // Default
+					x = 0;
+					y = 0;
+				}	
+				
+				// Clear Context
+				logger.popContext();				
+			} 			
+			
+			// Updates the stage scaling on resize events
+			private function resizeDisplay( event:flash.events.Event ):void 
+			{
+				// Log Activity
+				logger.pushContext( "resizeDisplay", arguments );
+				
+				if( stage.displayState != StageDisplayState.FULL_SCREEN && !isFullScreen )
+				{
+					if( stage.stageWidth != width || stage.stageHeight != height )    
+					{                
+						if( width > height )        
+						{           
+							scale = stage.stageHeight / height;        
+						}       
+						else        
+						{          
+							scale = stage.stageWidth / width;        
+						}         					 
+					}
+					else
+					{
+						scale = 1.0; // Default
+					}
+					
+					scaleX = scaleY = scale;
+					x = stage.stageWidth / 2 - ( width * scale ) / 2;             
+					y = stage.stageHeight / 2 - ( height * scale ) / 2;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Updates the account balance
+			public function refreshBalanceFromServer():void
+			{
+				// Log Activity
+				logger.pushContext( "refreshBalanceFromServer", arguments );
+				
+				// Set our inAction value
+				setInAction( true );
+				
+				SweepsAPI.getBalance( username, password, handleBalanceSuccess, handleBalanceError );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles update balance success
+			private function handleBalanceSuccess( newEntries:int, newWinnings:int, newProgressiveBalance:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleBalanceSuccess", arguments );
+				
+				// Set our inAction value
+				setInAction( false );
+				
+				if( newProgressiveBalance >= 0 )
+				{
+					progressiveEnabled = true;					
+					displayProgressiveBalance( newProgressiveBalance, false );
+				}
+				
+				displayBalance( newEntries, newWinnings );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Displays the progressive balance
+			public function displayProgressiveBalance( newProgressiveBalance:int, animate:Boolean = false ):void
+			{
+				logger.pushContext( "displayProgressiveBalance", arguments );
+				
+				// Determine the animation duration based on game type
+				var animationDuration:int = 0;
+				switch( GameType ) 
+				{
+					case Config.GAME_TYPE_SINGLELINE_SLOTS:
+					case Config.GAME_TYPE_SINGLINE_SLOTS_BIGPAY:
+						animationDuration = 6000;
+						break;
+					
+					case Config.GAME_TYPE_VIDEO_SLOTS:
+					case Config.GAME_TYPE_VIDEO_SLOTS_25:
+					case Config.GAME_TYPE_VIDEO_SLOTS_FSBONUS:
+						animationDuration = 10000;
+						break;
+					
+					case Config.GAME_TYPE_VIDEO_BLACKJACK:
+					case Config.GAME_TYPE_VIDEO_KENO:
+					case Config.GAME_TYPE_VIDEO_POKER:
+					case Config.GAME_TYPE_SUPER_VIDEO_SLOTS:
+					case Config.GAME_TYPE_QUAD_VIDEO_SLOTS:
+						animationDuration = 15000;
+						break;
+				}
+				
+				
+				// Updates the local copy of progressiveBalance
+				progressiveBalance = newProgressiveBalance;
+				if( isGameLoaded && progressiveEnabled && scProgressive != null )
+				{
+					if( animate )
+					{
+						scProgressive.displayBalance( progressiveBalance, animationDuration );
+					}
+					else
+					{
+						scProgressive.setBalance( progressiveBalance );
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Spins the progressive reel
+			public function spinProgressiveReel( winAmount:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinProgressiveReel", arguments );
+				
+				if( isGameLoaded && progressiveEnabled && scProgressive != null )
+				{
+					scProgressive.spin( winAmount > 0 );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Toggles the progressive jackpot
+			public function toggleProgressive( visible:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "toggleProgressive", arguments );
+				
+				if( isGameLoaded && progressiveEnabled && scProgressive != null )
+				{
+					scProgressive.visible = visible;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Displays the account balance
+			public function displayBalance( newEntries:int, newWinnings:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "displayBalance", arguments );
+				
+				// Updates the local copies of entries and winnings
+				Entries = newEntries;
+				Winnings = newWinnings;
+				
+				if( scMainPanel != null )
+				{
+					scMainPanel.display_Balance( Entries, Winnings );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Handles update balance errors
+			private function handleBalanceError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleBalanceError" ).error.apply( null, arguments );
+				
+				// Set our inAction value
+				setInAction( false );
+				
+				// Reset the balance back to the local amounts
+				displayBalance( Sweeps.Entries, Sweeps.Winnings );
+				
+				// Handle the error from the balance call
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						createPopUp( "Unauthorized", "We're sorry, but your account can only be logged in to one computer at a time.", false, true );
+						break;
+					
+					default:
+						createPopUp( "Oops!", "We're sorry, but there was an issue while trying to complete this request.", false, false );
+						break;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}					
+			
+			// Load a GAME component into our container
+			private function loadGame( gameType:int, gameID:int ):void 
+			{			
+				// Log Activity
+				logger.pushContext( "loadGame", arguments );
+				
+				// This should never be the true, but just in case...
+				if( isGameLoaded )
+				{
+					quit();
+				}
+				else
+				{
+					// Disable the main panel, so we can't quit while the game is loading
+					setInAction( true );
+					
+					// Load the proper component based on the GAME type
+					switch( gameType )
+					{
+						case Config.GAME_TYPE_SINGLELINE_SLOTS:
+						case Config.GAME_TYPE_SINGLINE_SLOTS_BIGPAY:
+							scMainLoader.addElement( new SinglelineSlots() );
+							isGameLoaded = true;
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_SLOTS:
+						case Config.GAME_TYPE_VIDEO_SLOTS_FSBONUS:
+						case Config.GAME_TYPE_VIDEO_SLOTS_25:
+							scMainLoader.addElement( new VideoSlots() );
+							isGameLoaded = true;
+							break;
+						
+						case Config.GAME_TYPE_SUPER_VIDEO_SLOTS:
+							scMainLoader.addElement( new SuperVideoSlots() );
+							isGameLoaded = true;
+							break;
+						
+						case Config.GAME_TYPE_QUAD_VIDEO_SLOTS:
+							scMainLoader.addElement( new QuadVideoSlots() );
+							isGameLoaded = true;
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_POKER:
+							scMainLoader.addElement( new VideoPoker() );
+							isGameLoaded = true;
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_KENO:
+//							scMainLoader.addElement( new VideoKeno() );
+//							isGameLoaded = true;
+							
+							// TODO: Why do I have to offset this?
+							var viewRect:Rectangle = new Rectangle( 0, 0, 800, 560 );
+							starlingInstance = new Starling( StarlingVideoKeno, stage, viewRect );
+							starlingInstance.addEventListener( starling.events.Event.ROOT_CREATED, onStarlingRootCreated );
+							starlingInstance.start();						
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_BLACKJACK:
+							scMainLoader.addElement( new VideoBlackjack() );
+							isGameLoaded = true;
+							break;
+					}
+					
+					// Set the game loaded time
+					gameLoadTime = getTimer();
+					
+					// Refresh the achievements
+					getAchievements( achievementsLoaded );
+					
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			private function onStarlingRootCreated( event:starling.events.Event ):void
+			{
+				starlingInstance.removeEventListener( starling.events.Event.ROOT_CREATED, onStarlingRootCreated );
+				isGameLoaded = true;
+			}
+			
+			// Handles notifying the game that the achivements have loaded
+			private function achievementsLoaded( badgedEarned:Array ):void
+			{
+				logger.pushContext( "achievementsLoaded", arguments );
+				
+				// Make sure game is loaded or call ourselves after a timeout
+				if( !isGameLoaded )
+				{
+					setTimeout( achievementsLoaded, 100, badgedEarned );
+					return;
+				}				
+				
+				// Notifity the game the achievements are loaded
+				if( starlingInstance != null )
+				{
+					Game( starlingInstance.root ).setAchievementsLoaded();
+				}
+				else if( scMainLoader != null && scMainLoader.numElements > 0 )
+				{
+					var baseGame:IVisualElement;
+					baseGame = scMainLoader.getElementAt( 0 );
+					
+					switch( gameType )
+					{
+						case Config.GAME_TYPE_SINGLELINE_SLOTS:
+						case Config.GAME_TYPE_SINGLINE_SLOTS_BIGPAY:
+							var sls:SinglelineSlots = baseGame as SinglelineSlots;
+							if( sls != null ){ sls.setAchievementsLoaded(); }
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_SLOTS:
+						case Config.GAME_TYPE_VIDEO_SLOTS_FSBONUS:
+						case Config.GAME_TYPE_VIDEO_SLOTS_25:
+							var vs:VideoSlots = baseGame as VideoSlots;
+							if( vs != null ){ vs.setAchievementsLoaded(); }
+							break;
+						
+						case Config.GAME_TYPE_SUPER_VIDEO_SLOTS:
+							var svs:SuperVideoSlots = baseGame as SuperVideoSlots;
+							if( svs!= null ){ svs.setAchievementsLoaded(); }
+							break;
+						
+						case Config.GAME_TYPE_QUAD_VIDEO_SLOTS:
+							var qvs:QuadVideoSlots = baseGame as QuadVideoSlots;
+							if( qvs!= null ){ qvs.setAchievementsLoaded(); }
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_POKER:
+							var vp:VideoPoker = baseGame as VideoPoker;
+							if( vp != null ){ vp.setAchievementsLoaded(); }
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_KENO:
+							var vk:StarlingVideoKeno = baseGame as StarlingVideoKeno;
+							if( vk != null ){ vk.setAchievementsLoaded(); }							
+							break;
+						
+						case Config.GAME_TYPE_VIDEO_BLACKJACK:
+							var vb:VideoBlackjack = baseGame as VideoBlackjack;
+							if( vb != null ){ vb.setAchievementsLoaded(); }
+							break;
+					}		
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Plays/Stops background audio
+			private function playAudio( play:Boolean ):void
+			{			
+				// Log Activity
+				logger.pushContext( "playAudio", arguments );
+				
+				if( !play )
+				{
+					// Stop any lingering sounds, clear the soundChannel as its sound will have stopped
+					SoundMixer.stopAll();
+					soundChannelMenuBackground = null;
+				}
+				
+				// Create the soundChannel if it doesn't exist
+				if( soundChannelMenuBackground == null )
+				{
+					soundChannelMenuBackground = SoundManager.playSound( assets.Sounds["menuBackground"], 50, int.MAX_VALUE );
+				}	
+				
+				// If we have a soundChannel, set its volume accordingly
+				if( soundChannelMenuBackground != null )
+				{
+					soundChannelMenuBackground.soundTransform = new SoundTransform( play ? 1 : 0 );
+				}	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'Idle' event
+			private function onIdle( event:FlexEvent ):void
+			{
+				if( event.currentTarget.mx_internal::idleCounter >= IDLE_TIMEOUT )
+				{				
+					// Remove the idle event handler
+					systemManager.removeEventListener( FlexEvent.IDLE, onIdle );
+					
+					// Log out the user
+					logout();
+				}
+			}
+			
+			// Logs out the user
+			public function logout():void
+			{			
+				// Log Activity
+				logger.pushContext( "logout", arguments );
+				
+				// Remove the pop up
+				if( popUp != null ) 
+				{ 
+					PopUpManager.removePopUp( popUp );
+					popUp = null;
+				}
+				
+				if( isGameLoaded )
+				{
+					quit( 2, true );
+				}
+				else
+				{
+					quit( 1, true );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+
+			/*
+			--------------------
+			ISweepsAPIHandler interface implementation
+			--------------------
+			*/
+			public function onTickerAdd( args:Object ):void
+			{
+				// Log Activity
+				logger.pushContext( "onTickerAdd", arguments );
+								
+				if( scMainPanel != null && scMainPanel.ticker != null )
+				{
+					scMainPanel.ticker.add( args );
+				}
+				
+				// Clear Context
+				logger.popContext();
+			}
+		]]>
+	</fx:Script>
+	
+	<s:SkinnableContainer id="scMain" width="800" height="600" backgroundAlpha="0"></s:SkinnableContainer>
+	
+</s:Application>

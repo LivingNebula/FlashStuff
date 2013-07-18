@@ -1,0 +1,89 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* images */
+	Skin: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Skin.png");
+	Paytable: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Paytable.jpg");
+	Reel: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Reel.jpg");
+	ReelBlurred: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Reel_Blurred.jpg");
+	ReelShadow: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelShadow.png");	
+	Playline: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Playline.png");	
+	PlaylineShadow: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/PlaylineShadow.png");
+	
+	Sprite_E: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Sprite_E.png");
+	Sprite_E_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Sprite_E_1.png");
+	Sprite_E_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Sprite_E_2.png");
+	Sprite_E_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/Sprite_E_3.png");	
+	
+	/* Images - Reel Icons*/
+	ReelIcon_A_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_1.jpg"); 		
+	ReelIcon_A_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_2.jpg");
+	ReelIcon_A_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_3.jpg");		
+	ReelIcon_A_4: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_4.jpg");		
+	ReelIcon_A_5: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_5.jpg");		
+	ReelIcon_A_6: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_6.jpg");		
+	ReelIcon_A_7: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_7.jpg");		
+	ReelIcon_A_8: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_A_8.jpg");		
+
+	ReelIcon_B_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_1.jpg"); 		
+	ReelIcon_B_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_2.jpg");		
+	ReelIcon_B_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_3.jpg");		
+	ReelIcon_B_4: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_4.jpg");		
+	ReelIcon_B_5: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_5.jpg");		
+	ReelIcon_B_6: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_6.jpg");		
+	ReelIcon_B_7: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_7.jpg");		
+	ReelIcon_B_8: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_8.jpg");
+	ReelIcon_B_9: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_B_9.jpg");
+		
+	ReelIcon_C_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_1.jpg");
+	ReelIcon_C_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_2.jpg");		
+	ReelIcon_C_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_3.jpg");		
+	ReelIcon_C_4: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_4.jpg");		
+	ReelIcon_C_5: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_5.jpg");		
+	ReelIcon_C_6: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_6.jpg");		
+	ReelIcon_C_7: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_7.jpg");		
+	ReelIcon_C_8: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_C_8.jpg");
+	
+	ReelIcon_D_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_1.jpg"); 		
+	ReelIcon_D_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_2.jpg"); 		
+	ReelIcon_D_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_3.jpg");		
+	ReelIcon_D_4: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_4.jpg");
+	ReelIcon_D_5: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_5.jpg");
+	ReelIcon_D_6: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_6.jpg");
+	ReelIcon_D_7: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_7.jpg");
+	ReelIcon_D_8: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_D_8.jpg");		
+		
+	ReelIcon_E_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_1.jpg"); 		
+	ReelIcon_E_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_2.jpg");		
+	ReelIcon_E_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_3.jpg");		
+	ReelIcon_E_4: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_4.jpg");
+	ReelIcon_E_5: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_5.jpg");		
+	ReelIcon_E_6: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_6.jpg");
+	ReelIcon_E_7: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_7.jpg");
+	ReelIcon_E_8: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_E_8.jpg");	
+		
+	ReelIcon_F_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_1.jpg"); 		
+	ReelIcon_F_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_2.jpg");		
+	ReelIcon_F_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_3.jpg");		
+	ReelIcon_F_4: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_4.jpg");
+	ReelIcon_F_5: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_5.jpg");		
+	ReelIcon_F_6: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_6.jpg");
+	ReelIcon_F_7: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_7.jpg");
+	ReelIcon_F_8: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_F_8.jpg");
+	
+	ReelIcon_G_1: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_1.jpg");
+	ReelIcon_G_2: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_2.jpg");		
+	ReelIcon_G_3: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_3.jpg");		
+	ReelIcon_G_4: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_4.jpg");
+	ReelIcon_G_5: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_5.jpg");		
+	ReelIcon_G_6: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_6.jpg");		
+	ReelIcon_G_7: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_7.jpg");
+	ReelIcon_G_8: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/images/ReelIcon_G_8.jpg");
+	
+	/* sounds */
+	Spin_Start: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/sounds/spin_start.mp3");
+	Spin_Stop: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/sounds/spin_stop.mp3");
+	Nudge_Indicator: Embed(source="/../../../assets/SinglelineSlots/OilTycoon/sounds/Nudge_Indicator.mp3");
+}

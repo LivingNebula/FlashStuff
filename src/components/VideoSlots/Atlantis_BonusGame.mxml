@@ -1,0 +1,778 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VideoSlots:VideoSlotsBonusGame xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								xmlns:s="library://ns.adobe.com/flex/spark" 
+								xmlns:mx="library://ns.adobe.com/flex/mx" 
+								xmlns:cx="components.*"
+								xmlns:VideoSlots="components.VideoSlots.*"
+								width="800" height="560"
+								initialize="init(event)">
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser"/>
+		<s:Linear id="linearEaser" easeInFraction="0.0" easeOutFraction="0.0" />
+		<s:Power id="powerEaser" easeInFraction="0.3" exponent="3" />	
+		<s:GlowFilter id="glowFilter" blurX="4" blurY="4" color="0xFFFFFF" strength="255" />
+	</fx:Declarations>
+	
+	<fx:Style>
+		.WheelNumber {
+			fontFamily: "esotericNewWestern";
+			fontSize: 26;
+			color: #000000;
+			textAlign: "center";
+			verticalAlign: "middle";
+		}
+	</fx:Style>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.SkinManager;
+			import assets.SoundManager;
+			
+			import flash.display.Loader;
+			import flash.utils.getTimer;
+			
+			import mx.core.UIComponent;
+			import mx.effects.Tween;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			
+			import spark.components.Image;
+			import spark.components.Label;
+			import spark.effects.Fade;
+			import spark.effects.Move;
+			import spark.effects.Rotate;
+			import spark.effects.Scale;
+			
+			import utils.ArrayHelper;
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( Atlantis_BonusGame );
+			
+			private var animationByteArray:ByteArray;
+			private var animationClass:Class;
+			
+			private var connect_nc:NetConnection;
+			private var stream_ns:NetStream;
+			private var video:Video;					
+			
+			private var introLoader:Loader;						// Loads the intro animation
+			private var lastFrame:int;							// Keeps track of the frame number while playing a clip
+			private var mcIntroExit:MovieClip;					// Movie Clip reference for the intro and exit animations
+			private var gameCompleted:Boolean = false;			// Set when the game is completed to limit additional interaction
+			private var aMeterBar:Scale;						// Animation that controls moving the meter bar
+			private var lastRot:Number = 0.0;					// Tracks the rotation of the wheel for purposes of audio
+			private var numberTargetIndex:int = 0;				// The index of the target label where we'll display our win amount
+			private var iconTargetIndex:int = 0;				// The index of the target label where we'll display our win icon
+			private var flasher:Timer;							// Flashes our win amount on the wheel
+			private var icons:Array;							// An array of icons
+			private var bonusSound:SoundChannel;
+			private var freeSpinBonusReelIcon:String;			// The target icon for the icon wheel
+			private var exitTimeout:uint;
+			
+			private var uiIntro:UIComponent;
+			private var uiFreeSpins:UIComponent;
+			
+			private var rotNumberWheel:Rotate;
+			private var rotIconWheel:Rotate;
+			
+			public function set FreeSpinBonusReelIcon( value:String ):void
+			{
+				freeSpinBonusReelIcon = value;
+			}
+			
+			public function get FreeSpinBonusReelIcon():String
+			{
+				return freeSpinBonusReelIcon;
+			}
+			
+			protected function init( event:FlexEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+				// Set the source of the background image
+				imgBG.source = SkinManager.getSkinAsset( styleManager, "BonusBG" );	
+				imgNumberWheel.source = SkinManager.getSkinAsset( styleManager, "BonusNumberWheel" );
+				imgIconWheel.source = SkinManager.getSkinAsset( styleManager, "BonusIconWheel" );
+				imgWheelStand.source = SkinManager.getSkinAsset( styleManager, "BonusWheelStand" );
+				imgPowerMeter.source = SkinManager.getSkinAsset( styleManager, "BonusPowerMeter" );
+				imgPowerMeter.mask = grpPowerMeterMask;
+				imgSpinButton.source = SkinManager.getSkinAsset( styleManager, "BonusSpinButton" );
+				imgBonusExit.source = SkinManager.getSkinAsset( styleManager, "BonusExit" );
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			override public function setParameters( betAmount:int, curLines:int, bonusWin:int, winAmount:int, startingAmount:int = 0 ):void
+			{
+				// Log Activity
+				logger.pushContext( "setParameters", arguments );
+				super.setParameters( betAmount, curLines, bonusWin, winAmount, startingAmount );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override public function resetAndPlay():void
+			{
+				// Log Activity
+				logger.pushContext( "resetAndPlay", arguments );
+				// Reset game completed
+				gameCompleted = false;
+				ddWinAmountExit.displayAmount = 0;
+				mcIntroExit = null;
+				if( introLoader != null )
+				{
+					introLoader.unloadAndStop( true );
+				}
+				
+				// Set the wheel rotation
+				var rot:Rotate = new Rotate();
+				rot.angleTo = 0;
+				rot.duration = 1;
+				rot.autoCenterTransform = true;
+				rot.play([grpNumberWheel, grpIconWheel]);
+				
+				// Calculate the winnings and play the intro
+				playIntro();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles playing the intro
+			private function playIntro():void
+			{
+				// Log Activity
+				logger.pushContext( "playIntro", arguments );				
+				// Load the animation class
+				animationClass = SkinManager.getSkinAsset( styleManager, "BonusGameIntro_Animation" );					
+				animationByteArray = new animationClass();
+				
+				// Initialize the net connection
+				connect_nc = new NetConnection();
+				connect_nc.connect( null );
+				
+				// Initialize the net stream
+				stream_ns = new NetStream( connect_nc );
+				stream_ns.client = this;
+				stream_ns.client = { onMetaData:function( obj:Object ):void{} }
+				stream_ns.addEventListener( NetStatusEvent.NET_STATUS, introNetStatusHandler );
+				stream_ns.play( null );
+				stream_ns.appendBytes( animationByteArray );
+				
+				// Initialize the animation
+				video = new Video( 800, 560 );
+				video.attachNetStream( stream_ns );
+				
+				// Add the animation to the stage
+				uiIntro = new UIComponent();
+				uiIntro.addChild( DisplayObject( video ) );
+				
+				addElement( uiIntro );
+				grpLayer0.visible = false;
+				grpLayer1.visible = false;				
+				grpLayer2.visible = false;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'Net Status' event of the Net Stream
+			protected function introNetStatusHandler( event:NetStatusEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "introNetStatusHandler", arguments.concat( event.info.code ) );
+				if( event.info.code == "NetStream.Play.Stop" || event.info.code == "NetStream.Buffer.Empty" )
+				{									
+					stopIntro();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes all the event listeners and elements from the container and dispatches a stop event
+			public function stopIntro():void
+			{
+				// Log Activity
+				logger.pushContext( "stopIntro", arguments );
+				if( stream_ns != null )
+				{
+					stream_ns.removeEventListener( NetStatusEvent.NET_STATUS, introNetStatusHandler );
+					stream_ns.close();
+					stream_ns = null;
+				}
+				
+				if( connect_nc != null )
+				{
+					connect_nc.close();
+					connect_nc = null;
+				}
+				
+				removeElement( uiIntro );
+				uiIntro = null;		
+				
+				grpLayer0.visible = true;
+				grpLayer1.visible = true;
+				grpLayer2.visible = false;
+				
+				// Play the bonus audio
+				bonusSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Bonus_Audio" ), bonusSound, true, true, 50, int.MAX_VALUE, 100, 25 );				
+				
+				// Start the meter
+				addIcons();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function addIcons():void
+			{
+				// Log Activity
+				logger.pushContext( "addIcons", arguments );
+				var numberCount:int = 22;
+				var iconCount:int = 11;
+				var curCount:int = 0;
+				var i:int;
+				var pt:Point;
+				var fd:Fade;
+				
+				
+				// Build the labels
+				var labelPositions:Array = MathHelper.getNPointsOnCircle( new Point( 0, 0 ), 260, 22 );
+				var lbl:Label;
+				for( i = 0; i < labelPositions.length; i++ )
+				{
+					pt = labelPositions[i] as Point;
+					lbl = new Label();
+					lbl.id = "lblWheelNumber" + i;
+					lbl.alpha = 0.0;
+					lbl.width = lbl.height = 60;
+					lbl.x = pt.x + ( grpNumberWheel.width / 2 ) - 30;
+					lbl.y = pt.y + ( grpNumberWheel.height / 2 ) - 30;
+					lbl.text = MathHelper.randomNumber( 1, 99 ).toString();
+					lbl.styleName = "WheelNumber";
+					lbl.rotationZ = i / 22 * 360;
+					lbl.transformZ = lbl.transformX = lbl.transformY =  lbl.width / 2;					
+					
+					grpNumberWheel.addElement( lbl );
+					
+					fd = AnimationManager.getFadeAnimation( lbl, 0.0, 0.8, 500, MathHelper.randomNumber( 500, 3000 ), 1 );
+					fd.addEventListener( EffectEvent.EFFECT_END, onRevealed );
+					fd.play();
+				}
+				
+				// Build the icons
+				icons = ["A","B","C","D","E","F","G","H","I","J","K"].map(function( icon:String, index:int, arr:Array):String{
+					return "ReelIcon_" + icon;
+				});
+				utils.ArrayHelper.randomize( icons );
+				var iconPositions:Array = MathHelper.getNPointsOnCircle( new Point( 0, 0 ), 164, 11, 10 );
+				var img:Image;
+				for( i = 0; i < icons.length; i++ )
+				{
+					pt = iconPositions[i] as Point;
+					img = new Image();
+					img.id = "imgWheelIcon" + i;
+					img.alpha = 0.0;
+					img.width = 80;
+					img.height = 75;
+					img.smooth = true;
+					img.x = pt.x + ( grpIconWheel.width / 2 ) - 40;
+					img.y = pt.y + ( grpIconWheel.height / 2 ) - 37;
+					img.source = SkinManager.getSkinAsset( styleManager, icons[i] );
+					img.rotationZ = i / 11 * 360;
+					img.transformZ = img.transformX = img.transformY =  img.width / 2;
+					
+					grpIconWheel.addElement( img );
+					
+					fd = AnimationManager.getFadeAnimation( img, 0.0, 1.0, 500, MathHelper.randomNumber( 500, 3000 ), 1 );
+					fd.addEventListener( EffectEvent.EFFECT_END, onRevealed );	
+					fd.play();
+				}
+				
+				function onRevealed( event:EffectEvent ):void 
+				{
+					fd = event.target as Fade;
+					fd.removeEventListener( EffectEvent.EFFECT_END, onRevealed );
+					fd = null;
+					
+					if( ++curCount == numberCount + iconCount )
+					{
+						startMeterBar();
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function startMeterBar():void
+			{
+				// Log Activity
+				logger.pushContext( "startMeterBar", arguments );				
+				// Start the meter bar animation
+				aMeterBar = AnimationManager.getScaleAnimation( grpPowerMeterMask, 1, 0, 1, 1, 4000, 0, 1, 0 );
+				aMeterBar.addEventListener( EffectEvent.EFFECT_UPDATE, aMeterBar_updateHandler );
+				aMeterBar.addEventListener( EffectEvent.EFFECT_END, aMeterBar_endHandler );
+				aMeterBar.play();
+				
+				imgSpinButton.buttonMode = true;
+				imgSpinButton.addEventListener( MouseEvent.CLICK, grpMeter_clickHandler );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function aMeterBar_updateHandler( event:EffectEvent ):void
+			{
+				grpPowerMeterMask.x = Math.abs( ( Math.round( flash.utils.getTimer() / 50 ) % 128 ) - 64 ) * -1;
+			}
+			
+			private function aMeterBar_endHandler( event:EffectEvent ):void
+			{
+				var t:Number = aMeterBar.scaleYFrom
+				aMeterBar.scaleYFrom = aMeterBar.scaleYTo;
+				aMeterBar.scaleYTo = t;
+				aMeterBar.play();
+			}		
+			
+			private function grpMeter_clickHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "grpMeter_clickHandler", arguments );
+				imgSpinButton.buttonMode = false;
+				imgSpinButton.removeEventListener( MouseEvent.CLICK, grpMeter_clickHandler );
+				
+				aMeterBar.removeEventListener( EffectEvent.EFFECT_END, aMeterBar_endHandler );
+				aMeterBar.stop();
+				
+				var powerPercent:Number = grpPowerMeterMask.scaleY;
+				spinNumberWheel( 1 + ( 3 * powerPercent ) );
+				spinIconWheel( 1 + ( 3 * powerPercent ) );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles spinning the number wheel
+			private function spinNumberWheel( speed:Number ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinNumberWheel", arguments );				
+				numberTargetIndex = MathHelper.randomNumber( 0, 21 );
+				var rotations:int = Math.pow( 2, Math.floor( speed ) );
+				var spinSpeed:int = 8000;
+				var duration:int = 0;
+				for( var i:int = 0; i < rotations; i++ )
+				{
+					duration += spinSpeed;
+					spinSpeed *= 0.8;
+				}
+				
+				rotNumberWheel = new Rotate( grpNumberWheel );
+				rotNumberWheel.autoCenterTransform = true;
+				rotNumberWheel.easer = powerEaser;
+				rotNumberWheel.duration = duration;
+				rotNumberWheel.repeatCount = 1;
+				rotNumberWheel.angleBy = ( ( rotations * 360 ) - ( numberTargetIndex * ( 360 / 22 ) ) );// + MathHelper.randomNumber( 360 / 22 * -.35, 360 / 22 * .35 );
+				rotNumberWheel.addEventListener( EffectEvent.EFFECT_UPDATE, spinNumberWheel_updateHandler );
+				rotNumberWheel.addEventListener( EffectEvent.EFFECT_END, spinNumberWheel_endHandler );
+				rotNumberWheel.play();		
+				
+				// Just to be safe, set the targetIndex value
+				setTimeout( function():void {
+					Label( grpNumberWheel.getElementAt( numberTargetIndex + 1 ) ).text = winAmount.toString();
+				}, duration * 0.5 );
+				
+				// "Drain" the meter bar
+				aMeterBar = AnimationManager.getScaleAnimation( grpPowerMeterMask, 1, grpPowerMeterMask.scaleY, 1, 0, duration, 0, 1, 0 );
+				aMeterBar.addEventListener( EffectEvent.EFFECT_UPDATE, aMeterBar_updateHandler );
+				aMeterBar.play();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function spinNumberWheel_updateHandler( event:EffectEvent ):void
+			{
+				if( Math.abs( grpNumberWheel.rotationZ - lastRot ) > ( 360 / 22 ) )
+				{
+					SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Wheel_Click" ), 0, 1 );
+					lastRot = grpNumberWheel.rotationZ;
+					
+					var offScreenIndex:int = MathHelper.mod( 5 - Math.round( lastRot / 360 * 22 ), 22 );										
+					if( offScreenIndex == numberTargetIndex ) {
+						Label( grpNumberWheel.getElementAt( numberTargetIndex + 1 ) ).text = winAmount.toString();
+					}
+					else
+					{
+						Label( grpNumberWheel.getElementAt( offScreenIndex + 1 ) ).text = MathHelper.randomNumber( 1, 99 ).toString();
+					}
+				}
+			}
+			
+			private function spinNumberWheel_endHandler( event:EffectEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinNumberWheel_endHandler", arguments );
+				if( !rotNumberWheel.isPlaying && ! rotIconWheel.isPlaying )
+				{
+					playFreeSpins( winAmount );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles spinning the icon wheel
+			private function spinIconWheel( speed:Number ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinIconWheel", arguments );
+				iconTargetIndex = icons.indexOf( freeSpinBonusReelIcon );
+				var rotations:int = Math.pow( 2, Math.floor( speed ) );
+				var spinSpeed:int = 7000;
+				var duration:int = 0;
+				for( var i:int = 0; i < rotations; i++ )
+				{
+					duration += spinSpeed;
+					spinSpeed *= 0.8;
+				}
+				
+				rotIconWheel = new Rotate( grpIconWheel );
+				rotIconWheel.autoCenterTransform = true;
+				rotIconWheel.easer = powerEaser;
+				rotIconWheel.duration = duration;
+				rotIconWheel.repeatCount = 1;
+				rotIconWheel.angleBy = ( ( rotations * 360 ) - ( iconTargetIndex * ( 360 / 11 ) ) ) + ( 360 / 11 * -.35 );
+				rotIconWheel.addEventListener( EffectEvent.EFFECT_UPDATE, spinIconWheel_updateHandler );
+				rotIconWheel.addEventListener( EffectEvent.EFFECT_END, spinIconWheel_endHandler );
+				rotIconWheel.play();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function spinIconWheel_updateHandler( event:EffectEvent ):void
+			{
+				
+			}
+			
+			private function spinIconWheel_endHandler( event:EffectEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinIconWheel_endHandler", arguments );
+				if( !rotNumberWheel.isPlaying && ! rotIconWheel.isPlaying )
+				{
+					playFreeSpins( winAmount );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}		
+			
+			// Handles playing the free spins transition animation
+			private function playFreeSpins( freeSpinCount:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "playFreeSpins", arguments );
+				// Create an animation timer to highlight how many free spins we wont
+				flasher = new Timer( 500, 8 );
+				flasher.addEventListener( TimerEvent.TIMER, flasherFired );
+				flasher.addEventListener( TimerEvent.TIMER_COMPLETE, flasherComplete );
+				flasher.start();
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			// Handles the flasher fired
+			private function flasherFired( event:TimerEvent ):void
+			{
+				var lbl:Label = Label( grpNumberWheel.getElementAt( numberTargetIndex + 1 ) );
+				lbl.setStyle( "color", flasher.currentCount % 2 != 0 ? "#FFFFFF" : "#000000" );
+				
+				var img:Image = Image( grpIconWheel.getElementAt( iconTargetIndex + 1 ) );
+				img.filters = flasher.currentCount % 2 != 0 ? [glowFilter] : [];
+			}			
+			
+			// Handles the flasher complete
+			private function flasherComplete( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "flasherComplete", arguments );
+				flasher.removeEventListener( TimerEvent.TIMER, flasherFired );
+				flasher.removeEventListener( TimerEvent.TIMER_COMPLETE, flasherComplete );
+				
+				removeIcons();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function removeIcons():void
+			{
+				// Log Activity
+				logger.pushContext( "removeIcons", arguments );
+				var numberCount:int = 22;
+				var iconCount:int = 11;
+				var curCount:int = 0;
+				var i:int = 0;
+				var fd:Fade;
+				var ui:UIComponent;
+				
+				for( i = 0; i < grpNumberWheel.numElements; i++ )
+				{
+					var lbl:Label = grpNumberWheel.getElementAt( i ) as Label;
+					if( lbl )
+					{
+						fd = AnimationManager.getFadeAnimation( lbl, lbl.alpha, 0.0, i == numberTargetIndex + 1 ? 1000: MathHelper.randomNumber( 1000, 3000 ), i == numberTargetIndex + 1 ? 3000 : 0, 1 );
+						fd.addEventListener( EffectEvent.EFFECT_END, onHidden );
+						fd.play();
+					}
+				}
+				
+				for( i = 0; i < grpIconWheel.numElements; i++ )
+				{
+					var img:Image = grpIconWheel.getElementAt( i ) as Image;
+					if( img && img != imgIconWheel )
+					{
+						fd = AnimationManager.getFadeAnimation( img, img.alpha, 0.0, i == iconTargetIndex + 1 ? 1000: MathHelper.randomNumber( 1000, 3000 ), i == iconTargetIndex + 1 ? 3000 : 0, 1 );
+						fd.addEventListener( EffectEvent.EFFECT_END, onHidden );
+						fd.play();
+					}
+				}				
+				
+				function onHidden( event:EffectEvent ):void 
+				{
+					fd = event.target as Fade;
+					ui = fd.target as UIComponent;
+					fd.removeEventListener( EffectEvent.EFFECT_END, onHidden );
+					fd = null;
+					( ui.parent as Group ).removeElement( ui );
+					
+					if( ++curCount == numberCount + iconCount )
+					{
+						playFreeSpinsAnimation();
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function playFreeSpinsAnimation():void
+			{
+				// Log Activity
+				logger.pushContext( "playFreeSpinsAnimation", arguments );
+				// Load the animation class
+				animationClass = SkinManager.getSkinAsset( styleManager, "BonusGameFreeSpins_Animation" );					
+				animationByteArray = new animationClass();
+				
+				// Initialize the net connection
+				connect_nc = new NetConnection();
+				connect_nc.connect( null );
+				
+				// Initialize the net stream
+				stream_ns = new NetStream( connect_nc );
+				stream_ns.client = this;
+				stream_ns.client = { onMetaData:function( obj:Object ):void{} }
+				stream_ns.addEventListener( NetStatusEvent.NET_STATUS, freeSpinsNetStatusHandler );
+				stream_ns.play( null );
+				stream_ns.appendBytes( animationByteArray );
+				
+				// Initialize the animation
+				video = new Video( 800, 560 );
+				video.attachNetStream( stream_ns );
+				
+				// Add the animation to the stage
+				uiFreeSpins = new UIComponent();
+				uiFreeSpins.addChild( DisplayObject( video ) );
+				uiFreeSpins.depth = 0;
+				addElement( uiFreeSpins );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'Net Status' event of the Net Stream
+			protected function freeSpinsNetStatusHandler( event:NetStatusEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "freeSpinsNetStatusHandler", arguments.concat( event.info.code ) );			
+				if( event.info.code == "NetStream.Buffer.Full" )
+				{
+					grpLayer0.visible = true;
+					grpLayer1.visible = false;				
+					grpLayer2.visible = false;					
+				}
+				
+				if( event.info.code == "NetStream.Play.Stop" || event.info.code == "NetStream.Buffer.Empty" )
+				{														
+					// Stop the bonus audio
+					bonusSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Bonus_Audio" ), bonusSound, false, true, 0, 1, 25 );				
+
+					// Clean up
+					stopFreeSpins();
+					
+					// Callback
+					_onPlayFreeSpins( this );	
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+						
+			// Removes all the event listeners and elements from the container and dispatches a stop event
+			public function stopFreeSpins():void
+			{
+				// Log Activity
+				logger.pushContext( "stopFreeSpins", arguments );
+				if( stream_ns != null )
+				{
+					stream_ns.removeEventListener( NetStatusEvent.NET_STATUS, freeSpinsNetStatusHandler );
+					stream_ns.close();
+					stream_ns = null;
+				}
+				
+				if( connect_nc != null )
+				{
+					connect_nc.close();
+					connect_nc = null;
+				}
+				
+				removeElement( uiFreeSpins );
+				uiFreeSpins = null;
+				
+				grpLayer0.visible = false;
+				grpLayer1.visible = false;
+				grpLayer2.visible = false;
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Handles playing the exit
+			override public function playExit( winAmount:int, isCurrency:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "playExit", arguments );				
+				// Set the exit win amount
+				ddWinAmountExit.displayAmount = winAmount;
+				ddWinAmountExit.isCurrency = isCurrency;	
+				ddWinAmountExit.visible = true;
+				
+				// Play the transition animation
+				grpLayer0.visible = false;
+				grpLayer1.visible = false;
+				grpLayer2.visible = true;
+				grpLayer2.alpha = 0;				
+				
+				if( bonusSound != null )
+				{
+					bonusSound.stop();
+					bonusSound = null;
+				}
+				
+				var obj:Object = new Object();
+				obj.onTweenUpdate = function( i:Number ):void {
+					grpLayer2.alpha = i;
+				};
+				
+				obj.onTweenEnd = function( i:Number ):void {
+					exitTimeout = setTimeout( exitTimeoutHandler, 1500 );
+				};
+				
+				var twn:Tween = new Tween( obj, 0, 1, 1500 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the freeSpinTimeout
+			private function exitTimeoutHandler():void
+			{
+				// Log Activity
+				logger.pushContext( "exitTimeoutHandler", arguments );
+				clearTimeout( exitTimeout );
+				
+				grpLayer0.visible = false;
+				grpLayer1.visible = false;
+				grpLayer2.visible = false;
+				
+				GameFinished();	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override protected function GameFinished():void
+			{
+				// Log Activity
+				logger.pushContext( "GameFinished", arguments );
+				ddWinAmountExit.visible = false;
+				super.GameFinished();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				if( bonusSound != null )
+				{
+					bonusSound.stop();
+					bonusSound = null;
+				}
+				
+				super.dispose();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Group id="grpLayer0" width="800" height="600" x="0" y="0" visible="false">
+		<s:BitmapImage id="imgBG" width="800" height="600" x="0" y="0"></s:BitmapImage>			
+	</s:Group>
+	
+	<s:Group id="grpLayer1" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" visible="false" depth="0">
+		<s:Group id="grpNumberWheel" width="618" height="618" x="-59" y="-25">
+			<s:Image id="imgNumberWheel" width="618" height="618" horizontalCenter="0" verticalCenter="0" smooth="true"></s:Image>
+		</s:Group>
+		
+		<s:Group id="grpIconWheel" width="460" height="460" x="21" y="53">
+			<s:Image id="imgIconWheel" width="460" height="460" horizontalCenter="0" verticalCenter="0" smooth="true"></s:Image>
+		</s:Group>
+		
+		<s:Image id="imgWheelStand" width="800" height="560" x="0" y="0"></s:Image>
+		
+		<s:Group id="grpMeter" x="678" y="257" width="128" height="264">
+			<s:BitmapImage id="imgPowerMeter" width="64" height="264" x="0" y="0"></s:BitmapImage>
+			<s:Group id="grpPowerMeterMask" width="128" height="264" x="0" y="0" bottom="0" scaleY="0">
+				<s:Path data="M 0 14 Q 34 46 64 14 Q 91 -14 128 14 L 128 278 L 0 278 L 0 14">
+					<s:fill>
+						<s:SolidColor color="0x000000" />
+					</s:fill>
+				</s:Path>			
+			</s:Group>
+		</s:Group>		
+		
+		<s:Image id="imgSpinButton" width="99" height="115" x="537" y="437"></s:Image>	
+		
+		<s:Group id="grpIcons" width="757" height="454" x="22" y="16" clipAndEnableScrolling="true"></s:Group>
+	</s:Group>
+	
+	<s:Group id="grpLayer2" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" depth="2" visible="false">
+		<s:Image id="imgBonusExit" width="800" height="560" x="0" y="0"></s:Image>
+		<cx:DigitDisplay id="ddWinAmountExit" x="232" y="292" width="340" displayAmount="0" fontSize="56" depth="2" isCurrency="true" visible="false" textAlign="center" />
+	</s:Group>
+</VideoSlots:VideoSlotsBonusGame>

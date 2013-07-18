@@ -1,0 +1,111 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* Images */
+	Skin: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Skin.png");		
+	CardBack: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/CardBack.png");
+	BonusBG: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/BonusBG.png");		
+	InPlay: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/InPlay.png");
+	ScoreBG: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/ScoreBG.png");		
+	Blackjack: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Blackjack.png");
+	Bust: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Bust.png");
+	Win: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Win.png");
+	Lose: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Lose.png");
+	Push: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Push.png");
+	PlayAgain: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/PlayAgain.png");
+	
+	Clubs_13: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_13.png");
+	Clubs_12: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_12.png");
+	Clubs_11: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_11.png");
+	Clubs_10: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_10.png");
+	Clubs_9: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_9.png");
+	Clubs_8: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_8.png");
+	Clubs_7: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_7.png");
+	Clubs_6: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_6.png");
+	Clubs_5: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_5.png");
+	Clubs_4: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_4.png");
+	Clubs_3: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_3.png");
+	Clubs_2: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_2.png");	
+	Clubs_1: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Clubs_1.png");
+	
+	Diamonds_13: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_13.png");
+	Diamonds_12: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_12.png");
+	Diamonds_11: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_11.png");
+	Diamonds_10: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_10.png");
+	Diamonds_9: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_9.png");
+	Diamonds_8: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_8.png");
+	Diamonds_7: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_7.png");
+	Diamonds_6: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_6.png");
+	Diamonds_5: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_5.png");
+	Diamonds_4: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_4.png");
+	Diamonds_3: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_3.png");
+	Diamonds_2: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_2.png");	
+	Diamonds_1: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Diamonds_1.png");	
+	
+	Hearts_13: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_13.png");
+	Hearts_12: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_12.png");
+	Hearts_11: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_11.png");
+	Hearts_10: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_10.png");
+	Hearts_9: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_9.png");
+	Hearts_8: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_8.png");
+	Hearts_7: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_7.png");
+	Hearts_6: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_6.png");
+	Hearts_5: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_5.png");
+	Hearts_4: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_4.png");
+	Hearts_3: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_3.png");
+	Hearts_2: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_2.png");	
+	Hearts_1: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Hearts_1.png");	
+	
+	Spades_13: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_13.png");
+	Spades_12: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_12.png");
+	Spades_11: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_11.png");
+	Spades_10: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_10.png");
+	Spades_9: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_9.png");
+	Spades_8: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_8.png");
+	Spades_7: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_7.png");
+	Spades_6: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_6.png");
+	Spades_5: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_5.png");
+	Spades_4: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_4.png");
+	Spades_3: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_3.png");
+	Spades_2: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_2.png");	
+	Spades_1: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/images/Spades_1.png");
+	
+	/* Sounds */
+	Bonus_Start: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/bonus_start.mp3");
+	Bonus_Stop: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/bonus_stop.mp3");
+	Bonus_Win: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/bonus_win.mp3");
+	Card_Flip: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/card_flip.mp3");	
+	Card_Held: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/card_held.mp3");
+	Value_1: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/1.mp3");
+	Value_2: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/2.mp3");
+	Value_3: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/3.mp3");
+	Value_4: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/4.mp3");
+	Value_5: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/5.mp3");
+	Value_6: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/6.mp3");
+	Value_7: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/7.mp3");
+	Value_8: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/8.mp3");
+	Value_9: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/9.mp3");
+	Value_10: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/10.mp3");
+	Value_11: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/11.mp3");
+	Value_12: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/12.mp3");
+	Value_13: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/13.mp3");
+	Value_14: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/14.mp3");
+	Value_15: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/15.mp3");
+	Value_16: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/16.mp3");
+	Value_17: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/17.mp3");
+	Value_18: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/18.mp3");
+	Value_19: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/19.mp3");
+	Value_20: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/20.mp3");
+	Value_21: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/21.mp3");
+	Value_22: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/22.mp3");
+	Value_23: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/23.mp3");
+	Value_24: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/24.mp3");
+	Value_25: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/25.mp3");
+	Value_26: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/26.mp3");
+	Value_27: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/27.mp3");
+	Value_28: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/28.mp3");
+	Value_29: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/29.mp3");
+	Value_30: Embed(source="/../../../assets/VideoBlackjack/TheBigDeal/sounds/30.mp3");	
+}

@@ -1,0 +1,1 @@
+FOR /R %1 %%m IN (*.css) DO CALL %2 -optimize=true -incremental=true -debug=false -raw-metadata '' -output "%%~dpnm.swf" %%m

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SparkSkin xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			 xmlns:s="library://ns.adobe.com/flex/spark" 
+             xmlns:fb="http://ns.adobe.com/flashbuilder/2009"
+			 xmlns:mx="library://ns.adobe.com/flex/mx">
+    
+    <fx:Metadata>        
+        [HostComponent("components.ImageButton")]
+    </fx:Metadata>
+	
+    <s:states>
+        <s:State name="up" />
+        <s:State name="over" />
+        <s:State name="down" />
+        <s:State name="disabled" />
+    </s:states>       
+    
+	<s:BitmapImage
+		source.up="{hostComponent.getStyle('imageSkin')}"
+		source.over="{hostComponent.getStyle('imageSkinOver')}"	
+		source.down="{hostComponent.getStyle('imageSkinDown')}"
+		source.disabled="{hostComponent.getStyle('imageSkinDisabled')}"
+		left="0" right="0" top="0" bottom="0">
+	</s:BitmapImage>
+	
+	<s:BitmapImage
+		source="{hostComponent.getStyle('imageIcon')}"
+		horizontalCenter="0" verticalCenter="0">		
+	</s:BitmapImage>
+	
+	<s:BitmapImage
+		source="{hostComponent.getStyle('imageBadge')}"
+		right="1" top="1">		
+	</s:BitmapImage>
+	
+    <s:Label 
+		id="labelDisplay"
+		textAlign="center"
+		maxDisplayedLines="1"
+		horizontalCenter="{0 + ( hostComponent.getStyle('textHorizontalCenter') as int )}" 
+		verticalCenter="{0 + ( hostComponent.getStyle('textVerticalCenter') as int )}"
+		color="0x1C1E1D" 
+		fontWeight="bold">
+		<s:filters>
+			<s:DropShadowFilter distance="1" angle="45" color="0xEDFD90"/>
+		</s:filters>
+    </s:Label>
+    
+</s:SparkSkin>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:cx="components.*"
+					  width="375" height="225" 
+					  horizontalCenter="0" verticalCenter="0"
+					  creationComplete="init(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import mx.events.FlexEvent;
+			
+			import objects.Achievement;
+			import objects.AchievementReward;
+			import objects.AchievementBadge;	
+			
+			private var isBadge:Boolean;
+			
+			// Handles the 'initialize' event
+			public function init( event:FlexEvent ):void 
+			{			
+				
+			}
+			
+			// Set the scale of the control
+			public function setScale( scale:Number ):void
+			{
+				scaleY = scaleX = scale;
+				x = stage.stageWidth / 2 - ( width * scale ) / 2;
+				y = stage.stageHeight / 2 - ( height * scale ) / 2;				
+			}					
+			
+			// Displays the requested badge
+			public function displayAchievement( achievementName:String, isBadge:Boolean, isMouseOver:Boolean ):void
+			{
+				this.isBadge = isBadge;
+				var achievement:Achievement;
+				
+				if( isBadge ) 
+				{
+					achievement = new AchievementBadge( "", achievementName );
+				}
+				else
+				{
+					achievement = new AchievementReward( achievementName );
+				}
+				
+				if( achievement != null )
+				{
+					imgAchievement.source = achievement.ImageClass;					
+					
+					if( isMouseOver )
+					{
+						lblTitle.text = achievement.DisplayName;
+						lblMessage.visible = lblMessage.includeInLayout = false;
+						lblDescription.text = achievement.Description;
+						lblDescription.visible = true;
+						
+						if( isBadge )
+						{
+							if( Sweeps.hasBadge( achievementName ) )
+							{
+								lblDescription.text = achievement.PopupDescription;
+							}
+						}
+						else
+						{
+							if( Sweeps.hasReward( achievementName ) )
+							{
+								lblDescription.text = achievement.PopupDescription;
+							}
+						}
+						
+						btnClose.visible = false;
+					}
+					else
+					{
+						lblTitle.text = "Congratulations!";						
+						if( isBadge )
+						{
+							lblMessage.text = "You've been awarded the " + achievement.DisplayName + " badge!";
+						}
+						else
+						{
+							lblMessage.text = "You've unlocked the " + achievement.DisplayName + " award!";
+						}
+						lblMessage.visible = true;
+						lblDescription.text = achievement.PopupDescription;
+						lblDescription.visible = true;
+						btnClose.visible = true;
+						imgBG.source = Images.messageBox_v2;
+					}
+				}	
+			}
+			
+			// Handles the click event of the 'Close' button
+			protected function btnClose_clickHandler( event:MouseEvent ):void
+			{						
+				// Dispatch a badges close event
+				Sweeps.getInstance().closeAchievementPopUp( isBadge, false );
+				event.stopImmediatePropagation();
+				
+				this.visible = false; // Hide the current control
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{						
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+			}				
+		]]>
+	</fx:Script>
+	
+	<s:BitmapImage id="imgBG" source="{Images.messageBox}"></s:BitmapImage>
+	<s:Group width="100%" height="100%" horizontalCenter="0">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>
+		<s:Label id="lblTitle" styleName="Title" paddingTop="7" horizontalCenter="0"></s:Label>
+		<s:Label id="lblMessage" styleName="Label" width="300" paddingTop="10" textAlign="center" visible="false"/>
+		<s:BitmapImage id="imgAchievement"></s:BitmapImage>
+		<s:Label id="lblDescription" styleName="Label" width="350" paddingTop="0" paddingBottom="5" paddingLeft="10" paddingRight="10" textAlign="center" visible="false"/>					
+	</s:Group>
+	<cx:ImageButton id="btnClose" skinClass="skins.ButtonSkin" label="OK" imageSkin="{Images.btnMedium_up}" imageSkinOver="{Images.btnMedium_over}" imageSkinDown="{Images.btnMedium_down}" imageSkinDisabled="{Images.btnMedium_disabled}" bottom="10" horizontalCenter="0" click="btnClose_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>	
+</s:SkinnableContainer>

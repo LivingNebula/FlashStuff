@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  xmlns:cx="components.*"
+					  width="400" height="285" 
+					  horizontalCenter="0" verticalCenter="0"
+					  creationComplete="init()">
+
+	<fx:Script>
+		<![CDATA[
+			import assets.Config;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import components.Progress;
+			
+			import mx.events.FlexEvent;
+			
+			import objects.PlayGameResponse;
+			
+			import services.SweepsAPI;
+			
+			import utils.FormatHelper;					
+			
+			private var scProgress:Progress;
+			private var errMsg:String = "";
+			
+			private var Entries:int = 0.0;
+			private var Winnings:int = 0.0;
+			
+			private var iEntries:int = 0.0;
+			private var iWinnings:int = 0.0;
+			private var iIncrement:int = 0.0;
+			private var iCounter:int = 0;
+			private var iIndex:int = 0;
+			private var iBetAmount:int = 0.0;
+			
+			private static const MAX_ENTRIES:int = 10000;
+			private static const INCREMENT_ARRAY:Array = [25, 50, 100, 500, 1000, 2500, 5000, 10000];
+			private static const GAME_ID_SIMPLE_REVEAL:int = 19;
+			
+			// Initializes the control
+			private function init():void
+			{				
+				// Add a keyboard listener
+				addEventListener( KeyboardEvent.KEY_UP, keyHandler );
+				
+				// Default the increment
+				iIncrement = INCREMENT_ARRAY[0];
+				
+				// Set the account entries
+				Entries = Sweeps.Entries;
+				txtEntries.text = FormatHelper.formatEntriesAndWinnings( iEntries );
+				
+				// Set the account winnings
+				Winnings = iWinnings = Sweeps.Winnings;						
+				
+				// Set the page focus
+				btnAccept.setFocus();
+			}													
+			
+			// Set the scale of the control
+			public function setScale( scale:Number ):void
+			{
+				scaleY = scaleX = scale;
+				x = stage.stageWidth / 2 - ( width * scale ) / 2;
+				y = stage.stageHeight / 2 - ( height * scale ) / 2;				
+			}
+			
+			// Handles the click event of the "Accept" button
+			protected function btnAccept_clickHandler( event:MouseEvent ):void
+			{				
+				processReveal(); // Process the reveal request
+			}
+			
+			// Handles the click event of the "Cancel" button
+			protected function btnCancel_clickHandler( event:MouseEvent ):void
+			{								
+				// Remove the keyboard listener
+				removeEventListener( KeyboardEvent.KEY_UP, keyHandler );
+				
+				// Dispatch a reveal response event
+				Sweeps.getInstance().quitRevealGame( Entries, Winnings );
+				
+				this.visible = false; // Hide the current control
+			}
+			
+			// Handles the click event of the "OK" button
+			protected function btnOK_clickHandler( event:MouseEvent ):void
+			{								
+				// Dispatch a reveal response event
+				Sweeps.getInstance().quitRevealGame( Entries, Winnings );
+				
+				this.visible = false; // Hide the current control
+			}
+			
+			// Handles the click event of the "Max" button
+			protected function btnMax_clickHandler( event:MouseEvent ):void
+			{
+				revealMaxEntries(); // Reveal maximum entries
+			}
+		
+			// Handles the button down event of the "Up" button
+			protected function btnUp_buttonDownHandler( event:FlexEvent ):void
+			{
+				iCounter = iCounter + 1;
+				if( iCounter % 5 == 0 ) { iIndex = iIndex + 1; }
+				
+				iIncrement = iIndex < INCREMENT_ARRAY.length ? INCREMENT_ARRAY[iIndex] : INCREMENT_ARRAY[INCREMENT_ARRAY.length - 1];
+				updateEntries( iIncrement );
+			}
+		
+			// Handles the button down event of the "Down" button
+			protected function btnDown_buttonDownHandler( event:FlexEvent ):void
+			{
+				iCounter = iCounter + 1;
+				if( iCounter % 5 == 0 ) { iIndex = iIndex + 1; }
+				
+				iIncrement = iIndex < INCREMENT_ARRAY.length ? INCREMENT_ARRAY[iIndex] : INCREMENT_ARRAY[INCREMENT_ARRAY.length - 1];
+				updateEntries( -iIncrement );
+			}
+			
+			// Handles the mouse up event of the button
+			protected function mouseUpHandler( event:MouseEvent ):void
+			{		
+				resetCounters(); // Reset the increment counters
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{		
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound				
+			}					
+			
+			// Updates the entries amount
+			private function updateEntries( increment:int ):void
+			{
+				if( Entries > 0 )
+				{					
+					iEntries = iEntries + increment;
+					
+					if( iEntries < 0 )
+					{				
+						iEntries = 0;
+						lblError.text = "Entries must be greater than 0."; btnDown.enabled = false; resetCounters();
+					}					
+					else if( iEntries > Entries && iEntries < MAX_ENTRIES )
+					{
+						iEntries = Entries;
+						lblError.text = "Insufficient entries."; btnUp.enabled = false; resetCounters();
+					}
+					else if( iEntries > MAX_ENTRIES )
+					{
+						iEntries = MAX_ENTRIES;
+						lblError.text = "Maximum reveal entries exceeded."; btnUp.enabled = false; resetCounters();
+					}
+					else
+					{
+						btnUp.enabled = btnDown.enabled = true;
+						lblError.text = "";
+					}
+
+					txtEntries.text = FormatHelper.formatEntriesAndWinnings( iEntries );
+				}
+				else { lblError.text = "Insufficient entries available."; btnUp.enabled = false; resetCounters(); }
+			}
+			
+			// Reveals maximum entries
+			private function revealMaxEntries():void
+			{	
+				if( Entries > MAX_ENTRIES )
+				{	
+					iEntries = MAX_ENTRIES;
+				}
+				else
+				{
+					iEntries = Entries;
+				}
+				
+				txtEntries.text = FormatHelper.formatEntriesAndWinnings( iEntries );
+				btnUp.enabled = false;
+				btnDown.enabled = true;
+				lblError.text = "";
+			}					
+			
+			// Resets the increment counters
+			private function resetCounters():void
+			{
+				iCounter = 0; iIndex = 0; iIncrement = INCREMENT_ARRAY[0];
+			}
+			
+			// Processes the reveal request
+			private function processReveal():void
+			{
+				if( isValid() )
+				{
+					// Remove the keyboard listener
+					removeEventListener( KeyboardEvent.KEY_UP, keyHandler );
+					
+					if( iEntries > 0 ) // Check if the reveal amount is valid
+					{			
+						scProgress = new Progress();
+						scProgress.depth = 100;
+						addElement( scProgress );
+						
+						gReveal.visible = false;																
+						
+						executeReveal();																																										
+					}
+					else
+					{											
+						// Dispatch a reveal response event
+						Sweeps.getInstance().quitRevealGame( Entries, Winnings );
+					}
+				}
+			}
+			
+			// Executes the reveal request
+			private function executeReveal():void
+			{
+				// Set the incremental reveal amount
+				iBetAmount = iEntries < 100 ? iEntries : 100;
+				
+				if( iBetAmount > 0 )
+				{				
+					// Update the main Entries value
+					Sweeps.Entries = (Sweeps.Entries - iBetAmount);
+						
+					// Call the 'Play Game' API event to get our results
+					SweepsAPI.playGame
+					( 
+						Sweeps.Username,
+						Sweeps.Password,
+						GAME_ID_SIMPLE_REVEAL,
+						Config.GAME_TYPE_VIDEO_POKER,
+						iBetAmount, 
+						1,
+						0,
+						handleRevealSuccess,
+						handleRevealError
+					);
+				}
+				else
+				{
+					removeElement( scProgress );
+					
+					gAward.visible = true;					
+					txtWinnings.text = FormatHelper.formatEntriesAndWinnings( Winnings - iWinnings );
+				}
+			}
+			
+			// Checks if the parameters are valid
+			private function isValid():Boolean
+			{
+				if( Entries == 0 ) { lblError.text = "Insufficient entries!"; return false; }
+				
+				if( !chkAgree.selected ) { lblError.text = "You must agree to terms & conditions."; return false; }
+				
+				lblError.text = "";
+				return true;
+			}
+			
+			// Handles reveal successes
+			private function handleRevealSuccess( response:PlayGameResponse ):void
+			{
+				if( response.ReelOutput != null )
+				{						
+					Sweeps.Entries = Entries = response.Entries;
+					Sweeps.Winnings = Winnings = response.Winnings;
+					
+					// Update the reveal amount
+					iEntries = iEntries - iBetAmount;
+					
+					// Execute the reveal request
+					executeReveal();
+				}
+				else
+				{
+					handleRevealError( SweepsAPI.ERROR_CODE_UNKNOWN, "Invalid Reveal" );
+				}		
+			}
+			
+			// Handles reveal errors
+			private function handleRevealError( errorCode:int, error:String ):void
+			{
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsLogout = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this request.\n\nPlease try again.";
+						pIsLogout = true;
+						break;
+				}
+				
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, false, pIsLogout );
+				removeElement( scProgress );
+				gReveal.visible = true;
+			}
+			
+			// Handles the keyboard 'Key Up' event
+			private function keyHandler( event:KeyboardEvent ):void 
+			{
+				switch( event.keyCode )
+				{
+					case Keyboard.ENTER:
+						processReveal(); // Process the reveal request
+						break;
+					
+					case Keyboard.UP:
+						updateEntries( iIncrement ); // Increment entries
+						break;
+					
+					case Keyboard.DOWN:
+						updateEntries( -iIncrement ); // Decrement entries
+						break;
+				}				
+			}					
+		]]>
+	</fx:Script>
+	
+	<s:BitmapImage source="{Images.messageBox_v2}"></s:BitmapImage>
+	<s:Group id="gReveal" width="100%" height="100%" horizontalCenter="0">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>
+		<s:Label text="REVEAL" styleName="Title" paddingTop="7"></s:Label>
+		<s:Label id="lblError" styleName="Error" visible="true" paddingTop="15"></s:Label>		
+		<s:VGroup id="vgReveal" paddingTop="10" gap="5" horizontalAlign="center">			
+			<s:Label id="lblEntries" styleName="Label" text="Entries: (Max 100)" paddingRight="100"></s:Label>
+			<s:HGroup verticalAlign="middle" gap="5">
+				<cx:ImageButton id="btnDown" skinClass="skins.ButtonSkin" imageSkin="{Images.btnSmall_up}" imageSkinOver="{Images.btnSmall_over}" imageSkinDown="{Images.btnSmall_down}" imageSkinDisabled="{Images.btnSmall_disabled}" imageIcon="{Images.iconMinus}" mouseUp="mouseUpHandler(event)" mouseOut="mouseUpHandler(event)" buttonDown="btnDown_buttonDownHandler(event)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<s:TextInput id="txtEntries" styleName="TextBox" width="150" editable="false" textAlign="right"></s:TextInput>
+				<cx:ImageButton id="btnUp" skinClass="skins.ButtonSkin" imageSkin="{Images.btnSmallAlt_up}" imageSkinOver="{Images.btnSmallAlt_over}" imageSkinDown="{Images.btnSmallAlt_down}" imageSkinDisabled="{Images.btnSmallAlt_disabled}" imageIcon="{Images.iconPlus}" mouseUp="mouseUpHandler(event)" mouseOut="mouseUpHandler(event)" buttonDown="btnUp_buttonDownHandler(event)" mouseDown="mouseDownHandler(event)" autoRepeat="true" repeatDelay="250" repeatInterval="250"></cx:ImageButton>
+				<cx:ImageButton id="btnMax" skinClass="skins.ButtonSkin" label="Max" imageSkin="{Images.btnSmallAlt_up}" imageSkinOver="{Images.btnSmallAlt_over}" imageSkinDown="{Images.btnSmallAlt_down}" imageSkinDisabled="{Images.btnSmallAlt_disabled}" click="btnMax_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+			</s:HGroup>
+			<s:HGroup verticalAlign="top" gap="5" paddingTop="5">
+				<s:CheckBox id="chkAgree" selected="false"></s:CheckBox>
+				<s:Label id="lblAgree" styleName="Label" width="325" text="I understand that by using the Instant Prize Revealer my Sweepstakes Entries will IMMEDIATELY be consumed without game simulation and that I will have immediate access to whatever prizes I have won."></s:Label>				
+			</s:HGroup>
+			<s:Label id="lblNote" styleName="Label" width="300" paddingTop="10" text="*Entries revealed in this way will be CONSUMED and NO LONGER AVAILABLE for playing Sweepstakes games!"></s:Label>
+		</s:VGroup>
+		<s:HGroup id="hgReveal" gap="20" paddingTop="10" paddingBottom="0" horizontalCenter="0" bottom="15">
+			<cx:ImageButton id="btnAccept" skinClass="skins.ButtonSkin" label="Accept" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" click="btnAccept_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+			<cx:ImageButton id="btnCancel" skinClass="skins.ButtonSkin" label="Cancel" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" click="btnCancel_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>		
+		</s:HGroup>
+	</s:Group>
+	<s:Group id="gAward" width="100%" height="100%" horizontalCenter="0" visible="false">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>
+		<s:Label text="CONGRATULATIONS" styleName="Title" paddingTop="7"></s:Label>
+		<s:VGroup id="vgAward" paddingTop="50" gap="5" horizontalAlign="center">
+			<s:Label id="lblCongrats" styleName="Label" text="You've won..." paddingRight="80"></s:Label>
+			<s:TextInput id="txtWinnings" styleName="TextBox" width="150" editable="false" textAlign="right"></s:TextInput>
+		</s:VGroup>
+		<s:HGroup id="hgAward" gap="20" paddingTop="30" paddingBottom="0" horizontalCenter="0" bottom="20">
+			<cx:ImageButton id="btnOK" skinClass="skins.ButtonSkin" label="OK" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" click="btnOK_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+		</s:HGroup>
+	</s:Group>	
+</s:SkinnableContainer>

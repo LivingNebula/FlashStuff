@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:StoreOverview="components.StoreOverview.*"
+		 initialize="initializeHandler(event)"
+		 creationComplete="creationCompleteHandler(event)">
+
+	<fx:Script>
+		<![CDATA[
+			import assets.DataTimer;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+
+			import mx.events.FlexEvent;
+
+			import utils.DebugHelper;
+			import utils.MathHelper;
+
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( SOCommunityReels );
+
+			private var spinStartDelay:Number = 450;
+			private var spinWin:Boolean = false;
+			private var spinning:int = 0;
+			private var spinStopTimer:DataTimer;
+			private var creationCompletedCallback:Function = null;
+			private var spinCompletedCallback:Function = null;
+
+			// Sets the Community reels' start delay
+			public function set setSpinStartDelay( value:Number ):void
+			{
+				spinStartDelay = value;
+			}
+
+			// Sets the Community reels' win status
+			public function set setSpinWin( value:Boolean ):void
+			{
+				spinWin = value;
+			}
+
+			// Sets the creation completed callback function
+			public function set setCreationCompletedCallback( value:Function ):void
+			{
+				creationCompletedCallback = value;
+			}
+
+			// Sets the completed callback function
+			public function set setSpinCompletedCallback( value:Function ):void
+			{
+				spinCompletedCallback = value;
+			}
+
+			// Handles the initialize event
+			protected function initializeHandler( event:FlexEvent ):void
+			{
+				logger.pushContext( "initializeHandler", arguments );
+
+				// Set the slot values
+				reel0.slotValues = ["X","W","Z","S","G"];
+				reel1.slotValues = ["X","G","I","S","Z"];
+				reel2.slotValues = ["S","Z","X","N","G"];
+
+				// Set the reel images
+				reel0.reelImage = Images.SOCommunityJackpotReel1;
+				reel1.reelImage = Images.SOCommunityJackpotReel2;
+				reel2.reelImage = Images.SOCommunityJackpotReel3;
+				reel0.reelBlurredImage = Images.SOCommunityJackpotReelBlurred;
+				reel1.reelBlurredImage = Images.SOCommunityJackpotReelBlurred;
+				reel2.reelBlurredImage = Images.SOCommunityJackpotReelBlurred;
+				reel0Shadow.source = Images.SOCommunityReelShadow;
+				reel1Shadow.source = Images.SOCommunityReelShadow;
+				reel2Shadow.source = Images.SOCommunityReelShadow;
+
+				// Make sure the reels aren't displaying a win by default
+				var reelPos0:int = reel0.getTargetPosition();
+				var reelPos1:int = reel1.getTargetPosition();
+				var reelPos2:int = reel2.getTargetPosition();
+
+				// Make sure we do not have 3 matching icons and our icons do not spell "WIN"
+				while( ( reel2.slotValues[reelPos2] == reel1.slotValues[reelPos1] && reel1.slotValues[reelPos1] == reel0.slotValues[reelPos0] ) || ( reelPos0 == 1 && reelPos1 == 2 && reelPos2 == 3 ) )
+				{
+					reelPos1 = MathHelper.randomNumber( 0, 4 );
+					reel1.setTargetPosition( reelPos1, true );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the creation complete event
+			protected function creationCompleteHandler( event:FlexEvent ):void
+			{
+				logger.pushContext( "creationCompleteHandler", arguments );
+
+				// Fire the creation complete callback
+				if( creationCompletedCallback != null )
+				{
+					creationCompletedCallback();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Starts a spin
+			public function spin():void
+			{
+				// Log Activity
+				logger.pushContext( "spin ").debug.apply( null, arguments );
+
+				if( spinning == 0 )
+				{
+					// If our timers aren't initialized yet, go ahead and initialize them
+					if( !spinStopTimer )
+					{
+						spinStopTimer = new DataTimer( spinStartDelay, 200, 3, null, spinStopTimer_Listener, true );	// 0ms start delay, 500ms reel delay
+					}
+
+					// Call the spin start handler
+					spinStarted();
+
+					// Set a spinning count so we can keep tracking if we're still spinning or not
+					spinning = 3;
+
+					// Start the "dummy spins" spin
+					reel0.spin( 100 );
+					reel1.spin( 100 );
+					reel2.spin( 100 );
+
+					// Set the reel positions spin
+					var reelPos0:int;
+					var reelPos1:int;
+					var reelPos2:int;
+
+					if( spinWin )
+					{
+						// Force 3 matching icons
+						reelPos0 = 1;
+						reelPos1 = 2;
+						reelPos2 = 3;
+					}
+					else
+					{
+						reelPos0 = MathHelper.randomNumber( 0, 4 );
+						reelPos1 = MathHelper.randomNumber( 0, 4 );
+						reelPos2 = MathHelper.randomNumber( 0, 4 );
+
+						// Make sure we do not have 3 matching icons and our icons do not spell "WIN"
+						while( ( reel2.slotValues[reelPos2] == reel1.slotValues[reelPos1] && reel1.slotValues[reelPos1] == reel0.slotValues[reelPos0] ) || ( reelPos0 == 1 && reelPos1 == 2 && reelPos2 == 3 ) )
+						{
+							reelPos1 = MathHelper.randomNumber( 0, 4 );
+						}
+					}
+					spinStopTimer.startDelay = spinStartDelay;
+					spinStopTimer.data = [reelPos0, reelPos1, reelPos2];
+					spinStopTimer.start();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "spin stop" event of the data timer
+			private function spinStopTimer_Listener( event:TimerEvent ):void
+			{
+				var timer:DataTimer = ( event.target as DataTimer );
+				var reelResults:Array = timer.data as Array;
+
+				switch( timer.currentCount )
+				{
+					case 1:
+						reel0.setTargetPosition( reelResults[0] );
+						reel0.stop();
+						break;
+
+					case 2:
+						reel1.setTargetPosition( reelResults[1] );
+						reel1.stop();
+						break;
+
+					case 3:
+						reel2.setTargetPosition( reelResults[2] );
+						reel2.stop();
+						timer.reset();
+						break;
+				}
+			}
+
+			private function spinStarted():void
+			{
+				SoundManager.playSound( Sounds.spinStart, 0, 0 ); // Play the spinning started sound
+			}
+
+			private function spinEnded():void
+			{
+				// Fire the callback
+				if( spinCompletedCallback != null )
+				{
+					spinCompletedCallback( spinWin );
+				}
+			}
+
+			// Handles a reel's spin stopped event
+			protected function reel_spinStoppedHandler( reel:SOReel ):void
+			{
+				spinning--;
+
+				SoundManager.playSound( Sounds.spinStop, 0, 0 );
+
+				if( spinning == 0 )
+				{
+					spinEnded();
+				}
+			}
+		]]>
+	</fx:Script>
+
+	<s:Group id="grpReels">
+		<s:HGroup gap="2">
+			<StoreOverview:SOReel id="reel0" width="100" height="150" slotHeight="83" onSpinStopped="reel_spinStoppedHandler" />
+			<StoreOverview:SOReel id="reel1" width="100" height="150" slotHeight="83" onSpinStopped="reel_spinStoppedHandler" />
+			<StoreOverview:SOReel id="reel2" width="100" height="150" slotHeight="83" onSpinStopped="reel_spinStoppedHandler" />
+		</s:HGroup>
+
+		<s:HGroup gap="2">
+			<s:Image y="0" id="reel0Shadow" width="100" height="150" />
+			<s:Image y="0" id="reel1Shadow" width="100" height="150" />
+			<s:Image y="0" id="reel2Shadow" width="100" height="150" />
+		</s:HGroup>
+	</s:Group>
+
+</s:Group>

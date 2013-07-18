@@ -1,0 +1,24 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* images */
+	Skin: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Skin.png");
+	Paytable: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Paytable.jpg");
+	Reel: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Reel.jpg");
+	ReelBlurred: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Reel_Blurred.jpg");
+	ReelShadow: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/ReelShadow.png");	
+	Playline: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Playline.png");	
+	PlaylineShadow: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/PlaylineShadow.png");
+	
+	Sprite_E: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Sprite_E.png");
+	Sprite_E_1: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Sprite_E_1.png");
+	Sprite_E_2: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Sprite_E_2.png");
+	Sprite_E_3: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/images/Sprite_E_3.png");
+	
+	/* sounds */
+	Spin_Start: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/sounds/spin_start.mp3");
+	Spin_Stop: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/sounds/spin_stop.mp3");
+	Nudge_Indicator: Embed(source="/../../../assets/SinglelineSlots/TikiTreasure/sounds/Nudge_Indicator.mp3");	
+}

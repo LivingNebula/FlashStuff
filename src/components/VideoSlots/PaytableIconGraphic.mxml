@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Graphic xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			import components.GradientLabel;
+			
+			import mx.events.FlexEvent;
+			import mx.graphics.BitmapSmoothingQuality;
+			
+			import objects.ReelIcon;
+			
+			import spark.components.Label;
+			
+			private var _source:Object;
+			private var _payoutID:String;
+			private var _payouts:Array;
+			private var _payoutMultiplier:int = 1;
+			private var _flashPayouts:Array = [];
+			private var _title:String;
+			private var _fontFamily:String;
+			private var _fontSize:Number;
+			private var _fontColors:Array = [];
+			private var _timerRef:uint = 0;
+			
+			// Initializes the Graphic
+			public function initGraphic( source:Object, fontFamily:String, fontSize:Number, fontColors:Array, reelIcon:ReelIcon ):void
+			{		
+				setSource( source );					
+				setFontFamily( fontFamily );
+				setFontSize( fontSize );
+				setFontColors( fontColors );
+				setTitle( reelIcon.displayName );
+				setPayoutID( reelIcon.name );
+				setPayouts( reelIcon.payouts );
+			}
+			
+			public function setPayoutMutlipler( mutiplier:int ):void
+			{
+				_payoutMultiplier = mutiplier;
+				updatePayoutDisplay();
+			}
+			
+			// Sets the source of the Graphic
+			private function setSource( value:Object ):void
+			{
+				_source = value;
+				bmpIcon.source = _source;				
+			}
+			
+			// Sets the font family of the Graphic
+			private function setFontFamily( value:String ):void
+			{
+				_fontFamily = value;
+				grpTitle.setStyle( "fontFamily", _fontFamily );
+				grpPayouts.setStyle( "fontFamily", _fontFamily );
+			}
+			
+			// Sets the font size of the Graphic
+			private function setFontSize( value:Number ):void
+			{
+				_fontSize = value;
+				grpTitle.setStyle( "fontSize", _fontSize );
+				grpPayouts.setStyle( "fontSize", _fontSize );
+			}
+			
+			// Sets the font colors of the Graphic
+			private function setFontColors( value:Array ):void
+			{
+				_fontColors = value;
+			}
+			
+			// Sets the title of the Graphic
+			private function setTitle( value:String ):void
+			{
+				_title = value;
+				if( _title != "" )
+				{
+					var lbl:GradientLabel = new GradientLabel(
+						"lblTitle",
+						220,
+						0,
+						_title,
+						null,
+						0,
+						"left",
+						_fontColors
+					);
+					lbl.x = 5;
+					lbl.y = 110;
+					
+					grpTitle.addElement( lbl );					
+				}
+			}
+			
+			// Sets the payout ID of the Graphic
+			private function setPayoutID( value:String ):void
+			{
+				_payoutID = value;				
+			}
+			
+			// Gets the payout ID of the Graphic
+			public function getPayoutID():String
+			{
+				return _payoutID;
+			}
+			
+			// Sets the payouts of the Graphic
+			private function setPayouts( payouts:Array ):void
+			{				
+				// Check if the value was passed in			
+				_payouts = payouts;
+				updatePayoutDisplay();
+			}
+			
+			private function updatePayoutDisplay():void
+			{
+				if( _payouts )
+				{
+					// Stop the flashing
+					stop_Flash();
+					
+					// Remove existing labels
+					grpPayouts.removeAllElements();
+					
+					// Loop over our payouts and create new labels
+					var y:int = 0;
+					for( var i:int = _payouts.length; i > 0; i-- )
+					{					
+						if( _payouts[i - 1] > 0 )
+						{
+							var lbl:GradientLabel = new GradientLabel(
+								"lblPayout_" + i,
+								220,
+								0,
+								i + "x " + ( _payouts[i - 1] * _payoutMultiplier ),
+								null,
+								i == _payouts.length ? _fontSize : _fontSize * 0.8,
+								"right",
+								_fontColors
+							);
+							lbl.x = 0;
+							lbl.y = y;
+							
+							y += ( i == _payouts.length ? _fontSize : _fontSize * 0.75 );
+							
+							grpPayouts.addElement( lbl );
+						}
+					}
+				}
+			}
+			
+			// Starts the flashing of the Graphic
+			public function start_Flash( payoutCount:int ):void 
+			{ 						
+				if( _timerRef == 0 )
+				{
+					for( var i:int = 0; i < grpPayouts.numElements; i++ )
+					{
+						var lbl:GradientLabel = ( grpPayouts.getElementAt( i ) as GradientLabel );
+						if( lbl && lbl.id == "lblPayout_" + payoutCount )
+						{
+							_timerRef = setInterval( flashWin, 500, lbl );
+							break;
+						}
+					}
+				}															
+			}
+			
+			// Flashes the Graphic
+			private function flashWin( lbl:GradientLabel ):void
+			{				
+				if( lbl )
+				{
+					lbl.visible = !lbl.visible;
+				}
+			}
+			
+			// Stops the flashing of the Graphic
+			public function stop_Flash():void
+			{
+				if( _timerRef )
+				{
+					clearInterval( _timerRef );
+					_timerRef = 0;
+					
+					for( var i:int = 0; i < grpPayouts.numElements; i++ )
+					{
+						var lbl:GradientLabel = ( grpPayouts.getElementAt( i ) as GradientLabel );
+						if( lbl )
+						{
+							lbl.visible = true;
+						}
+					}					
+				}						
+			}
+		]]>
+	</fx:Script>
+		
+	<s:BitmapImage id="bmpIcon" width="122" height="114" x="15" y="15" smooth="true" smoothingQuality="{ BitmapSmoothingQuality.HIGH }" />				
+	<s:Group id="grpTitle"></s:Group>
+	<s:Group id="grpPayouts"></s:Group>
+</s:Graphic>

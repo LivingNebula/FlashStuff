@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  width="800" height="560"
+					  backgroundColor="#000000"
+					  creationComplete="init()">
+
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import mx.events.FlexEvent;
+			
+			import skins.ButtonSkin;
+			
+			private var callbackFunction:Function;
+			
+			private static const VIDEO_SLOTS_PREFIX:String = "btnVDSlot_";
+			
+			// Initializes the control
+			private function init():void
+			{						
+				var skin1:Class = Images[ VIDEO_SLOTS_PREFIX + Sweeps.GameName + "_Skin" ];
+				var imgSkin1:ImageButton = new ImageButton();
+				imgSkin1.name = Sweeps.GameName + "_Skin";
+				imgSkin1.label = "Background 1";
+				imgSkin1.setStyle( "imageSkin", skin1 );
+				imgSkin1.setStyle( "imageSkinOver", skin1 );
+				imgSkin1.setStyle( "imageSkinDown", skin1 );
+				imgSkin1.setStyle( "imageSkinDisabled", skin1 );
+				imgSkin1.setStyle( "skinClass", skins.ButtonSkin );
+				imgSkin1.setStyle( "textVerticalCenter", 43 );
+				imgSkin1.addEventListener( MouseEvent.MOUSE_DOWN, imgSkin_mouseDownHandler );
+				grpSkins.addElement( imgSkin1 );
+				
+				var skin2:Class = Images[ VIDEO_SLOTS_PREFIX + Sweeps.GameName + "_Skin1" ];
+				var imgSkin2:ImageButton = new ImageButton();					
+				imgSkin2.name = Sweeps.GameName + "_Skin1";
+				imgSkin2.label = "Background 2";
+				imgSkin2.setStyle( "imageSkin", skin2 );
+				imgSkin2.setStyle( "imageSkinOver", skin2 );
+				imgSkin2.setStyle( "imageSkinDown", skin2 );
+				imgSkin2.setStyle( "imageSkinDisabled", skin2 );
+				imgSkin2.setStyle( "skinClass", skins.ButtonSkin );
+				imgSkin2.setStyle( "textVerticalCenter", 43 );
+				imgSkin2.addEventListener( MouseEvent.MOUSE_DOWN, imgSkin_mouseDownHandler );
+				grpSkins.addElement( imgSkin2 );						
+			}
+			
+			// Handles the mouse down event of the image button(s)
+			private function imgSkin_mouseDownHandler( event:MouseEvent ):void
+			{
+				var imgSkin:ImageButton = ImageButton(event.currentTarget);				
+				var skinName:String = imgSkin.name;
+				
+				if( callbackFunction != null )
+				{
+					callbackFunction( skinName );
+				}
+				
+				this.visible = false; // Hide the current control
+			}								
+			
+			// Set the callback function of the control
+			public function setCallback( callback:Function ):void
+			{
+				callbackFunction = callback;
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{		
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound				
+			}						
+		]]>
+	</fx:Script>
+	
+	<s:BitmapImage source="{Images.messageBox_v2}" horizontalCenter="0" verticalCenter="0"></s:BitmapImage>
+	<s:Group width="100%" height="100%">
+		<s:layout><s:VerticalLayout horizontalAlign="center" verticalAlign="middle"></s:VerticalLayout></s:layout>		
+		<s:Label text="SELECT A BACKGROUND" styleName="Title" paddingTop="7"></s:Label>						
+		<s:Group id="grpSkins" top="10" width="100%" height="250">				
+			<s:layout><s:HorizontalLayout horizontalAlign="center" verticalAlign="middle" gap="10"></s:HorizontalLayout></s:layout>			
+		</s:Group>
+	</s:Group>	
+</s:SkinnableContainer>

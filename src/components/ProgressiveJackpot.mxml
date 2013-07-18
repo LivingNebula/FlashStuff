@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 			  xmlns:s="library://ns.adobe.com/flex/spark" 
+		 			  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:ProgressiveJackpot="components.ProgressiveJackpot.*"
+					  width="178" height="40" 
+					  initialize="init(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.DataTimer;
+			import assets.Images;
+			
+			import mx.events.FlexEvent;
+			
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			public static const JACKPOT_BET_PERCENTAGE:Number = 0.02;
+			private static const SET_BALANCE_THRESHOLD:int = 25;
+			private static const SET_BALANCE_DURATION:int = 300;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( ProgressiveJackpot );
+			
+			private var balance:int = 0;
+			private var spinning:int = 0;
+			private var spinStopTimer:DataTimer;
+			
+			public function getVisibleBalance():int
+			{
+				return number0.currentNumber + 
+					( number1.currentNumber * 10 ) + 
+					( number2.currentNumber * 100 ) +
+					( number3.currentNumber * 1000 ) +
+					( number4.currentNumber * 10000 ) +
+					( number5.currentNumber * 100000 ); 
+			}
+			
+			public function displayBalance( newBalance:int, animationDuration:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "displayBalance", arguments );
+				if( balance != newBalance )
+				{					
+					var numbers:Array = [number0, number1, number2, number3, number4, number5];
+					var i:int = 0;
+					
+					// If we're still spinning, stop					
+					for( i = 0; i < numbers.length; i++ ) {
+						if( numbers[i].isSpinning ) {
+							numbers[i].stop();
+							break;
+						}
+					}
+					
+					// If our new balance is less than current balance, start over at 0
+					if( newBalance < balance )
+					{
+						balance = 0;
+						setBalance( 0 );
+					}
+					
+					// Calculate our difference and duration
+					var initBalance:int = getVisibleBalance();
+					var difference:int = newBalance - initBalance;
+					var mods:Array = [1, 10, 100, 1000, 10000, 100000];
+					
+					for( i = 0; i < 6; i++ ) {
+						if( difference >= mods[i] ) {
+							var steps:int = Math.floor( ( difference + ( initBalance % mods[i] ) ) / mods[i] );
+							if( steps > SET_BALANCE_THRESHOLD ) 
+							{
+								numbers[i].fakeSpin( Math.ceil( animationDuration / steps ) * 10 );
+							}
+							else
+							{
+								numbers[i].spin( Math.ceil( animationDuration / steps ), steps );
+								break;
+							}
+						}
+					}
+					
+					balance = newBalance;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			public function setBalance( newBalance:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "setBalance", arguments );
+				// Stop the spin if we're currently spinning
+				if( number0.isSpinning )
+				{
+					number0.stop();
+				}
+				
+				// Update the balances immediately
+				balance = newBalance;
+				
+				// Splice the balance into individual digits and update the reels accordingly
+				var numbers:Array = [number0, number1, number2, number3, number4, number5];				
+				var mods:Array = [1, 10, 100, 1000, 10000, 100000];
+				var i:int = 0;
+				
+				for( i = 0; i < 6; i ++ ) {
+					if( balance >= mods[i] ) {
+						numbers[i].set( MathHelper.getDigitFromValue( balance, i ) );
+					} else {
+						numbers[i].set( 0 );
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+
+			protected function init(event:FlexEvent):void
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+				// Set the reel images
+				reel0.reelImage = Sweeps.SkilltopiaEnabled ? Images.progressiveJackpotReel_Skilltopia : Images.progressiveJackpotReel;
+				reel1.reelImage = Sweeps.SkilltopiaEnabled ? Images.progressiveJackpotReel_Skilltopia : Images.progressiveJackpotReel;
+				reel2.reelImage = Sweeps.SkilltopiaEnabled ? Images.progressiveJackpotReel_Skilltopia : Images.progressiveJackpotReel;				
+				reel0.reelBlurredImage = Images.progressiveJackpotReelBlurred;
+				reel1.reelBlurredImage = Images.progressiveJackpotReelBlurred;
+				reel2.reelBlurredImage = Images.progressiveJackpotReelBlurred;
+				
+				// Set the number images
+				number5.numberReelImage = Images.progressiveJackpotNumbers;
+				number4.numberReelImage = Images.progressiveJackpotNumbers;
+				number3.numberReelImage = Images.progressiveJackpotNumbers;
+				number2.numberReelImage = Images.progressiveJackpotNumbers;
+				number1.numberReelImage = Images.progressiveJackpotNumbers;
+				number0.numberReelImage = Images.progressiveJackpotNumbers;			
+				
+				// Make sure the reels aren't displaying a win by default
+				var reelPos0:int = reel0.getTargetPosition();
+				var reelPos1:int = reel1.getTargetPosition();
+				var reelPos2:int = reel2.getTargetPosition();
+				
+				while( reelPos2 == reelPos1 && reelPos1 == reelPos0 )
+				{
+					reelPos1 = MathHelper.randomNumber(1, 4);
+					reel1.setTargetPosition( reelPos1, true );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Starts a spin
+			public function spin( generateWin:Boolean = false ):void
+			{
+				// Log Activity
+				logger.pushContext( "spin", arguments );				
+				if( spinning == 0 )
+				{
+					// If our timers aren't initialized yet, go ahead and initialize them
+					if( !spinStopTimer )
+					{
+						spinStopTimer = new DataTimer( 450, 200, 3, null, spinStopTimer_Listener, true );	// 0ms start delay, 500ms reel delay
+					}
+					
+					// Call the spin start handler to disable buttons, etc
+					spinStarted();
+					
+					// Set a spinning count so we can keep tracking if we're still spinning or not
+					spinning = 3;
+					
+					// Start the "dummy spins" spin
+					if( !Sweeps.SkilltopiaEnabled )
+					{
+						reel0.spin( 100 );
+						reel1.spin( 100 );
+						reel2.spin( 100 );
+					}
+					else
+					{
+						reel0.blink( 400 );
+						reel1.blink( 400 );
+						reel2.blink( 400 );
+					}
+					
+					// Set the reel positions spin
+					var reelPos0:int;
+					var reelPos1:int;
+					var reelPos2:int;
+					
+					if( generateWin )
+					{
+						// Force 3 matching icons
+						reelPos0 = reelPos1 = reelPos2 = MathHelper.randomNumber(1, 4);
+					}
+					else
+					{
+						reelPos0 = MathHelper.randomNumber(1, 4);
+						reelPos1 = MathHelper.randomNumber(1, 4);
+						reelPos2 = MathHelper.randomNumber(1, 4);
+						
+						// Make sure we do not have 3 matching icons
+						while( reelPos2 == reelPos1 && reelPos1 == reelPos0 )
+						{
+							reelPos1 = MathHelper.randomNumber(1, 4);
+						}
+					}
+					spinStopTimer.startDelay = 450;
+					spinStopTimer.data = [reelPos0, reelPos1, reelPos2];
+					spinStopTimer.start();		
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}		
+			
+			private function checkWin():void
+			{
+				// Log Activity
+				logger.pushContext( "checkWin", arguments );
+				if( reel0.getTargetPosition() == reel1.getTargetPosition() && reel0.getTargetPosition() == reel2.getTargetPosition() )
+				{
+					// Update the balance immediately
+					setBalance( balance );
+					
+					// Display the win
+					Sweeps.getInstance().createProgressiveWin();
+				}
+				
+				spinEnded();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "spin stop" event of the data timer
+			private function spinStopTimer_Listener( event:TimerEvent ):void 
+			{
+				// Log Activity
+				logger.pushContext( "spinStopTimer_Listener", arguments );
+				var timer:DataTimer = ( event.target as DataTimer );
+				var reelResults:Array = timer.data as Array;
+				
+				switch( timer.currentCount )
+				{
+					case 1:
+						reel0.setTargetPosition( reelResults[0] );
+						reel0.stop();
+						break;
+					
+					case 2:
+						reel1.setTargetPosition( reelResults[1] );
+						reel1.stop();
+						break;
+					
+					case 3:
+						reel2.setTargetPosition( reelResults[2] );	
+						reel2.stop();
+						timer.reset();
+						break;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			private function spinStarted():void
+			{
+				// Log Activity
+				logger.pushContext( "spinStarted", arguments );
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			private function spinEnded():void
+			{
+				// Log Activity
+				logger.pushContext( "spinEnded", arguments );
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles a reel's spin stopped event
+			protected function reel_spinStoppedHandler( reel:ProgressiveReel ):void
+			{
+				// Log Activity
+				logger.pushContext( "reel_spinStoppedHandler", arguments );
+				spinning--;
+				
+				if( spinning == 0 )
+				{
+					checkWin();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			// Handles a reel's stop event
+			protected function number_stoppedHandler( reel:ProgressiveNumber ):void
+			{
+				switch( reel.id )
+				{
+					case "number0":
+						break;
+					
+					case "number1":
+						if( number0.isFakeSpinning ) { number0.set( MathHelper.getDigitFromValue( balance, 0 ) ) }
+						break;
+					
+					case "number2":
+						if( number1.isFakeSpinning ) { number1.set( MathHelper.getDigitFromValue( balance, 1 ) ) }
+						break;
+					
+					case "number3":
+						if( number2.isFakeSpinning ) { number2.set( MathHelper.getDigitFromValue( balance, 2 ) ) }
+						break;
+					
+					case "number4":
+						if( number3.isFakeSpinning ) { number3.set( MathHelper.getDigitFromValue( balance, 3 ) ) }
+						break;
+					
+					case "number5":
+						if( number4.isFakeSpinning ) { number4.set( MathHelper.getDigitFromValue( balance, 4 ) ) }
+						break;
+				}
+			}
+			
+			// Handles a reel's roll over event
+			protected function number_rollOverHandler( reel:ProgressiveNumber, duration:int ):void
+			{
+				switch( reel.id )
+				{
+					case "number0":
+						number1.spin( duration, 1 );
+						break;
+					
+					case "number1":
+						number2.spin( duration, 1 );
+						break;
+					
+					case "number2":
+						number3.spin( duration, 1 );
+						break;
+					
+					case "number3":
+						number4.spin( duration, 1 );
+						break;
+					
+					case "number4":
+						number5.spin( duration, 1 );
+						break;
+					
+					case "number5":
+						break;
+				}
+			}			
+		]]>
+	</fx:Script>	
+	<s:BitmapImage width="178" height="40" source="{Images.progressiveJackpot}"></s:BitmapImage>
+	
+	<s:Group x="0" y="18" width="178" height="19" clipAndEnableScrolling="true">
+		<s:Group id="grpReels" x="3" y="0" height="20">
+			<ProgressiveJackpot:ProgressiveReel id="reel0" x="0"  slotValues="{[1,2,3,4]}" onSpinStopped="reel_spinStoppedHandler"></ProgressiveJackpot:ProgressiveReel>
+			<ProgressiveJackpot:ProgressiveReel id="reel1" x="24" slotValues="{[1,2,3,4]}" onSpinStopped="reel_spinStoppedHandler"></ProgressiveJackpot:ProgressiveReel>
+			<ProgressiveJackpot:ProgressiveReel id="reel2" x="48" slotValues="{[1,2,3,4]}" onSpinStopped="reel_spinStoppedHandler"></ProgressiveJackpot:ProgressiveReel>
+			
+			
+			<s:Image x="0" y="0" width="24" height="20" source="{Images.progressiveJackpotReelShadow}" />			
+			<s:Image x="24" y="0" width="24" height="20" source="{Images.progressiveJackpotReelShadow}" />			
+			<s:Image x="48" y="0" width="24" height="20" source="{Images.progressiveJackpotReelShadow}" />
+		</s:Group>
+		
+		<s:Group id="grpNumbers" x="0" y="0" height="20">
+			<ProgressiveJackpot:ProgressiveNumber id="number5" x="84"  onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></ProgressiveJackpot:ProgressiveNumber>
+			<ProgressiveJackpot:ProgressiveNumber id="number4" x="99"  onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></ProgressiveJackpot:ProgressiveNumber>
+			<ProgressiveJackpot:ProgressiveNumber id="number3" x="114" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></ProgressiveJackpot:ProgressiveNumber>
+			<ProgressiveJackpot:ProgressiveNumber id="number2" x="129" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></ProgressiveJackpot:ProgressiveNumber>
+			<ProgressiveJackpot:ProgressiveNumber id="number1" x="144" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></ProgressiveJackpot:ProgressiveNumber>
+			<ProgressiveJackpot:ProgressiveNumber id="number0" x="159" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></ProgressiveJackpot:ProgressiveNumber>
+			
+			<s:Image x="84" y="0" width="16" height="20" source="{Images.progressiveJackpotNumbersShadow}" />			
+			<s:Image x="99" y="0" width="16" height="20" source="{Images.progressiveJackpotNumbersShadow}" />		
+			<s:Image x="114" y="0" width="16" height="20" source="{Images.progressiveJackpotNumbersShadow}" />
+			<s:Image x="129" y="0" width="16" height="20" source="{Images.progressiveJackpotNumbersShadow}" />
+			<s:Image x="144" y="0" width="16" height="20" source="{Images.progressiveJackpotNumbersShadow}" />
+			<s:Image x="159" y="0" width="16" height="20" source="{Images.progressiveJackpotNumbersShadow}" />			
+		</s:Group>		
+	</s:Group>		
+</s:SkinnableContainer>

@@ -1,0 +1,189 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* Button Panel */
+	btn1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn1.png");
+	btn1_Down: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn1_Down.png");
+	btn1_Disabled: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn1_Disabled.png");
+		
+	btn2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn2.png");
+	btn2_Down: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn2_Down.png");
+	btn2_Disabled: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn2_Disabled.png");
+	
+	btn3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn3.png");
+	btn3_Down: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn3_Down.png");
+	btn3_Disabled: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn3_Disabled.png");	
+			
+	btn4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn4.png");
+	btn4_Down: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn4_Down.png");
+	btn4_Disabled: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn4_Disabled.png");
+
+	btn6: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn6.png");
+	btn6_Down: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn6_Down.png");
+	btn6_Disabled:  Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btn6_Disabled.png");
+	
+	btnNudgeLeft: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btnNudgeLeft.png");
+	btnNudgeLeft_Down: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btnNudgeLeft_Down.png");
+	btnNudgeLeft_Disabled: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btnNudgeLeft_Disabled.png");	
+	
+	btnNudgeRight: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btnNudgeRight.png");
+	btnNudgeRight_Down: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btnNudgeRight_Down.png");
+	btnNudgeRight_Disabled: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/btnNudgeRight_Disabled.png");	
+	
+	imgNudgeTimer: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/imgNudgeTimer.png");
+	imgNudgeTimer_Disabled: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/imgNudgeTimer_Disabled.png");		
+				
+	
+	/* Animations */
+	Intro_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Intro.flv", mimeType="application/octet-stream");
+	BonusGameIntro_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/BonusGame_Intro.flv", mimeType="application/octet-stream");
+	BonusGameWon_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/BonusGame_Won.flv", mimeType="application/octet-stream");
+	BonusGameExit_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/BonusGame_Exit.flv", mimeType="application/octet-stream");
+	ReelIcon_A1_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_A1.flv", mimeType="application/octet-stream");
+	ReelIcon_A2_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_A2.flv", mimeType="application/octet-stream");
+	ReelIcon_A3_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_A3.flv", mimeType="application/octet-stream");
+	ReelIcon_A4_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_A4.flv", mimeType="application/octet-stream");
+	ReelIcon_B_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_B.flv", mimeType="application/octet-stream");
+	ReelIcon_C_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_C.flv", mimeType="application/octet-stream");
+	ReelIcon_K1_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_K1.flv", mimeType="application/octet-stream");
+	ReelIcon_K2_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_K2.flv", mimeType="application/octet-stream");
+	ReelIcon_K3_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_K3.flv", mimeType="application/octet-stream");
+	ReelIcon_K4_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/ReelIcon_K4.flv", mimeType="application/octet-stream");
+	RandomWin_1_Animation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/RandomWin_IdahoStreak.flv", mimeType="application/octet-stream");
+	
+	/* Character Animations */
+	BonusCharacter_Static: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/IdahoBones.png");
+	BonusCharacter_Walk: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Walk.flv", mimeType="application/octet-stream");
+	BonusCharacter_Run: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Run.flv", mimeType="application/octet-stream");
+	BonusCharacter_Search1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Axe.flv", mimeType="application/octet-stream");
+	BonusCharacter_Search2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Magnify.flv", mimeType="application/octet-stream");
+	BonusCharacter_Search3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Shovel.flv", mimeType="application/octet-stream");
+	BonusCharacter_Find1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Happy.flv", mimeType="application/octet-stream");
+	BonusCharacter_Find2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Yes.flv", mimeType="application/octet-stream");
+	BonusCharacter_Find3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Idaho_Diamonds.flv", mimeType="application/octet-stream");
+	
+	/* Bonus Icons */
+	BonusIcon_1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Ankh.png");
+	BonusIcon_2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Camel.png");
+	BonusIcon_3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_CrystalPyramid.png");
+	BonusIcon_4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Diamond.png");
+	BonusIcon_5: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_EyeOfRa.png");
+	BonusIcon_6: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Jackal.png");
+	BonusIcon_7: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Money.png");
+	BonusIcon_8: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Mummy.png");
+	BonusIcon_9: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_MummyHead.png");
+	BonusIcon_10: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Nefertiti.png");
+	BonusIcon_11: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Obelisk.png");
+	BonusIcon_12: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Palm.png");
+	BonusIcon_13: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_ScarabBeetle.png");
+	BonusIcon_14: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Scorpion.png");
+	BonusIcon_14: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Seven.png");
+	BonusIcon_15: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusIcon_Treasure.png");
+	
+	BonusWammy_1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Wammy_Tornado.flv", mimeType="application/octet-stream");
+	BonusWammy_2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Wammy_Crocodile.flv", mimeType="application/octet-stream");
+	BonusWammy_3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Wammy_Snake.flv", mimeType="application/octet-stream");
+	BonusWammy_4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/animations/Wammy_Mummy.flv", mimeType="application/octet-stream");
+	
+	BonusChoice_1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusChoice_Axe.png");
+	BonusChoice_2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusChoice_Magnify.png");
+	BonusChoice_3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusChoice_Shovel.png");
+	
+	/* Sprites */
+	Sprite_C: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C.png");
+	Sprite_C_1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C_1.png");
+	Sprite_C_2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C_2.png");
+	Sprite_C_3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C_3.png");
+	Sprite_C_4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C_4.png");
+	Sprite_C_5: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C_5.png");
+	Sprite_C_6: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C_6.png");
+	Sprite_C_7: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_C_7.png");
+	
+	Sprite_D_1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_1.png");
+	Sprite_D_2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_2.png");
+	Sprite_D_3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_3.png");
+	Sprite_D_4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_4.png");
+	Sprite_D_5: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_5.png");
+	Sprite_D_6: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_6.png");
+	Sprite_D_7: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_7.png");
+	Sprite_D_8: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_D_8.png");
+	
+	Sprite_E: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_E.png");
+	Sprite_E_1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_E_1.png");
+	Sprite_E_2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_E_2.png");
+	Sprite_E_3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_E_3.png");
+	Sprite_E_4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_E_4.png");
+	Sprite_E_5: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_E_5.png");
+	Sprite_E_6: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Sprite_E_6.png");
+	
+	Transparent: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Transparent.png");	
+	
+	/* Images */
+	Title: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/LogoSmall.png");
+	Skin: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Skin.png");
+	InfoSkin: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/InfoSkin.png");	
+	InfoPaytableTitle: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/InfoPaytableTitle.png");
+	InfoNavigator: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/InfoNavigator.png");
+	InfoNext: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/InfoNext.png");		
+	InfoPrevious: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/InfoPrevious.png");
+	InfoBetLines: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/InfoBetLines.png");
+	InfoBonusGame: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/InfoBonusGame.png");
+	BackToGame: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BackToGame.png");
+	BackToGame_over: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BackToGame_over.png");
+	
+	ReelBackdrop1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Desert_backdrop.png");
+	ReelBackdrop2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Nile_backdrop.png");
+	ReelBackdrop3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Pyramid_backdrop.png");	
+	ReelBackdrop4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Tomb_backdrop.png");
+	ReelBorder1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Desert_reels.png");
+	ReelBorder2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Nile_reels.png");
+	ReelBorder3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Pyramid_reels.png");
+	ReelBorder4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Tomb_reels.png");	
+	
+	ReelIcon_A1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_A1.png");
+	ReelIcon_A2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_A2.png");
+	ReelIcon_A3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_A3.png");
+	ReelIcon_A4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_A4.png");
+	ReelIcon_B: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_B.png");	
+	ReelIcon_C: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_C.png");	
+	ReelIcon_D: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_D.png");	
+	ReelIcon_E: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_E.png");	
+	ReelIcon_F: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_F.png");	
+	ReelIcon_G: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_G.png");	
+	ReelIcon_H: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_H.png");	
+	ReelIcon_I: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_I.png");	
+	ReelIcon_J: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_J.png");	
+	ReelIcon_K1: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_K1.png");
+	ReelIcon_K2: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_K2.png");
+	ReelIcon_K3: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_K3.png");
+	ReelIcon_K4: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/ReelIcon_K4.png");
+	
+	Overview_Map: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Overview_Map.png");
+	Desert_Map: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Desert_Map.png");
+	Desert_Map_Paths: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Desert_Map_Paths.png");
+	Desert_Map_Icon: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Desert_Map_Icon.png");
+	Nile_Map: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Nile_Map.png");
+	Nile_Map_Paths: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Nile_Map_Paths.png");
+	Nile_Map_Icon: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Nile_Map_Icon.png");
+	Pyramid_Map: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Pyramid_Map.png");
+	Pyramid_Map_Paths: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Pyramid_Map_Paths.png");
+	Pyramid_Map_Icon: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Pyramid_Map_Icon.png");
+	Tomb_Map: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Tomb_Map.png");
+	Tomb_Map_Paths: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Tomb_Map_Paths.png");
+	Tomb_Map_Icon: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/Tomb_Map_Icon.png");
+	
+	BonusWin: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/images/BonusWin.png");
+	
+	/* Sounds */
+	Background_Audio: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/sounds/Background_Audio.mp3");
+	Spin_Start: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/sounds/Spin_Start.mp3");
+	Spin_Stop: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/sounds/Spin_Stop.mp3");
+	Scatter_Anticipation: Embed(source="/../../../assets/QuadVideoSlots/MummysMoney/sounds/Scatter_Anticipation.mp3");
+	
+	/* Fonts */
+	rockIt: Embed( source='/../../../assets/QuadVideoSlots/MummysMoney/fonts/RockIt.ttf', fontFamily='rockIt', mimeType='application/x-font' );
+	bostonTruckStyle: Embed( source='/../../../assets/QuadVideoSlots/MummysMoney/fonts/LHFBostonTruckstyle.ttf', fontFamily='bostonTruckStyle', mimeType='application/x-font' );
+	bradyBunch: Embed( source='/../../../assets/QuadVideoSlots/MummysMoney/fonts/bradbunr.ttf', fontFamily='bradyBunch', mimeType='application/x-font' );
+}

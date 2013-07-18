@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:cx="components.*"
+					  width="800" height="600"
+					  creationComplete="init();">		
+	
+	<fx:Declarations>
+		<s:Animate id="flyOut" duration="550"><s:SimpleMotionPath property="y" valueTo="-500"/></s:Animate>
+		<s:Bounce id="bounceEaser"/>
+		<s:Linear id="linearEaser" easeInFraction="0" easeOutFraction="0"/>
+		<s:GlowFilter id="glowFilter" color="0xE4FF00" strength="5" />
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.Config;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import flash.events.FullScreenEvent;
+			
+			import mx.controls.Image;
+			import mx.effects.Sequence;
+			
+			import spark.effects.Animate;
+			
+			private static const MENU_ANIMATION_DURATION:int = 400;
+			private static const MENU_ANIMATION_FROM:int = 600;
+			private static const MENU_ANIMATION_TO:int = 0;
+			
+			private var _scrollPosition:Number = 0;
+			private var _scrollIncrement:Number = 0;
+			private var _onFullScreen:Function;
+			
+			private static const MenuItems_Demo:Array = [
+				Config.MOUNT_OLYMPUS,
+				Config.ATLANTIS,
+				Config.MUMMYS_MONEY,
+				Config.EMERALD_ERUPTION,
+				Config.HOMERUN_DERBY,
+				Config.SHARK_ATTACK,
+				Config.IRISH_LUCK,
+				Config.LUCKY_DUCKY,
+				Config.CHERRY_BOMB,
+				Config.MAYAN_MONEY,
+				Config.FLAMING_7S,
+				Config.GOLDEN_HORSESHOE,
+				Config.THE_BIG_DEAL,
+				Config.POWER_POKER,
+				Config.ALADDINS_KENO,
+				Config.DEFAULT_VIDEO_KENO,
+				Config.FLYING_FRUITS,
+				Config.WILD_WEST,
+				Config.SHARP_SHOOTER,
+				Config.PIRATES_BOOTY,
+				Config.SAFE_CRACKER,
+				Config.HAUNTED_MANSION,
+				Config.TIKI_TREASURE,
+				Config.ROCK_STAR,
+				Config.MEDUSAS_TREASURE,
+				Config.NEPTUNES_TRIDENT,
+				Config.VIDEO_KENO,
+				Config.CROWN_JEWELS,
+				Config.LUCKY_DAWG
+			];
+			
+			private static const MenuItems_Live:Array = [
+				Config.MOUNT_OLYMPUS,
+				Config.HOMERUN_DERBY,
+				Config.EMERALD_ERUPTION,
+				Config.ATLANTIS,
+				Config.IRISH_LUCK,
+				Config.SHARK_ATTACK,
+				Config.LUCKY_DUCKY,
+				Config.CHERRY_BOMB,
+				Config.MAYAN_MONEY,
+				Config.MEDUSAS_TREASURE,
+				Config.FLYING_FRUITS,
+				Config.MUMMYS_MONEY,
+				Config.FLAMING_7S,
+				Config.GOLDEN_HORSESHOE,
+				Config.WILD_WEST,
+				Config.SHARP_SHOOTER,
+				Config.PIRATES_BOOTY,
+				Config.SAFE_CRACKER,
+				Config.NEPTUNES_TRIDENT,
+				Config.HAUNTED_MANSION,
+				Config.TIKI_TREASURE,
+				Config.ROCK_STAR,
+				Config.ALADDINS_KENO,
+				Config.DEFAULT_VIDEO_KENO,
+				Config.VIDEO_KENO,
+				Config.THE_BIG_DEAL,
+				Config.POWER_POKER,
+				Config.CROWN_JEWELS,
+				Config.LUCKY_DAWG
+			];
+			
+			public function set onFullScreen( value:Function ):void
+			{
+				_onFullScreen = value;
+			}
+			
+			// Initializes the component
+			private function init():void
+			{				
+				// Set the release version
+				lblVersion.text = Sweeps.RELEASE_VERSION;
+				
+				// Set the reveal game visibility
+				btnReveal.visible = !Sweeps.SkilltopiaEnabled;
+				
+				// Set the internet button visibility
+				btnAccessInternet.visible = !Sweeps.SkilltopiaEnabled;
+				
+				reset(); // Default										
+			}			
+			
+			// Maybe calls play game
+			private function maybePlayGame( type:int, id:int, name:String ):void
+			{
+				// Check to be sure the menu is visible to prevent any errant clicks
+				if( this.visible )
+				{
+					// Clear the stage focus to prevent users from re-clicking the game icon	
+					stage.focus = null;	
+					
+					// Retrieve the game asset
+					var asset:String = Config.Game_Asset( name );					
+					
+					// Play the game
+					Sweeps.getInstance().playGame( type, id, name, asset );
+				}
+			}
+			
+			// Handles the mouse down event of the "More Games" button
+			protected function btnMoreGames_mouseDownHandler( event:MouseEvent ):void
+			{			
+				// Play the button click sound if audio enabled
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 );
+			}	
+			
+			// Handles the mouse down event of the "Full Screen" button
+			protected function btnFullScreen_mouseDownHandler( event:MouseEvent ):void
+			{			
+				// Play the button click sound if audio enabled
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 );
+			}
+			
+			// Handles the mouse down event of the "Access Internet" button
+			protected function btnAccessInternet_mouseDownHandler( event:MouseEvent ):void
+			{			
+				// Play the button click sound if audio enabled
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 );
+			}
+			
+			// Handles the mouse down event of the "Reveal Entries" button
+			protected function btnReveal_mouseDownHandler( event:MouseEvent ):void
+			{			
+				// Play the button click sound if audio enabled
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 );
+			}
+			
+			// Handles the click event of the 'Reveal Entries' button
+			protected function btnReveal_clickHandler( event:MouseEvent ):void
+			{			
+				Sweeps.getInstance().loadRevealGame();
+			}
+			
+			// Handles the click event of the 'More Games' button
+			protected function btnMoreGames_clickHandler( event:MouseEvent ):void
+			{
+				var row_Height:Number = 134;
+				var row_Total:int = Math.round( vgMenuItems.contentHeight/row_Height );
+				var row_Count:int = row_Total - _scrollIncrement;				
+				var row_Mod:int = (row_Count - 3) < 3 ? (row_Count - 3) : 3;
+				var row_Increment:int = row_Height * row_Mod;
+				
+				if( row_Increment > 0 )
+				{
+					_scrollPosition += row_Increment;
+					_scrollIncrement += row_Mod;
+				}				
+				else
+				{
+					_scrollPosition = 0;
+					_scrollIncrement = 0;
+				}
+				
+				vgMenuItems.verticalScrollPosition = _scrollPosition;
+			}
+			
+			// Handles the click event of the 'Full Screen' button
+			protected function btnFullScreen_clickHandler( event:MouseEvent ):void
+			{
+				_onFullScreen( this );
+			}
+			
+			// Handles the click event of the 'Access Internet' button
+			protected function btnAccessInternet_clickHandler( event:MouseEvent ):void
+			{
+				var request:URLRequest = new URLRequest( Sweeps.InternetURL );
+				try 
+				{					
+					navigateToURL( request, '_blank' );
+				} 
+				catch( e:Error ) 
+				{
+					trace( "Unable to access internet: " + e.toString() );
+				}
+			}
+			
+			// Creates the animation for the menu items
+			private function animateMenuItem( targets:Array, property:String, duration:int, valueFrom:int, valueTo:int ):void
+			{						
+				for( var i:int = 0; i < targets.length; i++ )
+				{			
+					// Create the 'Fly In' and 'Bounce' animations
+					var aFlyIn:Animate = AnimationManager.getAnimatedItem( targets[i], property, duration + (i * 15), 1, valueFrom + (i * 5), valueTo, linearEaser );
+					var aBounce:Animate = AnimationManager.getAnimatedItem( targets[i], property, 300, 1, 10, valueTo, bounceEaser );
+					
+					// Play the animation in a sequence
+					var sequence:Sequence = new Sequence();
+					sequence.addChild( aFlyIn );
+					sequence.addChild( aBounce );
+					sequence.play();
+				}						
+			}			
+			
+			// Resets the page to the default state
+			public function reset():void
+			{
+				// Create storage for the list of menu items
+				var menuItems:Array = new Array();
+				
+				// Retrieve the menu item lists depending on build
+				var menuItemsList:Array = new Array();
+				if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API ) // Check if in DEMO Mode
+				{
+					menuItemsList = MenuItems_Demo;
+				}
+				else
+				{
+					menuItemsList = MenuItems_Live;
+				}
+				
+				var gameName:String;
+				var gameID:int;
+				var gameType:int;
+				var gameLabel:String;
+				var gameMenuItem:Class;
+				
+				// Build the menu items
+				for( var i:int = 0; i < menuItemsList.length; i++ )
+				{				
+					gameName = menuItemsList[i];
+					gameID = parseInt( Config.Game_ID( gameName ) );
+					gameType = parseInt( Config.Game_Type( gameName ) );
+					gameLabel = Config.Game_Label( gameName );
+					gameMenuItem = Config.Game_Menu_Item( gameName );
+					
+					if( includeMenuItem( gameID ) )
+					{
+						var grpMenuItem:Group = new Group();
+						grpMenuItem.id = "grp_" + gameID;
+						
+						var btnMenuItem:ImageButton = new ImageButton();
+						btnMenuItem.id = "ibtn_" + gameID;
+						btnMenuItem.label = gameLabel;
+						btnMenuItem.setStyle( "imageSkin", gameMenuItem );
+						btnMenuItem.setStyle( "imageSkinOver", gameMenuItem );
+						btnMenuItem.setStyle( "imageSkinDown", gameMenuItem );
+						btnMenuItem.setStyle( "imageSkinDisabled", gameMenuItem );
+						btnMenuItem.setStyle( "imageBadge", getMenuItemBadge( gameType ) );
+						btnMenuItem.setStyle( "skinClass", skins.ButtonSkin );
+						btnMenuItem.setStyle( "textVerticalCenter", 43 );
+ 						btnMenuItem.addEventListener( MouseEvent.CLICK, btnMenuItem_clickHandler( gameType, gameID, gameName ) );
+						
+						grpMenuItem.addElement( btnMenuItem );
+						vgMenuItems.addElement( grpMenuItem );
+						
+						menuItems.push( btnMenuItem );
+					}
+				}
+			
+				// Animate the menu items
+				animateMenuItem( menuItems, "y", MENU_ANIMATION_DURATION, MENU_ANIMATION_FROM, MENU_ANIMATION_TO );
+			}
+			
+			// Handles the click event of the menu item
+			protected function btnMenuItem_clickHandler( menuItemType:int, menuItemID:int, menuItemName:String ):Function
+			{
+				return function(event:MouseEvent):void 
+				{
+					maybePlayGame( menuItemType, menuItemID, menuItemName );
+				}		
+			}
+			
+			// Retrieves the menu item badge
+			private function getMenuItemBadge( menuItemType:int ):Class
+			{
+				var badge:Class;
+				
+				switch( menuItemType )
+				{
+					case Config.GAME_TYPE_QUAD_VIDEO_SLOTS:
+					case Config.GAME_TYPE_SUPER_VIDEO_SLOTS:
+					case Config.GAME_TYPE_VIDEO_SLOTS_25:
+					case Config.GAME_TYPE_VIDEO_SLOTS_FSBONUS:
+					case Config.GAME_TYPE_VIDEO_SLOTS:
+						badge = Images.badgeVDSlot;
+						break;
+					
+					case Config.GAME_TYPE_SINGLELINE_SLOTS:
+					case Config.GAME_TYPE_SINGLINE_SLOTS_BIGPAY:
+						badge = Images.badgeSLSlot;
+						break;
+					
+					case Config.GAME_TYPE_VIDEO_BLACKJACK:
+						badge = Images.badgeVDBlackjack;
+						break;
+						
+					case Config.GAME_TYPE_VIDEO_KENO:
+						badge = Images.badgeVDKeno;
+						break;
+					
+					case Config.GAME_TYPE_VIDEO_POKER:
+						badge = Images.badgeVDPoker;
+						break;
+				}
+				
+				return badge;
+			}
+			
+			// Checks if the menu item should be displayed
+			private function includeMenuItem( menuItemID:int ):Boolean
+			{
+				var result:Boolean = false;
+				
+				if( Sweeps.ExclusionList.indexOf( menuItemID.toString() ) == -1 )
+				{
+					if( !Sweeps.SkilltopiaEnabled || [29,30,1,4,5,6,7,12,13,14,24,28,8,2,9,21,23,25,27,26].indexOf( menuItemID ) >= 0 )
+					{
+						result = true;
+					}				
+				}
+
+				return result;
+			}
+		]]>		
+	</fx:Script>
+	
+	<s:Group left="0" right="0" top="0" bottom="0">		
+		<s:BitmapImage source="{ Sweeps.SkilltopiaEnabled ? Images.menuHeader_skilltopia : Images.menuHeader}" depth="1"></s:BitmapImage>
+		<s:BitmapImage source="{Images.menuBG}"></s:BitmapImage>
+		
+		<cx:ImageButton id="btnReveal" skinClass="skins.ButtonSkin" label="REVEAL ENTRIES" fontSize="15" fontFamily="FuturaBold" textVerticalCenter="2" imageSkin="{Images.btnMenuSmallAlt_up}" imageSkinOver="{Images.btnMenuSmallAlt_over}" imageSkinDown="{Images.btnMenuSmallAlt_down}" imageSkinDisabled="{Images.btnMenuSmallAlt_disabled}" right="165" top="15" depth="2" click="btnReveal_clickHandler(event)" mouseDown="btnReveal_mouseDownHandler(event)"></cx:ImageButton>
+		
+		<s:Label id="lblVersion" styleName="Label" text="" right="1" top="1" depth="2" alpha="0.1"></s:Label>
+		
+		<cx:ImageButton id="btnAccessInternet" skinClass="skins.ButtonSkin" label="ACCESS INTERNET" fontSize="15" fontFamily="FuturaBold" textVerticalCenter="2" imageSkin="{Images.btnMenuSmallAlt_up}" imageSkinOver="{Images.btnMenuSmallAlt_over}" imageSkinDown="{Images.btnMenuSmallAlt_down}" imageSkinDisabled="{Images.btnMenuSmallAlt_disabled}" right="8" top="15" depth="2" click="btnAccessInternet_clickHandler(event)" mouseDown="btnAccessInternet_mouseDownHandler(event)"></cx:ImageButton>
+		
+		<s:Scroller width="100%" top="110" height="400" verticalScrollPolicy="off">						
+			<s:Group id="vgMenuItems" width="100%">				
+				<s:layout><s:TileLayout paddingTop="5" paddingLeft="15" horizontalGap="20"/></s:layout>
+			</s:Group>
+		</s:Scroller>
+		
+		<cx:ImageButton id="btnMoreGames" skinClass="skins.ButtonSkin" label="MORE GAMES" fontSize="15" fontFamily="FuturaBold" textVerticalCenter="2" imageSkin="{Images.btnMenuSmall_up}" imageSkinOver="{Images.btnMenuSmall_over}" imageSkinDown="{Images.btnMenuSmall_down}" imageSkinDisabled="{Images.btnMenuSmall_disabled}" y="498" horizontalCenter="0" depth="2" click="btnMoreGames_clickHandler(event)" mouseDown="btnMoreGames_mouseDownHandler(event)"></cx:ImageButton>
+		
+		<s:HGroup gap="5" x="690" y="520" verticalAlign="middle" depth="2">
+			<s:Label id="lblFullScreen" styleName="LabelYellow" text="Full Screen" buttonMode="true" click="btnFullScreen_clickHandler(event)" mouseDown="btnFullScreen_mouseDownHandler(event)" visible="false"></s:Label>			
+			<cx:ImageButton id="btnFullScreen" skinClass="skins.ButtonSkin" imageSkin="{Images.btnFullScreen}" imageSkinOver="{Images.btnFullScreen_over}" imageSkinDown="{Images.btnFullScreen_down}" click="btnFullScreen_clickHandler(event)" mouseDown="btnFullScreen_mouseDownHandler(event)" visible="false"></cx:ImageButton>
+		</s:HGroup>		
+	</s:Group>
+	
+</s:SkinnableContainer>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SparkSkin xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			 xmlns:s="library://ns.adobe.com/flex/spark" 
+             xmlns:fb="http://ns.adobe.com/flashbuilder/2009" 
+			 minWidth="40" 
+			 minHeight="40" 
+			 alpha.disabled="0.5">
+	
+    <fx:Metadata>
+		[HostComponent("components.VideoKeno.VideoKenoNumber")]
+	</fx:Metadata>
+	
+    <s:states>
+        <s:State name="up" />
+        <s:State name="over" />
+        <s:State name="down" />
+        <s:State name="disabled" />
+		<s:State name="userSelected" />
+		<s:State name="gameSelected" />
+    </s:states>
+	
+    <!-- layer 1: image -->
+	<s:BitmapImage 
+		source.up="{hostComponent.getStyle('imageUp')}"
+		source.over="{hostComponent.getStyle('imageOver')}"	
+		source.down="{hostComponent.getStyle('imageDown')}"
+		source.disabled="{hostComponent.getStyle('imageUp')}"
+		source.userSelected="{hostComponent.getStyle('imageUserSelected')}"
+		source.gameSelected="{hostComponent.getStyle('imageGameSelected')}"
+		left="0" right="0" top="0" bottom="0">
+	</s:BitmapImage>
+	
+    <!-- layer 8: text -->
+    <s:Label id="labelDisplay"
+             textAlign="center"
+             verticalAlign="middle"
+             maxDisplayedLines="1"
+             horizontalCenter="0" 
+			 verticalCenter="1"
+			 fontFamily="Verdana"
+			 fontSize="18"
+             left="2" right="2" top="2" bottom="2" color="0xFFFFFF" color.userSelected="0x000000" color.gameSelected="0x000000">
+		<s:filters>
+			<s:DropShadowFilter distance="1" angle="45" color="0x000000"  color.userSelected="0x666666" color.gameSelected="0x000000" />
+		</s:filters>		
+    </s:Label>
+    
+</s:SparkSkin>

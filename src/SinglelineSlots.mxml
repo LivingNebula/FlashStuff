@@ -1,0 +1,1710 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009"
+					  xmlns:s="library://ns.adobe.com/flex/spark"
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:cx="components.*"
+					  xmlns:SinglelineSlots="components.SinglelineSlots.*"
+					  minWidth="800" minHeight="600" width="800" height="600"
+					  backgroundColor="#000000"
+					  initialize="init( event )"
+					  creationComplete="creationComplete( event )"
+					  implements="interfaces.IDisposable"
+					  creationPolicy="none">
+
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser"/>
+	</fx:Declarations>
+
+	<fx:Script>
+		<![CDATA[
+			import assets.Achievements.Rewards;
+
+			import objects.ErrorMessage;
+
+			import assets.AnimationManager;
+			import assets.Config;
+			import assets.DataTimer;
+			import assets.SkinManager;
+			import assets.SoundManager;
+			import assets.Sounds;
+
+			import components.Progress;
+			import components.ProgressiveJackpot;
+			import components.SinglelineSlots.WinningIconGraphic;
+			import components.SpriteUIComponent;
+
+			import flash.utils.getTimer;
+
+			import mx.controls.Alert;
+			import mx.controls.Image;
+			import mx.core.FlexGlobals;
+			import mx.effects.SoundEffect;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			import mx.events.StyleEvent;
+			import mx.managers.PopUpManager;
+
+			import objects.AchievementReward;
+			import objects.PlayGameResponse;
+
+			import org.osmf.events.TimeEvent;
+
+			import services.SweepsAPI;
+
+			import spark.effects.Animate;
+
+			import utils.ArrayHelper;
+			import utils.DebugHelper;
+			import utils.MathHelper;
+
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( SinglelineSlots );
+
+			private var betAmounts:Array = [];
+			private var betAmountStep:int = 0;
+			private var winAmounts:Array;
+			private var currentWinAmount:int = 0.0;
+			private var serverOutput:Array = [];
+			private var serverEntries:int;
+			private var serverWinnings:int;
+			private var achievementsEarned:Array;
+
+			private var isSpinning:Boolean = false;
+			private var tiltReward:Boolean = false;
+			private var tiltHint:Boolean = false;
+			private var tiltSpin:Boolean = false;
+			private var tiltReel:SlotReel = null;
+
+			private var achievementsLoaded:Boolean = false;
+			private var assetsLoaded:Boolean = false;
+			private var gameLoaded:Boolean = false;
+
+			private var flasher:Timer;
+			private var autoPlay:Boolean = false;
+			private var autoSpinTimeout:uint = uint.MIN_VALUE;
+			private var msAPIStart:Number;
+
+			private var vReelList:Vector.<SlotReel>;				// A vector containing each of the 3 reels
+			private var spinsList:Array = [];						// An array of "spins" each round has produced
+			private var doBlink:Boolean = false;					// If true, the reels will blink instead of spin
+			private var doPlayReelStop:Boolean = true;				// If true, the game will play sounds as each reel stops
+			private var doRandomStop:Boolean = false;				// If true, the reels with stop in a random order
+			private var nudgeTimedOut:Boolean = false;				// Indicates the user didn't nudge within the specified time
+			private var nudgeIndicatorGraphic:SpriteUIComponent		// The graphic used to indicate which reel you're nudging
+			private var nudgeReel:SlotReel;							// The reel you're nudging
+			private var isQuickStop:Boolean = false;				// Indicates a particular spin should stop quickly
+
+			private var spinStopTimer:Timer;
+			private var nudgeTimer:Timer;
+
+			private var image_reel:Class;
+			private var image_reelBlurred:Class;
+			private var image_reelShadow:Class;
+
+			private var winningsChnl:SoundChannel;
+			private var winningsBdChnl:SoundChannel;
+			private var nudgeIndicatorSound:SoundChannel;
+
+			private var cssStyleDispatcher:IEventDispatcher;
+
+			// Handles the 'initialize' event
+			private function init( event:FlexEvent ):void
+			{				// Log Activity				logger.pushContext( "init", arguments );
+				switch( Sweeps.GameType )
+				{
+					case Config.GAME_TYPE_SINGLELINE_SLOTS:
+						winAmounts = [5, 25, 50, 75, 125, 250, 1000];
+						betAmounts = [20, 30, 50, 100, 200, 300, 500];
+						break;
+
+					case Config.GAME_TYPE_SINGLINE_SLOTS_BIGPAY:
+						winAmounts = [2, 25, 50, 100, 200, 1000, 5000];
+						betAmounts = [25, 50, 75, 100];
+						break;
+				}
+
+				// Reset any game features based on Skilltopia
+				if( Sweeps.SkilltopiaEnabled )
+				{
+					doBlink = true;
+					doPlayReelStop = false;
+					doRandomStop = true;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the 'creation complete' event
+			private function creationComplete( event:FlexEvent ):void
+			{				// Log Activity				logger.pushContext( "creationComplete", arguments );
+				// Start the progress meter
+				Sweeps.getInstance().startProgressMeter();
+
+				// Load the application skin
+				cssStyleDispatcher = styleManager.loadStyleDeclarations( Sweeps.AssetsLocation + "/SinglelineSlots/" + Sweeps.GameAsset, false );
+				cssStyleDispatcher.addEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.addEventListener( StyleEvent.COMPLETE, stylesLoaded );
+				cssStyleDispatcher.addEventListener( StyleEvent.ERROR, stylesError );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the 'progress' event of the style SWF
+			private function stylesProgress( event:StyleEvent ):void
+			{
+				Sweeps.getInstance().updateProgressMeter( Math.floor(100 * event.bytesLoaded/event.bytesTotal) );
+			}
+
+			// Handles the 'complete' event of the style SWF
+			private function stylesLoaded( event:StyleEvent ):void
+			{				// Log Activity				logger.pushContext( "stylesLoaded", arguments );
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );
+				assetsLoaded = true;
+
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Notifies the game our achivements have loaded
+			public function setAchievementsLoaded():void
+			{				// Log Activity				logger.pushContext( "setAchievementsLoaded", arguments );
+				achievementsLoaded = true;
+
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Loades the deffered content and starts the game
+			private function continueLoadingGame():void
+			{				// Log Activity				logger.pushContext( "continueLoadingGame", arguments );
+				if( gameLoaded ) { return; }
+				gameLoaded = true;
+
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();
+
+				// Create any deffered components
+				createDeferredContent();
+
+				// Store the physical reels
+				vReelList = Vector.<SlotReel>( [reel0, reel1, reel2] );
+
+				// See if we have the tilt reward
+				tiltReward = Sweeps.hasReward( AchievementReward.REWARD_NUDGE );
+
+				// Setup a listener to display the prize amount
+				flasher = new Timer( 500, 0 );
+				flasher.addEventListener( TimerEvent.TIMER, flasherFired );
+
+				// Default win amount and current bet amount
+				resetPrize();
+				displayBetAmount();
+
+				// Set the UI image sources to their proper classes
+				imgSkin.source = SkinManager.getSkinAsset( styleManager, "Skin" );
+				imgPaytable.source = SkinManager.getSkinAsset( styleManager, "Paytable" );
+
+				imgPlayline.source = SkinManager.getSkinAsset( styleManager, "Playline" );
+				imgPlaylineShadow.source = SkinManager.getSkinAsset( styleManager, "PlaylineShadow" );
+
+				image_reel = SkinManager.getSkinAsset( styleManager, "Reel" );
+				image_reelBlurred = SkinManager.getSkinAsset( styleManager, "ReelBlurred" );
+				reel0.reelImage = image_reel;
+				reel0.reelBlurredImage = image_reelBlurred;
+				reel0.slotValues = ["A","E","F","D","C","G","B"];
+				reel0.setPosition( 1 );
+				reel0.slotMappings =
+					[
+						[0],
+						[10,11,12],
+						[13,14,15,16,17],
+						[6,7,8,9],
+						[3,4,5],
+						[18,19,20,21,22,23,24,25,26,27,28,29,30,31],
+						[1,2]
+					];
+
+				reel1.reelImage = image_reel;
+				reel1.reelBlurredImage = image_reelBlurred;
+				reel1.slotValues = ["A","E","F","D","C","G","B"];
+				reel1.setPosition( 2 );
+				reel1.slotMappings =
+					[
+						[0],
+						[8,9,10],
+						[11,12,13,14,15],
+						[5,6,7],
+						[2,3,4],
+						[16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],
+						[1]
+					];
+
+				reel2.reelImage = image_reel;
+				reel2.reelBlurredImage = image_reelBlurred;
+				reel2.slotValues = ["A","E","F","D","C","G","B"];
+				reel2.setPosition( 1 );
+				reel2.slotMappings =
+					[
+						[0],
+						[4],
+						[5,6,7,8,9,10,11,12,13,14],
+						[3],
+						[2],
+						[15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],
+						[1]
+					];
+
+				if( !doBlink )
+				{
+					var image_reelShadow:Class = SkinManager.getSkinAsset( styleManager, "ReelShadow" );
+					imgReelShadowOne.source = imgReelShadowTwo.source = imgReelShadowThree.source = image_reelShadow;
+				}
+				else
+				{
+					grpReelShadows.visible = false;
+				}
+
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the 'error' event of the style SWF
+			private function stylesError( event:StyleEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "stylesError" ).error.apply( null, arguments );
+
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();
+
+				// Display a popup indicating an error occurred
+				Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an error while trying to complete this request.\n\nPlease try again.", false, false );
+
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );
+
+				// Return to the main menu
+				Sweeps.getInstance().quit();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Retrieves the current bet amount
+			private function getBetAmount():int
+			{
+				return betAmounts[betAmountStep];
+			}
+
+			// Retrieve the Skilltopia surchage, when applicable
+			private function getSkillSurcharge():int
+			{
+				return Sweeps.SkilltopiaEnabled ? 1 : 0;
+			}
+
+			// Handles the 'firing' event of flasherFired timer
+			private function flasherFired( event:TimerEvent ):void
+			{
+				grpPaytable.visible = !grpPaytable.visible;
+			}
+
+			// Stops auto play
+			private function stopAutoPlay():void
+			{				// Log Activity				logger.pushContext( "stopAutoPlay", arguments );
+				autoPlay = false;
+				btnPanel.stopAutoPlay();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Checks to see if we should auto spin again
+			private function checkAutoSpin():void
+			{				// Log Activity				logger.pushContext( "checkAutoSpin", arguments );
+				// Clear any autoplay timeouts
+				clearTimeout( autoSpinTimeout );
+				autoSpinTimeout = uint.MIN_VALUE;
+
+				if( autoPlay && !isSpinning )
+				{
+					spin();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Starts a spin
+			private function spin():void
+			{				// Log Activity				logger.pushContext( "spin", arguments );
+				// Clear any autoplay timeouts
+				clearTimeout( autoSpinTimeout );
+				autoSpinTimeout = uint.MIN_VALUE;
+
+				// Immediately return if we're already spinning
+				if( isSpinning )
+				{
+					return;
+				}
+
+				// Set the nudge variable
+				nudgeTimedOut = false;
+
+				// Reset the prize display
+				resetPrizeWin();
+				resetPrize();
+
+				// Check to see if we have enough credits to pay for this spin/bet
+				if( getBetAmount() + getSkillSurcharge() <= Sweeps.Entries )
+				{
+					// Decrement our entries amount
+					Sweeps.getInstance().displayBalance( Sweeps.Entries - ( getBetAmount() + getSkillSurcharge() ), Sweeps.Winnings );
+
+					// Call the spin start handler to disable buttons, etc
+					spinStarted();
+
+					// Start the "dummy spins" spin
+					for( var x:int = 0; x < vReelList.length; x++ )
+					{
+						if( !doBlink )
+						{
+							vReelList[x].spin( 100 );
+						}
+						else
+						{
+							vReelList[x].blink( 400 );
+						}
+					}
+
+					// Check if in DEBUG Mode
+					if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+					{
+						// Update our progressive jackpot
+						SweepsAPI.progressiveBalanceDemo += Math.ceil( getBetAmount() * ProgressiveJackpot.JACKPOT_BET_PERCENTAGE );
+						Sweeps.getInstance().displayProgressiveBalance( SweepsAPI.progressiveBalanceDemo, true );
+						Sweeps.getInstance().spinProgressiveReel( -1 );
+
+						// Default our current win amount
+						serverEntries = Sweeps.Entries;
+						serverWinnings = Sweeps.Winnings;
+						currentWinAmount = 0;
+
+						// Save our achievements earned for this spin
+						achievementsEarned = null;
+
+						// Set the reel positions spin
+						var reelPos1:int = MathHelper.randomNumber( 0, 31 );
+						var reelPos2:int = MathHelper.randomNumber( 0, 31 );
+						var reelPos3:int = MathHelper.randomNumber( 0, 31 );
+						var reelOutput:Array = [reelPos1, reelPos2, reelPos3];
+
+						// Determine if we'll do a tilt
+						serverOutput = reelOutput;
+						determineTilt( reelOutput );
+						spinsList = getArrayReelPositions( reelOutput, vReelList.slice( 0 ) );
+
+						// Start the stop spin timer
+						spinStopTimer = new Timer( 900, 1 );
+						spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+						spinStopTimer.start();
+
+						// Enable the stop button
+						if( !autoPlay )
+						{
+							setTimeout( function():void { btnPanel.togglePlayStopEnabled( true ); }, 200 );
+						}
+					}
+					else
+					{
+						// Save the current ms
+						msAPIStart = flash.utils.getTimer();
+
+						// Call the 'Play Game' API event to get our results
+						SweepsAPI.playGame(
+							Sweeps.Username,
+							Sweeps.Password,
+							Sweeps.GameID,
+							Sweeps.GameType,
+							getBetAmount(),
+							1,
+							getSkillSurcharge(),
+							handlePlayGameSuccess,
+							handlePlayGameError
+						);
+					}
+				}
+				else
+				{
+					// If we're on auto play, make sure to stop it.
+					stopAutoPlay();
+
+					// Check to see if we have enough winnings that we could redeem to complete this spin
+					if( getBetAmount() + getSkillSurcharge() <= ( Sweeps.Entries + Sweeps.Winnings ) )
+					{
+						// Check to see if auto-redeem enabled
+						if( Sweeps.AutoRedeemEnabled && Sweeps.Winnings >= 100 )
+						{
+							var redeemAmount:int = ( ( ( getBetAmount() + getSkillSurcharge() ) - Sweeps.Entries) <= 100) ? 100 : ( getBetAmount() + getSkillSurcharge() ) - Sweeps.Entries;
+
+							// Send the request to the service API and handle response
+							SweepsAPI.redeemEntries( Sweeps.Username, Sweeps.Password, Sweeps.Entries, Sweeps.Winnings, redeemAmount, handleRedeemSuccess, handleRedeemError );
+						}
+						else
+						{
+							// Reset the button panel
+							spinEnded();
+
+							Sweeps.getInstance().loadRedeemQuick();
+						}
+					}
+					else
+					{
+						// Reset the button panel
+						spinEnded();
+
+						Sweeps.getInstance().createPopUp( "Insufficient Entries", "You do not have enough entries to complete this spin.", false, false );
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles success for the SweepsAPI.redeemEntries call
+			private function handleRedeemSuccess( entries:int, winnings:int ):void
+			{				// Log Activity				logger.pushContext( "handleRedeemSuccess", arguments );
+				// Refresh the account balances
+				Sweeps.getInstance().displayBalance( entries, winnings );
+
+				// Re-spin
+				spin();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles error for the SweepsAPI.redeemEntries call
+			private function handleRedeemError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemError" ).error.apply( null, arguments );
+
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean = false;
+				var pIsError:Boolean = false;
+
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsError = true;
+						break;
+
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this request.\n\nPlease try again.";
+						pIsError = true;
+						break;
+				}
+
+				// Reset the button panel
+				spinEnded();
+
+				// Create a popup
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, pIsError, pIsLogout );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles success for the SweepsAPI.playGame call
+			private function handlePlayGameSuccess( response:PlayGameResponse ):void
+			{				// Log Activity				logger.pushContext( "handlePlayGameSuccess", arguments );
+				if( response.ReelOutput != null )
+				{
+					// Updates the progressive balance && spins the reel
+					Sweeps.getInstance().displayProgressiveBalance( response.ProgressiveBalance, response.ProgressiveWin <= 0 );
+					Sweeps.getInstance().spinProgressiveReel( response.ProgressiveWin );
+
+					// Stop auto play if we've won the progressive
+					if( response.ProgressiveWin > 0 )
+					{
+						stopAutoPlay();
+					}
+
+					// Save our achievements earned for this spin
+					achievementsEarned = response.Achievements;
+
+					// Set our current win amount
+					currentWinAmount = response.WinAmount;
+					serverEntries = response.Entries;
+					serverWinnings = response.Winnings;
+
+					// Determine if we'll do a tilt
+					serverOutput = response.ReelOutput;
+					determineTilt( response.ReelOutput );
+					spinsList = getArrayReelPositions( response.ReelOutput, vReelList.slice( 0 ) );
+
+					// Set the reel positions spin
+					var msAPIElapsed:Number = getTimer() - msAPIStart;
+					spinStopTimer = new Timer( msAPIElapsed < 900 ? 900 - msAPIElapsed : 0, 1 );
+					spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener )
+					spinStopTimer.start();
+
+					// Enable the stop button
+					if( !autoPlay )
+					{
+						btnPanel.togglePlayStopEnabled( true );
+					}
+				}
+				else
+				{
+					handlePlayGameError( SweepsAPI.ERROR_CODE_UNKNOWN, "Invalid Reel Output" );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles errors for the SweepsAPI.playGame call
+			private function handlePlayGameError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameError" ).error.apply( null, arguments );
+
+				// We've likely had an error and need to alert the player
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean;
+
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsLogout = true;
+						break;
+
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this spin.\n\nPlease try again.";
+						pIsLogout = true;
+						break;
+				}
+
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, false, pIsLogout );
+
+				// If we're on auto play, make sure to stop it.
+				stopAutoPlay();
+
+				// Set the reels to stop on a non-win
+				serverOutput = [0, 1, 2];
+				spinsList = getArrayReelPositions( serverOutput, vReelList.slice( 0 ) );
+				currentWinAmount = 0;
+				spinStopTimer = new DataTimer( 900, 1 );
+				spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+				spinStopTimer.start();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "spin stop" event of the data timer
+			private function spinStopTimer_Listener( event:TimerEvent ):void
+			{				// Log Activity				logger.pushContext( "spinStopTimer_Listener", arguments );
+				spinStopTimer.stop();
+				spinStopTimer.removeEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+				spinStopTimer = null;
+
+				// Make sure this code can't execute if we're not in a spin or if we've cleared the timer's data
+				if( !isSpinning )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				// Retrieve the results
+				var reelOutput:Array = spinsList[0].ReelOutput;
+				var spinReels:Vector.<SlotReel> = spinsList[0].SpinReels;
+
+				// Set the reel target positions
+				for( var i:int = 0; i < spinReels.length; i++ )
+				{
+					spinReels[i].setTargetPosition( reelOutput[i] );
+				}
+
+				if( !doBlink )
+				{
+					// Stop the first reel
+					spinReels[0].stop( tiltHint == true && tiltReel == spinReels[0], tiltSpin == true && tiltReel == spinReels[0] );
+				}
+				else
+				{
+					// Stop the first reel
+					spinReels[0].stop();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Determines if a tile should be performed for a given set of reel positions
+			private function determineTilt( reelPositions:Array ):void
+			{				// Log Activity				logger.pushContext( "determineTilt", arguments );
+				// Reset our state
+				tiltHint = false;
+				tiltSpin = false;
+				tiltReel = null;
+
+				// If we're blinking our reels, don't do any tilts
+				if( doBlink )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				if( Sweeps.BadgesEnabled )
+				{
+					// The reel positions passed in are of a 32 icon reel, map them to our actual 8 position physical reels
+					var reelPos0:int = reel0.slotMappings.map(function( arr:Array, index:int, source:Array ):int{ return arr.indexOf( reelPositions[0] ) >= 0 ? 1 : 0 }).indexOf( 1 );
+					var reelPos1:int = reel1.slotMappings.map(function( arr:Array, index:int, source:Array ):int{ return arr.indexOf( reelPositions[1] ) >= 0 ? 1 : 0 }).indexOf( 1 );
+					var reelPos2:int = reel2.slotMappings.map(function( arr:Array, index:int, source:Array ):int{ return arr.indexOf( reelPositions[2] ) >= 0 ? 1 : 0 }).indexOf( 1 );
+
+					// If this is a winning spin
+					if( reelPos0 == reelPos1 && reelPos1 == reelPos2 )
+					{
+						// Activate tilt 50% of the time on wins, only if you have the reward
+						if( tiltReward )
+						{
+							tiltHint = MathHelper.randomNumber( 0, 1 ) == 1;
+							tiltReel = vReelList[MathHelper.randomNumber( 0, 2 )];
+							tiltSpin = tiltHint;
+						}
+					}
+						// Determine if this is a near miss
+					else if( ArrayHelper.getUnique( [reelPos0, reelPos1, reelPos2] ).length == 2 )
+					{
+						var isNearMiss:Boolean = false;
+
+						// If reels 0 and 1 are the same, reel 2 has to be + 1
+						if( reelPos0 == reelPos1 && reelPos2 == MathHelper.mod( reelPos1 + 1, reel1.slotMappings.length ) )
+						{
+							isNearMiss = true;
+							tiltReel = vReelList[2];
+							tiltSpin = false;
+						}
+							// If reels 0 and 2 are the same, reel 1 has to be + 1
+						else if( reelPos0 == reelPos2 && reelPos1 == MathHelper.mod( reelPos0 + 1, reel0.slotMappings.length ) )
+						{
+							isNearMiss = true;
+							tiltReel = vReelList[1];
+							tiltSpin = false;
+						}
+							// If reels 1 and 2 are the same, reel 0 has to be + 1
+						else if( reelPos1 == reelPos2 && reelPos0 == MathHelper.mod( reelPos2 + 1, reel2.slotMappings.length ) )
+						{
+							isNearMiss = true;
+							tiltReel = vReelList[0];
+							tiltSpin = false;
+						}
+
+						// If this is a near miss, do the tilt 10% of the time if we have the reward, 25% otherwise
+						if( isNearMiss )
+						{
+							tiltHint = MathHelper.randomNumber( 0, tiltReward ? 9 : 3 ) == 2;
+						}
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function reSpin():void
+			{
+				// Log Activity
+				logger.pushContext( "reSpin", arguments );
+				// Initialize the reels to spin
+				var spinReels:Vector.<SlotReel> = spinsList[0].SpinReels;
+
+				// ReSpin or preNudge the target reels
+				for( var x:int = 0; x < spinReels.length; x++ )
+				{
+
+					if( !doBlink )
+					{
+						spinReels[x].spin( 100 );
+					}
+					else
+					{
+						spinReels[x].preNudge( spinsList[0].ReelOutput[x] );
+					}
+				}
+
+				// Restart the timer
+				if( !doBlink )
+				{
+					spinStopTimer = new Timer( 900, 1 );
+					spinStopTimer.addEventListener( TimerEvent.TIMER, spinStopTimer_Listener );
+					spinStopTimer.start();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+
+			private function nudge( direction:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "nudge", arguments );
+				var spinReels:Vector.<SlotReel> = spinsList[0].SpinReels;
+				var nudgeReelIndex:int;
+
+				// Make sure we're still in the appropriate state
+				if( nudgeReel == null || !spinReels.length > 0 || !doBlink )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				// Nudge the nudgeReel and then setup the new nudgeReel
+				nudgeReel.nudge( direction );
+				nudgeReelIndex = spinReels.indexOf( nudgeReel );
+				nudgeReel = nudgeReelIndex + 1 >= spinReels.length ? null : spinReels[nudgeReelIndex + 1];
+
+				if( nudgeReel != null && !nudgeTimedOut )
+				{
+					// Setup the anticipation graphic and start the countdown
+					doNudgeIndicator( nudgeReel );
+				}
+				else
+				{
+					// Stop the nudge indicator
+					stopNudgeIndicator();
+
+					// Stop the nudge timer
+					stopNudgeCountdown();
+
+					// Disable the nudge controls
+					btnPanel.toggleEnabled( false );
+					btnPanel.toggleNudgeEnabled( false );
+					btnPanel.displayNudgeTime( -1 );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function startNudgeCountdown():void
+			{
+				// Log Activity
+				logger.pushContext( "startNudgeCountdown", arguments );
+				btnPanel.displayNudgeTime( 20 );
+				nudgeTimer = new Timer( 1000, 20 );
+				nudgeTimer.addEventListener( TimerEvent.TIMER, nudgeTimer_Timer );
+				nudgeTimer.addEventListener( TimerEvent.TIMER_COMPLETE, nudgeTimer_Complete );
+				nudgeTimer.start();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function nudgeTimer_Timer( event:TimerEvent ):void
+			{
+				btnPanel.displayNudgeTime( nudgeTimer.repeatCount - nudgeTimer.currentCount );
+			}
+
+			private function nudgeTimer_Complete( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "nudgeTimer_Complete", arguments );
+				// Disable the nudge buttons
+				btnPanel.toggleNudgeEnabled( false );
+				btnPanel.displayNudgeTime( -1 );
+
+				// Cleanup the nudge timer
+				nudgeTimedOut = true;
+				stopNudgeCountdown();
+
+				// Get a list of spin reels
+				var spinReels:Vector.<SlotReel> = spinsList[0].SpinReels;
+
+				// Nudge the reel into losing positions
+				for( var i:int = 0; i < spinReels.length; i++ )
+				{
+					spinReels[i].nudge( "LOSING" );
+				}
+
+				// Check the wins and destroy the anticipation graphic
+				stopNudgeIndicator();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function stopNudgeCountdown():void
+			{
+				// Log Activity
+				logger.pushContext( "stopNudgeCountdown", arguments );
+				if( nudgeTimer != null )
+				{
+					nudgeTimer.stop();
+					nudgeTimer.removeEventListener( TimerEvent.TIMER, nudgeTimer_Timer );
+					nudgeTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, nudgeTimer_Complete );
+					nudgeTimer = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Called when a spin is started to handle audio and notification events
+			private function spinStarted():void
+			{				// Log Activity				logger.pushContext( "spinStarted", arguments );
+				// Flip our isSpinning flag
+				isSpinning = true;
+
+				// Reset our quick stop
+				isQuickStop = false;
+
+				// Set our Sweeps inAction value
+				Sweeps.getInstance().setInAction( true );
+
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Spin_Start" ), 0, 0 ); // Play the spinning started sound
+				if( !autoPlay ) { btnPanel.toggleEnabled( false, true ); } else { btnPanel.toggleEnabled( false ); }
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Called when a spin is completed to handle audio and notification events
+			private function spinEnded( prizeDisplayEnded:Boolean = true ):void
+			{				// Log Activity				logger.pushContext( "spinEnded", arguments );
+				// Flip our isSpinning flag
+				isSpinning = false;
+
+				// Re-enable our button panel
+				if( !autoPlay )
+				{
+					btnPanel.togglePlayStopEnabled( false );
+					btnPanel.toggleEnabled( true );
+
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( !prizeDisplayEnded );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Returns the results of the current spin (all the icons on the screen)
+			private function getResults( virtual:Boolean = false, reelPositions:Array = null ):Array
+			{
+				var results:Array = new Array(3);
+
+				if( !virtual )
+				{
+					results[0] = reel0.slotValue;
+					results[1] = reel1.slotValue;
+					results[2] = reel2.slotValue;
+				}
+				else
+				{
+					results[0] = reel0.slotValues[reel0.mapPositionToSlot( reelPositions[0] )];
+					results[1] = reel1.slotValues[reel1.mapPositionToSlot( reelPositions[1] )];
+					results[2] = reel2.slotValues[reel2.mapPositionToSlot( reelPositions[2] )];
+				}
+
+				return results;
+			}
+
+			// Checks to see if a given spin was a winner
+			private function checkWin():void
+			{				// Log Activity				logger.pushContext( "checkWin", arguments );
+				var calculatedWin:int = 0;
+				var results:Array = getResults();
+				var intendedResults:Array = getResults( true, serverOutput );
+				var winningIndex:int = -1;
+				var choseCorrectly:Boolean = true;
+
+				// Determine score
+				if( results[0] == results[1] && results[0] == results[2] )
+				{
+					calculatedWin = winAmounts[["G","F","E","D","C","B","A"].indexOf( results[0] )];
+				}
+
+				// Reset the win amount if in DEBUG mode
+				if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+				{
+					currentWinAmount = calculatedWin;
+				}
+
+				// If we're in skillstopia mode, check to see if the user made the right selection
+				if( Sweeps.SkilltopiaEnabled )
+				{
+					if( intendedResults[0] != results[0] || intendedResults[1] != results[1] || intendedResults[2] != results[2] )
+					{
+						choseCorrectly = false;
+					}
+				}
+
+				if( Sweeps.SkilltopiaEnabled && nudgeTimedOut )
+				{
+					SweepsAPI.submitBadChoice( Sweeps.Username, Sweeps.Password, true, Sweeps.Entries, Sweeps.Winnings,
+						function( entries:int, winnings:int ):void
+						{
+							serverEntries = entries;
+							serverWinnings = winnings;
+							spinEnded();
+						},
+						function ( errorCode:int, error:String ):void
+						{
+							// Log Activity
+							logger.error.apply( null, arguments );
+
+							Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an issue while trying to complete this spin.\n\nPlease try again.", false, true );
+
+							// If we're on auto play, make sure to stop it.
+							stopAutoPlay();
+							spinEnded();
+						});
+				}
+					// Check to see if we've won anything or if we've calculated that we should've won something
+				else if( currentWinAmount > 0.0 )
+				{
+					// Verify our calculations match the API results
+					if( currentWinAmount != calculatedWin )
+					{
+						// Only send an error if we're not in skilltopia or we are and we chose correctly
+						if( !Sweeps.SkilltopiaEnabled || ( Sweeps.SkilltopiaEnabled && ( choseCorrectly || calculatedWin != 0 ) ) )
+						{
+							var errMsg:ErrorMessage = Sweeps.getInstance().getErrorMessageBase( "SINGLELINESLOTS:Calculated and Supplied Winnings do not match.", "", "", "" );
+							errMsg.append( "REVEAL INFO", "Bet: " + getBetAmount().toString() );
+							errMsg.append( "REVEAL INFO", "Reel Positions: " + serverOutput.toString() );
+							errMsg.append( "REVEAL INFO", "Calculated Winnings: " + calculatedWin );
+							errMsg.append( "REVEAL INFO", "Supplied Winnings:  " + currentWinAmount );
+
+							if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+							{
+								throw new Error( errMsg.toString() );
+							}
+							else
+							{
+								SweepsAPI.reportError( errMsg );
+							}
+						}
+
+						// We didn't win what we were supposed to win, because we didn't choose correctly
+						if( !choseCorrectly )
+						{
+							SweepsAPI.submitBadChoice( Sweeps.Username, Sweeps.Password, false, Sweeps.Entries, Sweeps.Winnings,
+								function ( entries:int, winnings:int ):void
+								{
+									serverEntries = entries;
+									serverWinnings = winnings;
+									displayPrize( 0, getSkillSurcharge() );
+								},
+								function ( errorCode:int, error:String ):void
+								{
+									// Log Activity
+									logger.error.apply( null, arguments );
+
+									Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an issue while trying to complete this spin.\n\nPlease try again.", false, true );
+
+									// If we're on auto play, make sure to stop it.
+									stopAutoPlay();
+									spinEnded();
+								});
+
+							// Clear Context
+							logger.popContext();
+							return;
+						}
+					}
+
+					winningIndex = winAmounts.indexOf( currentWinAmount );
+					displayWin( results );
+					displayPrizeHiglight( winningIndex );
+					displayPrize( currentWinAmount, getSkillSurcharge() );
+
+					// Immediately re-enable the button panel during normal gameplay
+					if( !autoPlay )
+					{
+						spinEnded( false );
+					}
+				}
+				else if( Sweeps.SkilltopiaEnabled )
+				{
+					displayPrize( 0, getSkillSurcharge() );
+				}
+				else
+				{
+					// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts
+					Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );
+
+					spinEnded();
+					autoSpinTimeout = setTimeout( checkAutoSpin, Sweeps.GameType == Config.GAME_TYPE_SINGLELINE_SLOTS ? 500 : 1000 );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function getArrayReelPositions( reelOutput:Array, spinReels:Vector.<SlotReel> ):Array
+			{
+				// Log Activity
+				logger.pushContext( "getArrayReelPositions", arguments );
+				var tempOutput:Array = [];
+				var spin1Output:Array = [];
+				var spin2Output:Array = reelOutput.slice( 0 );
+				var spinOutputCombinations:Vector.<Array> = new Vector.<Array>();
+				var isValid:Boolean = false;
+				var results:Array = getResults( true, reelOutput );
+				var tempResults:Array;
+
+				if( Sweeps.SkilltopiaEnabled )
+				{
+					while( !isValid )
+					{
+						isValid = true;
+
+						spin1Output.length = 0;
+						spin1Output.push(  MathHelper.randomNumber( 0, 31 ) );
+						spin1Output.push(  MathHelper.randomNumber( 0, 31 ) );
+						spin1Output.push(  MathHelper.randomNumber( 0, 31 ) );
+
+						spinOutputCombinations.length = 0;
+						spinOutputCombinations.push( [spin1Output[0], spin1Output[1], spin1Output[2]] ); // 1, 1, 1
+						spinOutputCombinations.push( [spin2Output[0], spin1Output[1], spin1Output[2]] ); // 2, 1, 1
+						spinOutputCombinations.push( [spin2Output[0], spin2Output[1], spin1Output[2]] ); // 2, 2, 1
+
+						spinOutputCombinations.push( [spin2Output[0], spin2Output[1], spin2Output[2]] ); // 2, 2, 2
+						spinOutputCombinations.push( [spin1Output[0], spin2Output[1], spin2Output[2]] ); // 1, 2, 2
+						spinOutputCombinations.push( [spin1Output[0], spin1Output[1], spin2Output[2]] ); // 1, 1, 2
+
+						spinOutputCombinations.push( [spin2Output[0], spin1Output[1], spin2Output[2]] ); // 2, 1, 2
+						spinOutputCombinations.push( [spin1Output[0], spin2Output[1], spin1Output[2]] ); // 1, 2, 1
+
+						// Filter out all winning cominbations and make sure we only have 1 if we were supposed to win
+						isValid = spinOutputCombinations.filter( function( output:Array, index:int, v:* ):Boolean {
+							tempResults = getResults( true, output );
+							return tempResults[0] == tempResults[1] && tempResults[1] == tempResults[2];
+						}).length == ( ( results[0] == results[1] && results[1] == results[2] ) ? 1 : 0 );
+					}
+
+					tempOutput.push( { ReelOutput: spin1Output, SpinReels: spinReels.slice( 0 ) } );
+					tempOutput.push( { ReelOutput: spin2Output, SpinReels: spinReels.slice( 0 ) } );
+				}
+				else
+				{
+					tempOutput.push( { ReelOutput: reelOutput, SpinReels: spinReels.slice( 0 ) } );
+				}
+
+				// Clear Context
+				logger.popContext();
+				return tempOutput;
+			}
+
+			// Handles displaying the winning icons
+			private function displayWin( results:Array ):void
+			{				// Log Activity				logger.pushContext( "displayWin", arguments );
+				// Only applicable for certain game types
+				if( Sweeps.GameType != Config.GAME_TYPE_SINGLINE_SLOTS_BIGPAY )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				var winIcon:String = results[0];
+				var iconGraphic:WinningIconGraphic;
+
+				// Loop through the 3 reels and create the icons
+				for( var c:int = 0; c < 3; c++ )
+				{
+					// Create the animation for this icon, and position it on the screen
+					iconGraphic = new WinningIconGraphic( "ReelIcon_" + winIcon );
+					iconGraphic.x = grpReels.getElementAt( c ).x + 12;
+					iconGraphic.y = grpReels.getElementAt( c ).y + 40;
+					iconGraphic.retartAnimations();
+
+					// Add the element to the screen
+					grpLayer0Icons.addElement( iconGraphic );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles highlighting the appropriate row on the pay table
+			private function displayPrizeHiglight( prizeIndex:int ):void
+			{				// Log Activity				logger.pushContext( "displayPrizeHiglight", arguments );
+				var highlightIndex:int = ( winAmounts.length - 1 ) - prizeIndex;
+
+				grpPaytable.visible = true;
+				grhPaytableMask.scaleY = 1 / winAmounts.length;
+				grhPaytableMask.y = 10 + ( highlightIndex * 30 );
+
+				flasher.start();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles displaying the prize in the "Win" box on the game
+			private function displayPrize( winMultiplier:int, additionalWinAmount:int = 0 ):void
+			{				// Log Activity				logger.pushContext( "displayPrize", arguments );
+				// Check to make sure we've actually won something and if not, exit the function
+				if( winMultiplier == 0 && additionalWinAmount == 0 )
+				{
+					spinEnded();
+
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				// Build an array of possible win amounts from each bet amount * each multiplier
+				var possibleWins:Array = new Array();
+				for( var i:int = 0; i < betAmounts.length; i++ )
+				{
+					for( var x:int = 0; x < winAmounts.length; x++ )
+					{
+						var possibleWin:int = betAmounts[i] * winAmounts[x];
+						if( possibleWins.indexOf( possibleWin ) < 0 )
+						{
+							possibleWins.push( possibleWin );
+						}
+					}
+				}
+				possibleWins.sort( Array.NUMERIC );
+
+				// Get our win amount and determine the win percentage so we know how long to play our animation
+				var winAmount:int = ( getBetAmount() * winMultiplier ) + getSkillSurcharge();
+				if( possibleWins.indexOf( winAmount ) == -1 )
+				{
+					possibleWins.push( winAmount );
+					possibleWins.sort( Array.NUMERIC );
+				}
+
+				var winPercentage:Number = ( possibleWins.indexOf( winAmount ) + 1 ) / possibleWins.length;
+
+				// Play the winning sounds
+				winningsChnl = SoundManager.playSound( assets.Sounds["Add_Winnings"], 0, 0 );
+				winningsBdChnl = SoundManager.playSound( assets.Sounds["Add_Winnings_Backdrop"], 0, 0 );
+
+				// Animate the winning amount display
+				ddWinAmount.animateDisplayAmount( winAmount,  6 * 1000 * winPercentage, function( dd:DigitDisplay ):void {
+
+					// Make sure the display has the proper amount after the animation is over
+					ddWinAmount.displayAmount = winAmount;
+
+					// Stops the sounds
+					if( winningsChnl != null && winningsBdChnl != null )
+					{
+						winningsChnl.stop();
+						winningsBdChnl.stop();
+					}
+
+					// End the spin
+					spinEnded();
+
+					// Set a delay before checking auto spin
+					autoSpinTimeout = setTimeout( checkAutoSpin, Sweeps.GameType == Config.GAME_TYPE_SINGLELINE_SLOTS ? 500 : 1000 );
+
+					// Reset the win amounts if in DEBUG mode
+					if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+					{
+						serverEntries = Sweeps.Entries;
+						serverWinnings = Sweeps.Winnings + winAmount;
+					}
+
+					// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts
+					Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );
+				} );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Resets the winning prize displays
+			private function resetPrizeWin():void
+			{				// Log Activity				logger.pushContext( "resetPrizeWin", arguments );
+				// Only applicable for certain game types
+				if( Sweeps.GameType != Config.GAME_TYPE_SINGLINE_SLOTS_BIGPAY )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				// Remove winning animations
+				for( var i:int = 0; i < grpLayer0Icons.numElements; i++ )
+				{
+					var iconGraphic:WinningIconGraphic = grpLayer0Icons.getElementAt( i ) as WinningIconGraphic;
+					if( iconGraphic != null )
+					{
+						iconGraphic.dispose();
+					}
+				}
+				grpLayer0Icons.removeAllElements();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Resets the "Win" box to 0 and hides the pay table highlight
+			private function resetPrize():void
+			{				// Log Activity				logger.pushContext( "resetPrize", arguments );
+				flasher.stop();
+				grpPaytable.visible = false;
+				ddWinAmount.displayAmount = 0.00;
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Displays the current bet amount in the "Bet" box
+			private function displayBetAmount():void
+			{				// Log Activity				logger.pushContext( "displayBetAmount", arguments );
+				ddBetAmount.displayAmount = getBetAmount() + getSkillSurcharge();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the 'nudgeReady' event of each reel
+			protected function reel_nudgeReadyHandler( reel:SlotReel ):void
+			{				// Log Activity				logger.pushContext( "reel_nudgeReadyHandler", arguments );
+				var spinReels:Vector.<SlotReel> = spinsList[0].SpinReels;
+				var reelIndex:int = spinReels.indexOf( reel );
+
+				if( reelIndex == spinReels.length - 1 )
+				{
+					// Toggle the buttonPanel
+					btnPanel.toggleNudgeEnabled( true );
+
+					// Set the nudge reel
+					nudgeReel = spinReels[0];
+
+					// Setup the anticipation graphic and start the countdown
+					doNudgeIndicator( spinReels[0] );
+					startNudgeCountdown();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles a reel's spin stopped event
+			protected function reel_spinStoppedHandler( reel:SlotReel, isTilt:Boolean = false, isNudge:Boolean = false ):void
+			{				// Log Activity				logger.pushContext( "reel_spinStoppedHandler", arguments );
+				// Get a reference to the reel and its results
+				var spinReels:Vector.<SlotReel> = spinsList[0].SpinReels;
+
+				// Tell the next reel in the list to stop
+				if( !isNudge && spinReels.indexOf( reel ) + 1 < spinReels.length )
+				{
+					var tempReel:SlotReel = spinReels[spinReels.indexOf( reel ) + 1];
+					setTimeout( tempReel.stop, isQuickStop ? 100 : 450, tiltHint == true && tiltReel == tempReel, tiltSpin == true && tiltReel == tempReel );
+				}
+
+				// Remove the reel from our list of reels
+				if( !isTilt || ( isTilt && !tiltReward ) )
+				{
+					spinReels.splice( spinReels.indexOf( reel ), 1 );
+				}
+
+				// Play our sound
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Spin_Stop" ), 0, 0 );
+
+				if( !doBlink )
+				{
+					// If this is the last reel, we hinted the nudge and we have the reward - enable the button
+					if( reel == tiltReel && tiltHint && tiltReward )
+					{
+						setTimeout( function():void { btnPanel.toggleNudgeEnabled( true ); }, 500 );
+					}
+				}
+
+				// If we're done spinning, check the win
+				if( spinReels.length == 0 )
+				{
+					// Remove the first set of reel positions
+					spinsList.shift();
+
+					// Reset our quick stop
+					isQuickStop = false;
+
+					// Check to see if we have more reel positions (we need to respin)
+					if( spinsList.length > 0 )
+					{
+						btnPanel.togglePlayStopEnabled( false );
+						reSpin();
+					}
+					else
+					{
+						if( achievementsEarned == null )
+						{
+							checkWin();
+						}
+						else
+						{
+							Sweeps.getInstance().addNewBadges( achievementsEarned, checkWin );
+						}
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles initializing the nudge anticipation graphic
+			private function doNudgeIndicator( reel:SlotReel ):void
+			{				// Log Activity				logger.pushContext( "doNudgeIndicator", arguments );
+				// Create and position the scatter graphic
+				if( !nudgeIndicatorGraphic )
+				{
+					nudgeIndicatorGraphic = AnimationManager.getAnimatedImage( styleManager, Sweeps.GameID, "Sprite_E", 40, 0, 0, true );
+					nudgeIndicatorGraphic.visible = true;
+					grpLayer3.addElement( nudgeIndicatorGraphic );
+				}
+				nudgeIndicatorGraphic.x = reel.x;
+				nudgeIndicatorGraphic.y = reel.y;
+
+				// Play the sound
+				if( nudgeIndicatorSound )
+				{
+					nudgeIndicatorSound.stop();
+				}
+
+				nudgeIndicatorSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Nudge_Indicator" ), 0, 1 );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles stoppping the nudge indicator graphic
+			private function stopNudgeIndicator():void
+			{				// Log Activity				logger.pushContext( "stopNudgeIndicator", arguments );
+				if( nudgeIndicatorGraphic )
+				{
+					// Stop the anticipation sound ( if it exists );
+					if( nudgeIndicatorSound )
+					{
+						nudgeIndicatorSound.stop();
+					}
+
+					// Remove the anticipation graphic
+					nudgeIndicatorGraphic.visible = false;
+					nudgeIndicatorGraphic.dispose();
+					grpLayer3.removeElement( nudgeIndicatorGraphic );
+					nudgeIndicatorGraphic = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Auto Play" event of btnPanel
+			protected function btnPanel_onAutoPlayHandler( buttonPanel:ButtonPanel ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onAutoPlayHandler", arguments );
+				autoPlay = true;
+
+				// Clear any autoplay timeouts
+				clearTimeout( autoSpinTimeout );
+				autoSpinTimeout = uint.MIN_VALUE;
+
+				// Execute a spin if we're not already spinning
+				if( !isSpinning )
+				{
+					spin();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Stop" event of btnPanel
+			protected function btnPanel_onStopHandler( buttonPanel:ButtonPanel ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onStopHandler", arguments );
+				autoPlay = false;
+				if( !isSpinning )
+				{
+					btnPanel.toggleEnabled( true );
+
+					// Clear any autoplay timeouts
+					clearTimeout( autoSpinTimeout );
+					autoSpinTimeout = uint.MIN_VALUE;
+
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( false );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Bet Sub" event of btnPanel
+			protected function btnPanel_onBetSubHandler( buttonPanel:ButtonPanel ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onBetSubHandler", arguments );
+				if( betAmountStep > 0 )
+				{
+					betAmountStep--;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Bet Add" event of btnPanel
+			protected function btnPanel_onBetAddHandler( buttonPanel:ButtonPanel ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onBetAddHandler", arguments );
+				if( betAmountStep < ( betAmounts.length - 1 ) )
+				{
+					betAmountStep++;
+					btnPanel.betAmount = getBetAmount() + getSkillSurcharge();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Nudge" event of btnPanel
+			protected function btnPanel_onNudgeHandler( buttonPanel:ButtonPanel, direction:String = "" ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onNudgeHandler", arguments );
+				if( !doBlink )
+				{
+					if( tiltReel != null && tiltReward && isSpinning && tiltHint )
+					{
+						var tiltAnimation:Animate = assets.AnimationManager.getMoveAnimation( this, -20, 0, 0, 0, 300, 0, 1, 0, bounceEaser );
+						tiltAnimation.play();
+
+						btnPanel.toggleNudgeEnabled( false );
+						tiltReel.tilt();
+
+						tiltHint = false;
+						tiltSpin = false;
+						tiltReel = null;
+					}
+				}
+				else
+				{
+					nudge( direction );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Bet Max" event of btnPanel
+			protected function btnPanel_onBetMaxHandler( buttonPanel:ButtonPanel ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onBetMaxHandler", arguments );
+				if( betAmountStep < ( betAmounts.length - 1 ) )
+				{
+					betAmountStep = betAmounts.length - 1;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Spin" event of btnPanel
+			protected function btnPanel_onSpinHandler( buttonPanel:ButtonPanel ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onSpinHandler", arguments );
+				// Force the winnings and audio to stop if you spin again before they're done
+				if( ddWinAmount.isAnimating )
+				{
+					ddWinAmount.endAnimation();
+				}
+
+				spin();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the "On Spin Stop" event of btnPanel
+			protected function btnPanel_onSpinStopHandler( buttonPanel:ButtonPanel ):void
+			{				// Log Activity				logger.pushContext( "btnPanel_onSpinStopHandler", arguments );
+				btnPanel.togglePlayStopEnabled( false );
+
+				isQuickStop = true;
+
+				if( spinStopTimer != null && spinStopTimer.running ) {
+					spinStopTimer.stop();
+					spinStopTimer.dispatchEvent( new TimerEvent( TimerEvent.TIMER ) );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				// Remove the style dispatcher
+				if( cssStyleDispatcher != null )
+				{
+					cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+					cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );
+					cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+					cssStyleDispatcher = null;
+				}
+
+				// Check to make sure the assets were loaded
+				if( assetsLoaded )
+				{
+					// Unload the styles
+					try
+					{
+						styleManager.unloadStyleDeclarations( Sweeps.AssetsLocation + "/SinglelineSlots/" + Sweeps.GameAsset, false );
+					}
+					catch( e:* ){ /* do nothing */ }
+				}
+
+				// Check to make sure the game was loaded
+				if( gameLoaded )
+				{
+					resetPrizeWin();
+					resetPrize();
+				}
+
+				if( reel0 != null )
+				{
+					reel0.dispose();
+				}
+
+				if( reel1 != null )
+				{
+					reel1.dispose();
+				}
+
+				if( reel2 != null )
+				{
+					reel2.dispose();
+				}
+
+				if( btnPanel != null )
+				{
+					btnPanel.dispose();
+				}
+
+				if( spinStopTimer != null )
+				{
+					spinStopTimer.stop();
+					spinStopTimer = null;
+				}
+
+				if( flasher != null )
+				{
+					flasher.removeEventListener( TimerEvent.TIMER, flasherFired );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+		]]>
+	</fx:Script>
+
+	<s:Group id="grpReels">
+		<SinglelineSlots:SlotReel id="reel0" width="145" height="190" x="101" y="276" slotHeight="110" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+		<SinglelineSlots:SlotReel id="reel1" width="145" height="190" x="261" y="276" slotHeight="110" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+		<SinglelineSlots:SlotReel id="reel2" width="145" height="190" x="421" y="276" slotHeight="110" onSpinStopped="reel_spinStoppedHandler" onNudgeReady="reel_nudgeReadyHandler" />
+	</s:Group>
+
+	<s:Group id="grpLayer0Icons"></s:Group>
+
+	<s:Group id="grpReelShadows">
+		<mx:Image id="imgReelShadowOne" width="145" height="190" x="101" y="276" />
+		<mx:Image id="imgReelShadowTwo" width="145" height="190" x="261" y="276" />
+		<mx:Image id="imgReelShadowThree" width="145" height="190" x="421" y="276" />
+	</s:Group>
+
+	<s:Group id="grpLayer2">
+		<mx:Image id="imgSkin" width="800" height="560" x="0" y="0" />
+
+		<cx:ButtonPanel id="btnPanel" x="0" y="470"
+						defaultBetAmount="{ getBetAmount() + getSkillSurcharge() }"
+						onAutoPlay="btnPanel_onAutoPlayHandler"
+						onStop="btnPanel_onStopHandler"
+						onNudge="btnPanel_onNudgeHandler"
+						onBetMax="btnPanel_onBetMaxHandler"
+						onBetSub="btnPanel_onBetSubHandler"
+						onBetAdd="btnPanel_onBetAddHandler"
+						onSpin="btnPanel_onSpinHandler"
+						onSpinStop="btnPanel_onSpinStopHandler" />
+	</s:Group>
+
+	<s:Group id="grpLayer3">
+		<s:Group id="grpPaytable" width="257" height="231" x="528" y="16" visible="false">
+			<mx:Image id="imgPaytable" width="257" height="231" x="0" y="0" mask="{grhPaytableMask}" />
+			<s:Graphic id="grhPaytableMask" width="257" height="231" x="0" y="0">
+				<s:Rect width="257" height="231">
+					<s:fill>
+						<s:SolidColor color="0x000000" />
+					</s:fill>
+				</s:Rect>
+			</s:Graphic>
+		</s:Group>
+
+		<mx:Image id="imgPlaylineShadow" width="492" x="86" y="368" />
+		<mx:Image id="imgPlayline" width="492" x="86" y="368" />
+
+		<cx:DigitDisplay id="ddWinAmount" x="607" y="332" width="128" height="30" text="0.00" fontSize="36"></cx:DigitDisplay>
+		<cx:DigitDisplay id="ddBetAmount" x="607" y="402" width="102" height="30" text="0.50" fontSize="36"></cx:DigitDisplay>
+	</s:Group>
+
+</s:SkinnableContainer>

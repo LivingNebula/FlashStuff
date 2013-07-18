@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with TexturePacker http://texturepacker.com-->
+<!-- $TexturePacker:SmartUpdate:a3a996391fdeef9a1123d710de12c939$ -->
+<TextureAtlas imagePath="TextureAtlas.png">
+    <SubTexture name="Ball" x="2" y="2" width="32" height="32"/>
+    <SubTexture name="Clear_Disabled" x="36" y="2" width="74" height="33"/>
+    <SubTexture name="Clear_Down" x="112" y="2" width="74" height="33"/>
+    <SubTexture name="Clear_Over" x="188" y="2" width="74" height="33"/>
+    <SubTexture name="Clear_Up" x="264" y="2" width="74" height="33"/>
+    <SubTexture name="Hit_1" x="340" y="2" width="39" height="39"/>
+    <SubTexture name="Hit_2" x="381" y="2" width="39" height="39"/>
+    <SubTexture name="Number_Down" x="422" y="2" width="37" height="37"/>
+    <SubTexture name="Number_GameSelected" x="461" y="2" width="37" height="37"/>
+    <SubTexture name="Number_Over" x="500" y="2" width="37" height="37"/>
+    <SubTexture name="Number_Up" x="539" y="2" width="37" height="37"/>
+    <SubTexture name="Number_UserSelected" x="578" y="2" width="37" height="37"/>
+    <SubTexture name="Paytable" x="617" y="2" width="275" height="180"/>
+    <SubTexture name="Paytable" x="2" y="184" width="275" height="180"/>
+    <SubTexture name="Skin" x="2" y="366" width="800" height="560"/>
+</TextureAtlas>

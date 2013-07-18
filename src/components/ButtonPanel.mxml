@@ -1,0 +1,828 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009"
+					  xmlns:s="library://ns.adobe.com/flex/spark"
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  width="800" height="65"
+					  xmlns:cx="components.*"
+					  initialize="skinnablecontainer1_initializeHandler(event)"
+					  addedToStage="skinnablecontainer1_addedToStageHandler(event)"
+					  implements="interfaces.IDisposable">
+
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+
+			import flash.geom.PerspectiveProjection;
+
+			import mx.events.FlexEvent;
+
+			import objects.AchievementReward;
+
+			import skins.ButtonPanelButtonSkin;
+
+			import utils.FormatHelper;
+
+			public static const MENU_TYPE_SINGLELINE_SLOTS:String  = "SingleLine";
+			public static const MENU_TYPE_VIDEO_SLOTS:String 	   = "VideoSlots";
+			public static const MENU_TYPE_VIDEO_POKER:String 	   = "VideoPoker";
+			public static const MENU_TYPE_VIDEO_BLACKJACK:String   = "VideoBlackjack";
+			public static const MENU_TYPE_SUPER_VIDEO_SLOTS:String = "SuperVideoSlots";
+			public static const MENU_TYPE_QUAD_VIDEO_SLOTS:String  = "QuadVideoSlots";
+
+			private var isEnabled:Boolean = true;
+			private var isAutoPlaying:Boolean = false;
+			private var _isDealt:Boolean = false;
+
+			public var menuType:String = MENU_TYPE_SINGLELINE_SLOTS;
+			public var defaultBetAmount:int = 0;
+			public var defaultBetLines:int = 1;
+			public var betAmount:int = 0.0;
+
+			private var _timer:Timer;
+			private var _blinkTimer:Timer;
+			private var repeatCount:int = 0;
+			private var eventListeners:Object = {};
+
+			private var _onAutoPlay:Function;
+			private var _onStop:Function;
+			private var _onInfo:Function;
+			private var _onNudge:Function;
+			private var _onBetOne:Function;
+			private var _onBetMax:Function;
+			private var _onBetSub:Function;
+			private var _onBetAdd:Function;
+			private var _onLineAdd:Function;
+			private var _onSpin:Function;
+			private var _onSpinStop:Function;
+			private var _onDeal:Function;
+			private var _onDraw:Function;
+
+			public function set onAutoPlay( value:Function ):void
+			{
+				_onAutoPlay = value;
+			}
+
+			public function set onStop( value:Function ):void
+			{
+				_onStop = value;
+			}
+
+			public function set onInfo( value:Function ):void
+			{
+				_onInfo = value;
+			}
+
+			public function set onNudge( value:Function ):void
+			{
+				_onNudge = value;
+			}
+
+			public function set onBetOne( value:Function ):void
+			{
+				_onBetOne = value;
+			}
+
+			public function set onBetMax( value:Function ):void
+			{
+				_onBetMax = value;
+			}
+
+			public function set onBetSub( value:Function ):void
+			{
+				_onBetSub = value;
+			}
+
+			public function set onBetAdd( value:Function ):void
+			{
+				_onBetAdd = value;
+			}
+
+			public function set onLineAdd( value:Function ):void
+			{
+				_onLineAdd = value;
+			}
+
+			public function set onSpin( value:Function ):void
+			{
+				_onSpin = value;
+			}
+
+			public function set onSpinStop( value:Function ):void
+			{
+				_onSpinStop = value;
+			}
+
+			public function set onDeal( value:Function ):void
+			{
+				_onDeal = value;
+			}
+
+			public function set onDraw( value:Function ):void
+			{
+				_onDraw = value;
+			}
+
+			private function setButtonPerspective():void
+			{
+				// Adjust the projection for the button text to display properly
+				if( stage != null )
+				{
+					var pp1:PerspectiveProjection = new PerspectiveProjection();
+					pp1.fieldOfView = 60;
+					pp1.projectionCenter = new Point( stage.width / 2, stage.height / 2 );
+					root.transform.perspectiveProjection = pp1;
+				}
+			}
+
+			protected function skinnablecontainer1_addedToStageHandler( event:Event ):void
+			{
+				setButtonPerspective();
+				stage.addEventListener( FullScreenEvent.FULL_SCREEN, fullScreenScale );
+			}
+
+			protected function fullScreenScale( event:FullScreenEvent ):void
+			{
+				setButtonPerspective();
+			}
+
+			protected function skinnablecontainer1_initializeHandler( event:FlexEvent ):void
+			{
+				// Display the correct buttons based on the menu type
+				if( menuType == MENU_TYPE_SINGLELINE_SLOTS )
+				{
+					btn1.visible = !Sweeps.SkilltopiaEnabled;
+
+					btn2.visible = false;
+					btn3.visible = false;
+					btn4.visible = !Sweeps.SkilltopiaEnabled && Sweeps.hasReward( AchievementReward.REWARD_NUDGE );
+					btn4.enabled = false;
+					btn5.visible = !Sweeps.SkilltopiaEnabled;
+
+					btnBetSub.visible = true;
+					grpBetWheel.visible = true;
+					btnBetAdd.visible = true;
+					lblBetWheel.text = FormatHelper.formatEntriesAndWinnings( defaultBetAmount );
+
+					btnNudgeLeft.visible = Sweeps.SkilltopiaEnabled;
+					btnNudgeRight.visible = Sweeps.SkilltopiaEnabled;
+					grpNudgeTimer.visible = Sweeps.SkilltopiaEnabled;
+
+					btnNudgeLeft.enabled = false;
+					btnNudgeRight.enabled = false;
+					imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinDisabled" ) );
+
+					btn1.label = "AUTO\nPLAY";
+					btn4.label = "NUDGE";
+					btn5.label = "ENTRIES\nMAX";
+					btn6.label = "REVEAL";
+				}
+				else if( menuType == MENU_TYPE_VIDEO_SLOTS )
+				{
+					btn1.visible = !Sweeps.SkilltopiaEnabled;
+					btn2.visible = true;
+					btn3.visible = true;
+
+					btnBetSub.visible = false;
+					grpBetWheel.visible = false;
+					btnBetAdd.visible = false;
+					btn5.visible = false;
+
+					btnNudgeLeft.visible = Sweeps.SkilltopiaEnabled;
+					btnNudgeRight.visible = Sweeps.SkilltopiaEnabled;
+					grpNudgeTimer.visible = Sweeps.SkilltopiaEnabled;
+
+					btnNudgeLeft.enabled = false;
+					btnNudgeRight.enabled = false;
+					imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinDisabled" ) );
+
+					btn1.label = "AUTO\nPLAY";
+					btn2.label = "INFO";
+					btn3.label = "ENTRIES\n" + FormatHelper.formatEntriesAndWinnings( defaultBetAmount );
+					btn4.label = "LINES\n" + defaultBetLines.toString(10);
+					btn6.label = "REVEAL";
+				}
+				else if( menuType == MENU_TYPE_QUAD_VIDEO_SLOTS )
+				{
+					btn1.visible = !Sweeps.SkilltopiaEnabled;
+					btn2.visible = true;
+					btn3.visible = Sweeps.SkilltopiaEnabled;
+					btn4.visible = !Sweeps.SkilltopiaEnabled;
+
+					btnBetSub.visible = false;
+					grpBetWheel.visible = false;
+					btnBetAdd.visible = false;
+					btn5.visible = false;
+
+					btnNudgeLeft.visible = Sweeps.SkilltopiaEnabled;
+					btnNudgeRight.visible = Sweeps.SkilltopiaEnabled;
+					grpNudgeTimer.visible = Sweeps.SkilltopiaEnabled;
+
+					btnNudgeLeft.enabled = false;
+					btnNudgeRight.enabled = false;
+					imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinDisabled" ) );
+
+					btn1.label = "AUTO\nPLAY";
+					btn2.label = "INFO";
+					btn3.label = "LINES\n" + defaultBetLines.toString(10); // Skilltopia mode
+					btn4.label = "LINES\n" + defaultBetLines.toString(10); // Regular mode
+					btn6.label = "REVEAL";
+				}
+				else if( menuType == MENU_TYPE_SUPER_VIDEO_SLOTS )
+				{
+					btn1.visible = !Sweeps.SkilltopiaEnabled;
+					btn2.visible = true;
+					btn3.visible = true;
+
+					btnBetSub.visible = false;
+					grpBetWheel.visible = false;
+					btnBetAdd.visible = false;
+					btn4.visible = false;
+					btn5.visible = false;
+
+					btnNudgeLeft.visible = Sweeps.SkilltopiaEnabled;
+					btnNudgeRight.visible = Sweeps.SkilltopiaEnabled;
+					grpNudgeTimer.visible = Sweeps.SkilltopiaEnabled;
+
+					btnNudgeLeft.enabled = false;
+					btnNudgeRight.enabled = false;
+					imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinDisabled" ) );
+
+					btn1.label = "AUTO\nPLAY";
+					btn2.label = "INFO";
+					btn3.label = "ENTRIES\n" + FormatHelper.formatEntriesAndWinnings( defaultBetAmount );
+					btn6.label = "REVEAL";
+				}
+				else if( menuType == MENU_TYPE_VIDEO_POKER )
+				{
+					btn2.visible = false;
+					btn3.visible = false;
+
+					btnBetSub.visible = true;
+					grpBetWheel.visible = true;
+					btnBetAdd.visible = true;
+					lblBetWheel.text = FormatHelper.formatEntriesAndWinnings( defaultBetAmount );
+
+					btnNudgeLeft.visible = false;
+					btnNudgeRight.visible = false;
+					grpNudgeTimer.visible = false;
+
+					btn1.label = "AUTO\nPLAY";
+					btn4.label = "ENTRIES\nMIN";
+					btn5.label = "ENTRIES\nMAX";
+					btn6.label = "REVEAL";
+				}
+				else if( menuType == MENU_TYPE_VIDEO_BLACKJACK )
+				{
+					btn1.visible = false;
+					btn2.visible = false;
+					btn3.visible = false;
+					btn5.visible = false;
+
+					btnBetSub.visible = true;
+					grpBetWheel.visible = true;
+					btnBetAdd.visible = true;
+					lblBetWheel.text = FormatHelper.formatEntriesAndWinnings( defaultBetAmount );
+
+					btnNudgeLeft.visible = false;
+					btnNudgeRight.visible = false;
+					grpNudgeTimer.visible = false;
+
+					btn4.label = "HANDS\n" + defaultBetLines.toString(10);
+					btn6.label = "REVEAL";
+				}
+
+				// Position invisible elements offscreen to fix visual glitching when popups are present
+				for( var i:int = 0; i < grpButtons.numElements; i++ )
+				{
+					if( grpButtons.getElementAt( i ).visible == false )
+					{
+						grpButtons.getElementAt( i ).x = -800;
+					}
+				}
+			}
+
+			// Gets the "Is Dealt" property value
+			public function get isDealt():Boolean
+			{
+				return _isDealt;
+			}
+
+			// Sets the "Is Dealt" property value
+			public function set isDealt( value:Boolean ):void
+			{
+				_isDealt = value;
+			}
+
+			// Toggles the enabled state of all the buttons except Auto Play/Stop
+			// includeAutoPlay: Includes Auto Play button
+			// includeGamePlay: Includes Game Play button
+			public function toggleEnabled( enabled:Boolean, includeAutoPlay:Boolean = false, includeGamePlay:Boolean = true ):void
+			{
+				isEnabled = enabled;
+
+				// Set the enabled status of the appropriate buttons
+				btn1.enabled = includeAutoPlay ? isEnabled : true;
+				btn2.enabled = isEnabled;
+				btn3.enabled = isEnabled;
+				btn4.enabled = menuType == MENU_TYPE_SINGLELINE_SLOTS ? false : isEnabled;
+				btn5.enabled = isEnabled && ( menuType == MENU_TYPE_SINGLELINE_SLOTS || menuType == MENU_TYPE_VIDEO_POKER );
+				btn6.enabled =  includeGamePlay ? isEnabled : true;
+				btnBetAdd.enabled = isEnabled;
+				btnBetSub.enabled = isEnabled;
+				imgBetPanel.source = isEnabled ? Images.imgBetWheel : Images.imgBetWheel_Disabled;
+			}
+
+			// Toggles the enabled state of the AUTO PLAY button
+			public function toggleAutoPlayEnabled( value:Boolean ):void
+			{
+				btn1.enabled = value && isEnabled;
+			}
+
+			// Toggles the enabled state of the NUDGE button, disregards isEnabled
+			public function toggleNudgeEnabled( value:Boolean ):void
+			{
+				if( menuType == MENU_TYPE_SINGLELINE_SLOTS && btn4.visible )
+				{
+					if( value == true )
+					{
+						btn4.enabled = true;
+
+						_blinkTimer = new Timer( 500 );
+						_blinkTimer.addEventListener( TimerEvent.TIMER, blinkTimerStarted );
+						_blinkTimer.start();
+					}
+					else
+					{
+						btn4.enabled = false;
+						btn4.setStyle( "imageSkin", Images.btn4 );
+
+						_blinkTimer.removeEventListener( TimerEvent.TIMER, blinkTimerStarted );
+						_blinkTimer.stop();
+						_blinkTimer = null;
+					}
+				}
+				else if( ( menuType == MENU_TYPE_SINGLELINE_SLOTS || menuType == MENU_TYPE_VIDEO_SLOTS || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS || menuType == MENU_TYPE_QUAD_VIDEO_SLOTS ) && btnNudgeLeft.visible && btnNudgeRight.visible )
+				{
+					if( value == true )
+					{
+						btnNudgeLeft.enabled = true;
+						btnNudgeLeft.setStyle( "imageSkin", btnNudgeLeft.getStyle( "imageSkinOver" ) );
+
+						btnNudgeRight.enabled = true;
+						btnNudgeRight.setStyle( "imageSkin", btnNudgeRight.getStyle( "imageSkinOver" ) );
+
+						imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinOver" ) );
+
+						_blinkTimer = new Timer( 500 );
+						_blinkTimer.addEventListener( TimerEvent.TIMER, blinkTimerStarted );
+						_blinkTimer.start();
+					}
+					else
+					{
+						btnNudgeLeft.enabled = false;
+						btnNudgeLeft.setStyle( "imageSkin", btnNudgeLeft.getStyle( "imageSkinDisabled" ) );
+
+						btnNudgeRight.enabled = false;
+						btnNudgeRight.setStyle( "imageSkin", btnNudgeRight.getStyle( "imageSkinDisabled" ) );
+
+						imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinDisabled" ) );
+
+						if( _blinkTimer )
+						{
+							_blinkTimer.removeEventListener( TimerEvent.TIMER, blinkTimerStarted );
+							_blinkTimer.stop();
+							_blinkTimer = null;
+						}
+					}
+				}
+			}
+
+			// Handles the timer event of the 'Blink' timer
+			private function blinkTimerStarted( event:TimerEvent ):void
+			{
+				if( menuType == MENU_TYPE_SINGLELINE_SLOTS && btn4.visible )
+				{
+					if( btn4.getStyle( "imageSkin" ) == Images.btn4 )
+					{
+						btn4.setStyle( "imageSkin", Images.btn4_Disabled );
+					}
+					else
+					{
+						btn4.setStyle( "imageSkin", Images.btn4 );
+					}
+				}
+				else if( MENU_TYPE_SINGLELINE_SLOTS || menuType == MENU_TYPE_VIDEO_SLOTS || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS || menuType == MENU_TYPE_QUAD_VIDEO_SLOTS )
+				{
+					if( btnNudgeLeft.getStyle( "imageSkin" ) == btnNudgeLeft.getStyle( "imageSkinOver") )
+					{
+						btnNudgeLeft.setStyle( "imageSkin", btnNudgeLeft.getStyle( "imageSkinDisabled") );
+						btnNudgeRight.setStyle( "imageSkin", btnNudgeRight.getStyle( "imageSkinDisabled") );
+						imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinDisabled" ) );
+					}
+					else
+					{
+						btnNudgeLeft.setStyle( "imageSkin", btnNudgeLeft.getStyle( "imageSkinOver") );
+						btnNudgeRight.setStyle( "imageSkin", btnNudgeRight.getStyle( "imageSkinOver") );
+						imgNudgeTimer.setStyle( "imageSkin", imgNudgeTimer.getStyle( "imageSkinOver" ) );
+					}
+				}
+			}
+
+			// Toggles the enabled state of the PLAY button
+			public function togglePlayEnabled( value:Boolean ):void
+			{
+				btn6.enabled = value && isEnabled;
+			}
+
+			// Toggles the enabled state of the PLAY STOP button
+			public function togglePlayStopEnabled( value:Boolean ):void
+			{
+				if( menuType == ButtonPanel.MENU_TYPE_SINGLELINE_SLOTS || menuType == ButtonPanel.MENU_TYPE_VIDEO_SLOTS || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS )
+				{
+					btn6.label = value == true ? "STOP" : "REVEAL";
+					btn6.enabled = value;
+				}
+			}
+
+			// Displays the amount of time left to nudge
+			public function displayNudgeTime( time:int ):void
+			{
+				if( ( menuType == MENU_TYPE_SINGLELINE_SLOTS || menuType == MENU_TYPE_VIDEO_SLOTS || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS || menuType == MENU_TYPE_QUAD_VIDEO_SLOTS ) && grpNudgeTimer.visible )
+				{
+					lblNudgeTimer.text = time >= 0 ? time.toString() : "";
+				}
+			}
+
+			// Displays the number of bet lines selected
+			public function displayBetLines( betLines:int ):void
+			{
+				if( menuType == ButtonPanel.MENU_TYPE_VIDEO_SLOTS )
+				{
+					btn4.label = "LINES\n" + betLines.toString();
+				}
+				else if( menuType == MENU_TYPE_QUAD_VIDEO_SLOTS )
+				{
+					if( Sweeps.SkilltopiaEnabled )
+					{
+						btn3.label = "LINES\n" + betLines.toString();
+					}
+					else
+					{
+						btn4.label = "LINES\n" + betLines.toString();
+					}
+				}
+				else if ( menuType == ButtonPanel.MENU_TYPE_VIDEO_BLACKJACK )
+				{
+					btn4.label = "HANDS\n" + betLines.toString();
+				}
+			}
+
+			// Updates the bet amount on the bet wheel, using an animation
+			public function displayBetAmount():void
+			{
+				if( menuType == ButtonPanel.MENU_TYPE_SINGLELINE_SLOTS )
+				{
+					SoundManager.playSound( assets.Sounds["changeBet"], 0, 0 ); // Play the change bet sound
+
+					imgBetWheel.visible = true;
+					lblBetWheel.visible = false;
+
+					_timer = new Timer( 25, 4 );
+					_timer.addEventListener( TimerEvent.TIMER, timerStarted );
+					_timer.addEventListener( TimerEvent.TIMER_COMPLETE, timerEnded );
+					_timer.start();
+				}
+				else if( menuType == ButtonPanel.MENU_TYPE_VIDEO_SLOTS )
+				{
+					btn3.label = "ENTRIES\n" + FormatHelper.formatEntriesAndWinnings( betAmount );
+				}
+				else if( menuType == ButtonPanel.MENU_TYPE_SUPER_VIDEO_SLOTS )
+				{
+					btn3.label = "ENTRIES\n" + FormatHelper.formatEntriesAndWinnings( betAmount );
+				}
+				else if( menuType == ButtonPanel.MENU_TYPE_VIDEO_POKER )
+				{
+					SoundManager.playSound( assets.Sounds["changeBet"], 0, 0 ); // Play the change bet sound
+
+					imgBetWheel.visible = true;
+					lblBetWheel.visible = false;
+
+					_timer = new Timer( 25, 4 );
+					_timer.addEventListener( TimerEvent.TIMER, timerStarted );
+					_timer.addEventListener( TimerEvent.TIMER_COMPLETE, timerEnded );
+					_timer.start();
+				}
+				else if( menuType == ButtonPanel.MENU_TYPE_VIDEO_BLACKJACK )
+				{
+					SoundManager.playSound( assets.Sounds["changeBet"], 0, 0 ); // Play the change bet sound
+
+					imgBetWheel.visible = true;
+					lblBetWheel.visible = false;
+
+					_timer = new Timer( 25, 4 );
+					_timer.addEventListener( TimerEvent.TIMER, timerStarted );
+					_timer.addEventListener( TimerEvent.TIMER_COMPLETE, timerEnded );
+					_timer.start();
+				}
+			}
+
+			// Stops auto play
+			public function stopAutoPlay():void
+			{
+				isAutoPlaying = false;
+				btn1.label = "AUTO\nPLAY";
+			}
+
+			// Handles the timer started event of the bet wheel
+			protected function timerStarted( event:TimerEvent ):void
+			{
+				repeatCount++;
+
+				if( repeatCount > 3 ){ repeatCount = 1; }
+
+				if( repeatCount == 1 ) { imgBetWheel.source = Images.imgBetWheel_Spin1; }
+				if( repeatCount == 2 ) { imgBetWheel.source = Images.imgBetWheel_Spin2; }
+				if( repeatCount == 3 ) { imgBetWheel.source = Images.imgBetWheel_Spin3; }
+			}
+
+			// Handles the timer ended event of the bet wheel
+			protected function timerEnded( event:TimerEvent ):void
+			{
+				_timer.removeEventListener( TimerEvent.TIMER, timerStarted );
+				_timer.removeEventListener( TimerEvent.TIMER_COMPLETE, timerEnded );
+
+				imgBetWheel.visible = false;
+				lblBetWheel.text = FormatHelper.formatEntriesAndWinnings( betAmount );
+				lblBetWheel.visible = true;
+			}
+
+			// Handles the btn1 click event
+			protected function btn1_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				// AUTO PLAY
+				isAutoPlaying = !isAutoPlaying;
+				if( isAutoPlaying )
+				{
+					btn1.label = "STOP";
+					if( menuType == MENU_TYPE_VIDEO_POKER )
+					{
+						if( isDealt ) { btn6.label = "DRAW"; } else { btn6.label = "REVEAL"; }
+					}
+
+					_onAutoPlay( this );
+				}
+				else
+				{
+					btn1.label = "AUTO\nPLAY";
+					if( menuType == MENU_TYPE_VIDEO_POKER )
+					{
+						if( isDealt ) { btn6.label = "DRAW"; } else { btn6.label = "REVEAL"; }
+					}
+
+					_onStop( this );
+				}
+			}
+
+			// Handles the btnSub click event
+			protected function btnBetSub_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				_onBetSub( this ); // BET SUBTRACT
+			}
+
+			// Handles the btnAdd click event
+			protected function btnBetAdd_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				_onBetAdd( this ); // BET ADD
+			}
+
+			// Handles the btn2 click event
+			protected function btn2_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				// INFO
+				if( menuType == MENU_TYPE_VIDEO_SLOTS  || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS || menuType == MENU_TYPE_QUAD_VIDEO_SLOTS )
+				{
+					_onInfo( this );
+				}
+			}
+
+			// Handles the btn3 click event
+			protected function btn3_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				if( menuType == MENU_TYPE_QUAD_VIDEO_SLOTS && Sweeps.SkilltopiaEnabled )
+				{
+					_onLineAdd( this );
+				}
+				else
+				{
+					_onBetAdd( this ); // BET STEP
+				}
+			}
+
+			// Handles the btn4 click event
+			protected function btn4_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				if( menuType == MENU_TYPE_SINGLELINE_SLOTS ) // NUDGE
+				{
+					_onNudge( this );
+				}
+				else if( menuType == MENU_TYPE_VIDEO_SLOTS ) // LINES
+				{
+					_onLineAdd( this );
+				}
+				else if( menuType == MENU_TYPE_QUAD_VIDEO_SLOTS && !Sweeps.SkilltopiaEnabled  ) // LINE
+				{
+					_onLineAdd( this );
+				}
+				else if( menuType == MENU_TYPE_SUPER_VIDEO_SLOTS ) // LINES
+				{
+					_onLineAdd( this );
+				}
+				else if( menuType == MENU_TYPE_VIDEO_POKER ) // BET ONE
+				{
+					_onBetOne( this );
+				}
+				else if( menuType == MENU_TYPE_VIDEO_BLACKJACK ) // BET ONE
+				{
+					_onLineAdd( this );
+				}
+			}
+
+			// Handles the btn5 click event
+			protected function btn5_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				if( menuType == MENU_TYPE_SINGLELINE_SLOTS ) // BET MAX
+				{
+					_onBetMax( this );
+				}
+				else if( menuType == MENU_TYPE_VIDEO_POKER ) // BET MAX
+				{
+					_onBetMax( this );
+				}
+			}
+
+			// Handles the btn6 click event
+			protected function btn6_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				if( menuType == MENU_TYPE_VIDEO_POKER )
+				{
+					// DEAL
+					isDealt = !isDealt;
+					if( isDealt )
+					{
+						btn6.label = "DRAW";
+						_onDeal( this );
+					}
+					else
+					{
+						btn6.label = "REVEAL";
+						_onDraw( this );
+					}
+				}
+				else if( menuType == MENU_TYPE_VIDEO_BLACKJACK )
+				{
+					_onDeal( this );
+				}
+				else if( menuType == MENU_TYPE_VIDEO_SLOTS || menuType == MENU_TYPE_SINGLELINE_SLOTS || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS || menuType == MENU_TYPE_QUAD_VIDEO_SLOTS )
+				{
+					if( btn6.label == "REVEAL" )
+					{
+						_onSpin( this ); // SPIN
+					}
+					else
+					{
+						_onSpinStop( this ); // SPIN STOP
+					}
+				}
+				else
+				{
+					_onSpin( this ); // SPIN
+				}
+			}
+
+			// Handles the btnNudgeLeft click event
+			protected function btnNudgeLeft_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				if( menuType == MENU_TYPE_SINGLELINE_SLOTS || menuType == MENU_TYPE_VIDEO_SLOTS || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS || menuType == MENU_TYPE_QUAD_VIDEO_SLOTS )
+				{
+					_onNudge( this, "RIGHT" );
+				}
+			}
+
+			// Handles the btnNudgeRight click event
+			protected function btnNudgeRight_clickHandler( event:MouseEvent ):void
+			{
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+
+				if(  menuType == MENU_TYPE_SINGLELINE_SLOTS || menuType == MENU_TYPE_VIDEO_SLOTS || menuType == MENU_TYPE_SUPER_VIDEO_SLOTS || menuType == MENU_TYPE_QUAD_VIDEO_SLOTS )
+				{
+					_onNudge( this, "LEFT" );
+				}
+			}
+
+			public override function addEventListener( type:String, listener:Function, useCapture:Boolean=false, priority:int=0, useWeakReference:Boolean=false ):void
+			{
+				if( eventListeners[type] == null )
+				{
+					eventListeners[type] = [];
+				}
+
+				eventListeners[type].push( listener );
+				super.addEventListener( type, listener, useCapture, priority, useWeakReference );
+			}
+
+			private function removeAllEventListeners():void
+			{
+				for( var type:String in eventListeners )
+				{
+					var arr:Array = eventListeners[type] as Array;
+
+					if( arr != null )
+					{
+						for( var i:int = 0; i < arr.length; i++ )
+						{
+							removeEventListener( type, arr[i] );
+						}
+					}
+
+					eventListeners[type] = [];
+				}
+
+				if( stage != null )
+				{
+					stage.removeEventListener( FullScreenEvent.FULL_SCREEN, fullScreenScale );
+				}
+			}
+
+			override public function toString():String
+			{
+				return this.id.split( "." ).pop();
+			}
+
+			public function dispose():void
+			{
+				removeAllEventListeners();
+
+				_onAutoPlay = null;
+				_onStop = null;
+				_onInfo = null;
+				_onNudge = null;
+				_onBetOne = null;
+				_onBetMax = null;
+				_onBetSub = null;
+				_onBetAdd = null;
+				_onLineAdd = null;
+				_onSpin = null;
+				_onSpinStop = null;
+				_onDeal = null;
+				_onDraw = null;
+			}
+		]]>
+	</fx:Script>
+
+	<s:Group id="grpButtons" clipAndEnableScrolling="true" left="0" top="0" width="800">
+		<cx:ImageButton id="btn1" width="124" height="68" x="10" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btn1}" imageSkinOver="{Images.btn1}" imageSkinDown="{Images.btn1_Down}" imageSkinDisabled="{Images.btn1_Disabled}" click="btn1_clickHandler( event )" textVerticalCenter="-11" textVerticalCenterDown="-3" textHorizontalCenter="2" textHorizontalCenterDown="4"  />
+		<cx:ImageButton id="btn2" width="116" height="68" x="145" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btn2}" imageSkinOver="{Images.btn2}" imageSkinDown="{Images.btn2_Down}" imageSkinDisabled="{Images.btn2_Disabled}" click="btn2_clickHandler( event )" textVerticalCenter="-8" textVerticalCenterDown="0" textHorizontalCenter="3" textHorizontalCenterDown="4"  />
+		<cx:ImageButton id="btn3" width="106" height="68" x="276" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btn3}" imageSkinOver="{Images.btn3}" imageSkinDown="{Images.btn3_Down}" imageSkinDisabled="{Images.btn3_Disabled}" click="btn3_clickHandler( event )" textVerticalCenter="-8" textVerticalCenterDown="-1" textHorizontalCenter="2" textHorizontalCenterDown="2"  />
+		<cx:ImageButton id="btn4" width="106" height="68" x="407" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btn4}" imageSkinOver="{Images.btn4}" imageSkinDown="{Images.btn4_Down}" imageSkinDisabled="{Images.btn4_Disabled}" click="btn4_clickHandler( event )" textVerticalCenter="-7" textVerticalCenterDown="0" textHorizontalCenter="-2" textHorizontalCenterDown="-2" />
+		<cx:ImageButton id="btn5" width="116" height="68" x="540" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btn5}" imageSkinOver="{Images.btn5}" imageSkinDown="{Images.btn5_Down}" imageSkinDisabled="{Images.btn5_Disabled}" click="btn5_clickHandler( event )" textVerticalCenter="-7" textVerticalCenterDown="0" textHorizontalCenter="-4" textHorizontalCenterDown="-4" />
+		<cx:ImageButton id="btn6" width="124" height="68" x="664" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btn6}" imageSkinOver="{Images.btn6}" imageSkinDown="{Images.btn6_Down}" imageSkinDisabled="{Images.btn6_Disabled}" click="btn6_clickHandler( event )" textVerticalCenter="-11" textVerticalCenterDown="-3" textHorizontalCenter="-3" textHorizontalCenterDown="-4"  />
+
+		<cx:ImageButton id="btnBetSub" width="65" height="67" x="127" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btnBetSub}" imageSkinOver="{Images.btnBetSub}" imageSkinDown="{Images.btnBetSub_Down}" imageSkinDisabled="{Images.btnBetSub_Disabled}" click="btnBetSub_clickHandler( event )" />
+		<s:Group id="grpBetWheel" width="118" height="68" x="183" y="7" clipAndEnableScrolling="true">
+			<mx:Image id="imgBetPanel" x="0" y="0" source="{Images.imgBetWheel}" />
+			<s:Group id="ctrBetWheel" x="0" y="0">
+				<mx:Image id="imgBetWheel" x="0" y="0" source="{Images.imgBetWheel_Spin1}" visible="false" />
+			</s:Group>
+			<s:Label id="lblBetWheel" width="100%" height="100%" textAlign="center" verticalAlign="middle" horizontalCenter="0" verticalCenter="-8" rotationX="-40" fontFamily="xTimes" fontSize="22" fontWeight="bold" />
+		</s:Group>
+		<cx:ImageButton id="btnBetAdd" width="58" height="70" x="301" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btnBetAdd}" imageSkinOver="{Images.btnBetAdd}" imageSkinDown="{Images.btnBetAdd_Down}" imageSkinDisabled="{Images.btnBetAdd_Disabled}" click="btnBetAdd_clickHandler( event )" />
+
+		<cx:ImageButton id="btnNudgeLeft" width="58" height="70" x="441" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btnNudgeLeft}" imageSkinOver="{Images.btnNudgeLeft}" imageSkinDown="{Images.btnNudgeLeft_Down}" imageSkinDisabled="{Images.btnNudgeLeft_Disabled}" click="btnNudgeLeft_clickHandler( event )" />
+		<s:Group id="grpNudgeTimer" width="118" height="68" x="499" y="7" clipAndEnableScrolling="true">
+			<cx:ImageButton id="imgNudgeTimer" x="0" y="0" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.imgNudgeTimer_Disabled}" imageSkinOver="{Images.imgNudgeTimer}" imageSkinDisabled="{Images.imgNudgeTimer_Disabled}" buttonMode="false" mouseEnabled="false" />
+			<s:Label id="lblNudgeTimer" width="100%" height="100%" textAlign="center" verticalAlign="middle" horizontalCenter="-8" verticalCenter="-8" rotationX="-40" fontFamily="xTimes" fontSize="22" fontWeight="bold" />
+		</s:Group>
+		<cx:ImageButton id="btnNudgeRight" width="65" height="67" x="608" y="7" skinClass="skins.ButtonPanelButtonSkin" imageSkin="{Images.btnNudgeRight}" imageSkinOver="{Images.btnNudgeRight}" imageSkinDown="{Images.btnNudgeRight_Down}" imageSkinDisabled="{Images.btnNudgeRight_Disabled}" click="btnNudgeRight_clickHandler( event )" />
+
+	</s:Group>
+</s:SkinnableContainer>

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:cx="components.*"
+		 width="800" height="560" 
+		 initialize="init(event)">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Achievements.Badges;
+			import assets.Achievements.Rewards;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import flash.utils.Timer;
+			
+			import mx.events.FlexEvent;
+			
+			import objects.AchievementBadge;
+			import objects.AchievementReward;
+			
+			import services.SweepsAPI;
+			
+			private var badgeList:Array;			
+			private var imageRefs:Object;
+			
+			private var achievementImage:Image;
+			private var achievementName:String;
+			private var isBadge:Boolean;
+			
+			private var popUpTimer:Timer;
+			private var isPopped:Boolean;
+			
+			// Handles the 'initialize' event of this component
+			protected function init( event:FlexEvent ):void
+			{				
+				var i:int;
+				var badge:AchievementBadge;
+				
+				badgeList = AchievementBadge.getBadgeList().slice(0);
+				imageRefs = {};
+				
+				for( i = 0; i < badgeList.length; i++ )
+				{
+					badge = badgeList[i] as AchievementBadge;
+										
+					var img:Image = new Image();
+					imageRefs[badge.ID] = img;
+					img.id = badge.ID;
+					img.source = badge.ImageClassEmptyMedium;
+					img.name = badge.Name;
+					img.addEventListener( MouseEvent.MOUSE_OVER, imgAchievement_mouseOverHandler );
+					img.addEventListener( MouseEvent.MOUSE_OUT, imgAchievement_mouseOutHandler );
+									
+					if( badge.Name == AchievementBadge.BADGE_FF20 || badge.Name == AchievementBadge.BADGE_FF30 )
+					{
+						continue;
+					}
+					
+					grpBadges.addElement( img );
+				}
+				
+				// Rabbit's Foot Reward
+				badgeList.push( new AchievementBadge( badgeSupSevEmptySmall_RF.id, AchievementBadge.BADGE_SUPER7 ) );
+				imageRefs[badgeSupSevEmptySmall_RF.id] = badgeSupSevEmptySmall_RF;
+				
+				badgeList.push( new AchievementBadge( badgeBonBusEmptySmall_RF.id, AchievementBadge.BADGE_BONUS ) );
+				imageRefs[badgeBonBusEmptySmall_RF.id] = badgeBonBusEmptySmall_RF;
+				
+				badgeList.push( new AchievementBadge( badgeGoldEmptySmall_RF.id, AchievementBadge.BADGE_GOLD ) );
+				imageRefs[badgeGoldEmptySmall_RF.id] = badgeGoldEmptySmall_RF;
+								
+				// Nudge Reward
+				badgeList.push( new AchievementBadge( badgeArThWrldEmptySmall_NG.id, AchievementBadge.BADGE_AROUNDTHEWORLD ) );
+				imageRefs[badgeArThWrldEmptySmall_NG.id] = badgeArThWrldEmptySmall_NG;
+				
+				badgeList.push( new AchievementBadge( badgeSilverEmptySmall_NG.id, AchievementBadge.BADGE_SILVER ) );
+				imageRefs[badgeSilverEmptySmall_NG.id] = badgeSilverEmptySmall_NG;
+				
+				// Game Changer Reward
+				badgeList.push( new AchievementBadge( badgeBronzeEmptySmall_GC.id, AchievementBadge.BADGE_BRONZE ) );
+				imageRefs[badgeBronzeEmptySmall_GC.id] = badgeBronzeEmptySmall_GC;
+				
+				Sweeps.getInstance().getAchievements( handleAchievementsSuccess );			
+			}
+			
+			// Handles the 'on success' event of the 'getAchievements' sweeps instance call
+			private function handleAchievementsSuccess( achievements:Array ):void
+			{
+				var i:int;
+				var j:int;
+				var k:int;
+				var badge:AchievementBadge;
+				
+				for( i = 0; i < achievements.length; i++ )
+				{									
+					for( j = 0; j < badgeList.length; j++ )
+					{
+						badge = badgeList[j] as AchievementBadge;
+						
+						if( achievements[i] == badge.Name )
+						{
+							var badgeID:String = badge.ID;
+														
+							if( badge.Name == AchievementBadge.BADGE_FF20 || badge.Name == AchievementBadge.BADGE_FF30 )
+							{
+								badgeID = AchievementBadge.BADGE_PREFIX + AchievementBadge.BADGE_FF10;
+								( imageRefs[badgeID] as Image ).name = badge.Name;
+							}
+								
+							var imgSource:String = ( imageRefs[badge.ID] as Image ).source.toString().toLowerCase();
+							if( imgSource.indexOf( "small" ) != -1 )
+							{
+								( imageRefs[badgeID] as Image ).source = badge.ImageClassSmall;
+							}
+							else if( imgSource.indexOf( "medium" ) != -1 )
+							{
+								( imageRefs[badgeID] as Image ).source = badge.ImageClassMedium;
+							}
+							else
+							{
+								( imageRefs[badgeID] as Image ).source = badge.ImageClass;
+							}
+						}
+					}
+				}
+				
+				if( Sweeps.hasReward( AchievementReward.REWARD_RABBITS_FOOT ) ) 
+				{					
+					rewardRabbitsFoot.source = new AchievementReward( AchievementReward.REWARD_RABBITS_FOOT ).ImageClassSmall;
+				}
+				
+				if( Sweeps.hasReward( AchievementReward.REWARD_NUDGE ) ) 
+				{
+					rewardNudge.source = new AchievementReward( AchievementReward.REWARD_NUDGE ).ImageClassSmall;
+				}
+				
+				if( Sweeps.hasReward( AchievementReward.REWARD_GAME_CHANGER ) )
+				{
+					rewardGameChanger.source = new AchievementReward( AchievementReward.REWARD_GAME_CHANGER ).ImageClassSmall;
+				}
+			}
+			
+			// Handles the mouse over event of the 'Achievement' images
+			private function imgAchievement_mouseOverHandler( event:MouseEvent ):void
+			{			
+				// Retrieve the image details
+				achievementImage = Image(event.currentTarget);				
+				achievementName = achievementImage.name;
+				isBadge = achievementImage.id.toLowerCase().indexOf( "badge" ) != -1 ? true : false;
+				achievementImage.setFocus();
+				
+				// Initialize the popup timer 
+				popUpTimer = new Timer( 100, 1 );
+				popUpTimer.addEventListener( TimerEvent.TIMER_COMPLETE, popUpTimer_complete );
+				popUpTimer.start();				
+			}
+			
+			// Handles the complete event of the 'Pop Up' timer
+			private function popUpTimer_complete( event:TimerEvent ):void
+			{
+				Sweeps.getInstance().loadAchievementPopUp( achievementName, isBadge, true, 0 );
+				isPopped = true;
+			}
+			
+			// Handles the mouse out event of the 'Achievement' images
+			private function imgAchievement_mouseOutHandler( event:MouseEvent ):void
+			{
+				if( popUpTimer )
+				{
+					popUpTimer.stop();
+					popUpTimer = null;
+				}
+				
+				// Remove the popup
+				if( isPopped )
+				{
+					Sweeps.getInstance().closeAchievementPopUp( isBadge, true );
+					isPopped = false;
+				}							
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Image id="imgBackground" x="0" y="0" width="800" height="560" source="{Badges.badgeBackground}" />
+	<s:Scroller width="100%" top="20" left="25" right="25" height="290" verticalScrollPolicy="off">
+		<s:Group id="grpRewards" top="25" left="25" right="25" width="100%" height="290">
+			<s:layout><s:VerticalLayout gap="15"></s:VerticalLayout></s:layout>
+			<s:HGroup verticalAlign="middle" paddingTop="10" paddingBottom="10" paddingLeft="10" paddingRight="10" gap="15">
+				<s:Image id="titleRabbitsFoot" source="{Rewards.titleRabbitsFoot}" />
+				<s:Image id="badgeSupSevEmptySmall_RF" name="{AchievementBadge.BADGE_SUPER7}" source="{Badges.badgeSupSevEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />
+				<s:Image source="{Badges.plus}" />
+				<s:Image id="badgeBonBusEmptySmall_RF" name="{AchievementBadge.BADGE_BONUS}" source="{Badges.badgeBonBusEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />
+				<s:Image source="{Badges.plus}" />
+				<s:Image id="badgeGoldEmptySmall_RF" name="{AchievementBadge.BADGE_GOLD}" source="{Badges.badgeGoldEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />
+				<s:Image source="{Badges.equals}" />
+				<s:Image id="rewardRabbitsFoot" name="{AchievementReward.REWARD_RABBITS_FOOT}" source="{Rewards.rewardRabbitsFootEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />
+			</s:HGroup>
+			<s:HGroup verticalAlign="middle" paddingTop="10" paddingBottom="10" paddingLeft="10" paddingRight="10" gap="15">
+				<s:Image id="titleNudge" source="{Rewards.titleNudge}" />
+				<s:Image id="badgeArThWrldEmptySmall_NG" name="{AchievementBadge.BADGE_AROUNDTHEWORLD}" source="{Badges.badgeArThWrldEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />
+				<s:Image source="{Badges.plus}" />
+				<s:Image id="badgeSilverEmptySmall_NG" name="{AchievementBadge.BADGE_SILVER}" source="{Badges.badgeSilverEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />				
+				<s:Image source="{Badges.equals}" />
+				<s:Image id="rewardNudge" name="{AchievementReward.REWARD_NUDGE}" source="{Rewards.rewardNudgeEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />
+			</s:HGroup>
+			<s:HGroup verticalAlign="middle" paddingTop="10" paddingBottom="10" paddingLeft="10" paddingRight="10" gap="15">
+				<s:Image id="titleGameChanger" source="{Rewards.titleGameChanger}" />
+				<s:Image id="badgeBronzeEmptySmall_GC" name="{AchievementBadge.BADGE_BRONZE}" source="{Badges.badgeBronzeEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />							
+				<s:Image source="{Badges.equals}" />
+				<s:Image id="rewardGameChanger" name="{AchievementReward.REWARD_GAME_CHANGER}" source="{Rewards.rewardGameChangerEmptySmall}" mouseOver="imgAchievement_mouseOverHandler(event)" mouseOut="imgAchievement_mouseOutHandler(event)" />
+			</s:HGroup>
+		</s:Group>		
+	</s:Scroller>
+	<s:Scroller width="100%" top="350" left="25" right="25" height="100" verticalScrollPolicy="off">						
+		<s:Group id="grpBadges" width="100%" top="350" left="25" right="25" height="100">				
+			<s:layout><s:HorizontalLayout horizontalAlign="center" verticalAlign="middle"></s:HorizontalLayout></s:layout>			
+		</s:Group>
+	</s:Scroller>
+</s:Group>

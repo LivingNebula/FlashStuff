@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  xmlns:cx="components.*"
+					  width="800" height="60"
+					  creationComplete="init()">
+	
+	<fx:Declarations>
+		<s:DropShadowFilter id="dropShadow" distance="1" angle="45" color="0xEDFD90"/>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import mx.events.EffectEvent;
+			
+			import spark.effects.Move;
+			
+			private var balancePopUpTimer:Timer;
+			private var balanceIsPopped:Boolean;
+			
+			private var tickerHideTimer:Timer;
+			private var tickerHideAnimation:Move;
+			
+			private var isAudioEnabled:Boolean = true;
+			
+			// Initializes the control
+			private function init():void
+			{				
+				// Replace "Redeem" text if Donate mode enabled
+				if( Sweeps.DonateEnabled )
+				{
+					btnRedeem.label = "Donate";
+				}
+				
+				// Check if in DEMO Mode
+				if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )					
+				{
+					// Display a visual indicator for Demo mode
+					ddEntries.setStyle( "color", "#FF0000" );
+					ddWinnings.setStyle( "color", "#FF0000" );
+					lblEntriesDemo.visible = lblWinningsDemo.visible = true;
+				}
+				
+				reset(); // Default
+			}
+			
+			// Displays the account balance
+			public function display_Balance( entries:int, winnings:int ):void
+			{
+				// Update the entries amount
+				ddEntries.displayAmount = entries;
+				
+				// Update the winnings amount
+				ddWinnings.displayAmount = winnings;
+				
+				// Update the entries and winnings amount
+				ddEntriesAndWinnings.displayAmount = entries + winnings;
+			}
+			
+			// Handles the click event of the 'Audio' button
+			protected function btnAudio_clickHandler( event:MouseEvent ):void
+			{
+				isAudioEnabled = !isAudioEnabled;
+				if( isAudioEnabled )
+				{
+					btnAudio.imageIcon = Images.iconVolume;
+					SoundManager.setVolume( SoundManager.DEFAULT_VOLUME );
+					Sweeps.getInstance().enableAudio();
+				}
+				else
+				{
+					btnAudio.imageIcon = Images.iconVolume_disabled;
+					SoundManager.setVolume( SoundManager.MUTE_VOLUME );
+					Sweeps.getInstance().disableAudio();
+				}
+				hsVolume.value = SoundManager.volume;
+			}
+
+			// Handles the click event of the 'Quit' button
+			protected function btnQuit_clickHandler( event:MouseEvent ):void
+			{
+				Sweeps.getInstance().quit();
+			}
+
+			// Handles the click event of the 'Redeem' button
+			protected function btnRedeem_clickHandler( event:MouseEvent ):void
+			{
+				Sweeps.getInstance().loadRedeemQuick();			
+			}
+			
+			// Handles the click event of the 'Refresh' button
+			protected function btnRefresh_clickHandler( event:MouseEvent ):void
+			{
+				Sweeps.getInstance().refreshBalanceFromServer();	
+			}									
+			
+			// Handles the click event of the 'Badges' button
+			protected function btnBadges_clickHandler( event:MouseEvent ):void
+			{
+				Sweeps.getInstance().loadBadgesPanel();			
+			}
+			
+			// Toggles the audio
+			private function toggleAudio( audioEnabled:Boolean ):void
+			{		
+				isAudioEnabled = audioEnabled;
+				if( isAudioEnabled )
+				{
+					btnAudio.imageIcon = Images.iconVolume;
+					Sweeps.getInstance().enableAudio();
+				}
+				else
+				{
+					btnAudio.imageIcon = Images.iconVolume_disabled;
+					Sweeps.getInstance().disableAudio();			
+				}										
+			}
+			
+			// Handles the change event of the 'Volume' slider
+			protected function hsVolume_changeHandler( event:Event ):void
+			{
+				SoundManager.setVolume( hsVolume.value );
+				toggleAudio( hsVolume.value != 0 );							
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{		
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound	
+			}
+						
+			// Handles the mouse over event of the Entries and Winnings label
+			protected function entriesAndWinnings_mouseOverHandler( event:MouseEvent ):void
+			{		
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+				
+				if( !balanceIsPopped )
+				{
+					// Initialize the popup timer 
+					balancePopUpTimer = new Timer( 100, 1 );
+					balancePopUpTimer.addEventListener( TimerEvent.TIMER_COMPLETE, popUpTimer_complete );
+					balancePopUpTimer.start();
+				}
+			}
+			
+			// Handles the complete event of the 'Pop Up' timer
+			private function popUpTimer_complete( event:TimerEvent ):void
+			{
+				Sweeps.getInstance().loadBalancePopUp();
+				balanceIsPopped = true;
+			}
+			
+			// Handles the mouse out event of the Entries and Winnings label
+			private function entriesAndWinnings_mouseOutHandler( event:MouseEvent ):void
+			{
+				if( balancePopUpTimer )
+				{
+					balancePopUpTimer.stop();
+					balancePopUpTimer = null;
+				}
+				
+				// Remove the popup
+				if( balanceIsPopped )
+				{
+					Sweeps.getInstance().closeBalancePopUp();
+					balanceIsPopped = false;
+				}							
+			}
+			
+			// Enables/Disables available functions
+			public function updateFunctions( enabled:Boolean ):void
+			{
+				btnRedeem.enabled = !enabled;
+				btnRefresh.enabled = !enabled;
+				btnBadges.enabled = !enabled;
+				btnQuit.enabled = !enabled;
+			}
+			
+			// Resets the page to the default state
+			public function reset():void
+			{
+				isAudioEnabled = true;
+				btnAudio.imageIcon = Images.iconVolume;
+				hsVolume.value = SoundManager.volume;
+			}
+			
+			// Toggles the display of the 'Badges' button
+			public function toggleBadges( badgesEnabled:Boolean ):void
+			{
+				btnBadges.visible = btnBadges.includeInLayout = badgesEnabled;				
+			}
+			
+			// Toggles the display of the 'BG' image
+			public function toggleBG( bg_Option:int ):void
+			{
+				switch( bg_Option )
+				{
+					case 1: // Combined balance display
+						bgImage.source = Images.menuPanel_v2;
+						btnRedeem.visible = false;
+						lblEntries.visible = ddEntries.visible = false;
+						lblWinnings.visible = ddWinnings.visible = false;
+						lblEntriesAndWinnings.visible = ddEntriesAndWinnings.visible = grpEntriesAndWinnings.visible = true;
+						break;
+					
+					default:
+						bgImage.source = Images.menuPanel;
+						break;
+				}
+			}
+			
+			// Toggles the display of the ticker
+			public function toggleTicker( enabled:Boolean ):void
+			{
+				grpTicker.visible = grpTicker.includeInLayout = enabled;
+				
+				if( !enabled )
+				{
+					ticker.turnOff( true );
+				}
+			}
+			
+			protected function btnAudio_mouseOverHandler( event:MouseEvent ):void
+			{
+				if( !grpTicker.visible ) { return; };
+				
+				ticker.turnOff();
+				
+				if( tickerHideTimer )
+				{
+					tickerHideTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, volumePopUpTimer_complete );
+					tickerHideTimer.stop();
+					tickerHideTimer = null;					
+				}
+				
+				if( tickerHideAnimation )
+				{
+					tickerHideAnimation.removeEventListener( EffectEvent.EFFECT_END, tickerHideAnimation_end );
+					tickerHideAnimation.stop(); 
+					tickerHideAnimation = null;
+				}
+				
+				tickerHideAnimation = assets.AnimationManager.getMoveAnimation( grpTicker, 0, grpTicker.y, 0, -36, 500, 0, 1, 0 );
+				tickerHideAnimation.play();
+			}
+			
+			protected function btnAudio_mouseOutHandler( event:MouseEvent ):void
+			{
+				if( !grpTicker.visible ) { return; };
+				
+				if( !tickerHideTimer )
+				{
+					tickerHideTimer = new Timer( 2000, 1 );
+					tickerHideTimer.addEventListener( TimerEvent.TIMER_COMPLETE, volumePopUpTimer_complete );
+					tickerHideTimer.start();
+				}
+			}
+			
+			protected function grpVolume_mouseOverHandler( event:MouseEvent ):void
+			{
+				if( !grpTicker.visible ) { return; };
+				
+				if( tickerHideTimer )
+				{
+					tickerHideTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, volumePopUpTimer_complete );
+					tickerHideTimer.stop();
+					tickerHideTimer = null;
+				}			
+			}
+			
+			protected function grpVolume_mouseOutHandler( event:MouseEvent ):void
+			{
+				if( !grpTicker.visible ) { return; };
+				
+				if( !tickerHideTimer )
+				{
+					tickerHideTimer = new Timer( 2000, 1 );
+					tickerHideTimer.addEventListener( TimerEvent.TIMER_COMPLETE, volumePopUpTimer_complete );
+					tickerHideTimer.start();
+				}
+			}
+			
+			protected function volumePopUpTimer_complete( event:TimerEvent ):void
+			{
+				if( !grpTicker.visible ) { return; };
+				
+				tickerHideTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, volumePopUpTimer_complete );
+				tickerHideTimer = null;
+				
+				if( tickerHideAnimation )
+				{
+					tickerHideAnimation.removeEventListener( EffectEvent.EFFECT_END, tickerHideAnimation_end );
+					tickerHideAnimation.stop(); 
+					tickerHideAnimation = null;
+				}
+				
+				
+				tickerHideAnimation = assets.AnimationManager.getMoveAnimation( grpTicker, 0, grpTicker.y, 0, 0, 500, 0, 1, 0 );
+				tickerHideAnimation.addEventListener( EffectEvent.EFFECT_END, tickerHideAnimation_end );
+				tickerHideAnimation.play();
+			}
+			
+			protected function tickerHideAnimation_end( event:EffectEvent ):void
+			{
+				if( !grpTicker.visible ) { return; };
+				
+				tickerHideAnimation.removeEventListener( EffectEvent.EFFECT_END, tickerHideAnimation_end );
+				tickerHideAnimation = null;
+				ticker.turnOn();
+			}
+		]]>		
+	</fx:Script>
+	
+	<s:Group left="0" right="0" top="0" bottom="0" clipAndEnableScrolling="true">				
+		<s:Graphic id="grpTransparencyFiller" width="800" height="20" x="0" y="40">
+			<s:Rect width="800" height="20" x="0" y="0">
+				<s:fill>
+					<s:SolidColor color="0x000000" />
+				</s:fill>
+			</s:Rect>
+		</s:Graphic>		
+		<s:BitmapImage id="bgImage" source="{Images.menuPanel}"></s:BitmapImage>
+				
+		<s:Label id="lblEntriesAndWinnings" styleName="LabelMainPanel" x="5" y="14" text="Total" filters="{dropShadow}" buttonMode="true" visible="false"></s:Label>
+		<cx:DigitDisplay id="ddEntriesAndWinnings" x="1" y="29" width="115" height="22" displayAmount="0" visible="false"></cx:DigitDisplay>
+		
+		<s:HGroup id="hgEntries" x="5" y="14">
+			<s:Label id="lblEntries" styleName="LabelMainPanel" text="Entries" filters="{dropShadow}"></s:Label><s:Label id="lblEntriesDemo" styleName="LabelDemo" text="(Demo)" visible="false"></s:Label>
+		</s:HGroup>
+		<s:HGroup id="hgWinnings" x="125" y="14">
+			<s:Label id="lblWinnings" styleName="LabelMainPanel" text="Winnings" filters="{dropShadow}"></s:Label><s:Label id="lblWinningsDemo" styleName="LabelDemo" text="(Demo)" visible="false"></s:Label>
+		</s:HGroup>
+		
+		<cx:DigitDisplay id="ddEntries" x="1" y="29" width="115" height="22" displayAmount="0"></cx:DigitDisplay>
+		<cx:DigitDisplay id="ddWinnings" x="123" y="29" width="115" height="22" displayAmount="0"></cx:DigitDisplay>
+		
+		<s:Group id="grpEntriesAndWinnings" width="140" height="60" x="0" y="0" mouseOver="entriesAndWinnings_mouseOverHandler(event)" mouseOut="entriesAndWinnings_mouseOutHandler(event)" visible="false"></s:Group>
+		
+		<s:HGroup id="hgPanel" x="270" y="20" width="525" gap="5" horizontalAlign="center">			
+			<cx:ImageButton id="btnRedeem" skinClass="skins.ButtonSkin" label="Buy" imageSkin="{Images.btnMedium_up}" imageSkinOver="{Images.btnMedium_over}" imageSkinDown="{Images.btnMedium_down}" imageSkinDisabled="{Images.btnMedium_disabled}" click="btnRedeem_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>		
+			<cx:ImageButton id="btnRefresh" skinClass="skins.ButtonSkin" imageSkin="{Images.btnSmall_up}" imageSkinOver="{Images.btnSmall_over}" imageSkinDown="{Images.btnSmall_down}" imageSkinDisabled="{Images.btnSmall_disabled}" imageIcon="{Images.iconRefresh}" click="btnRefresh_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+			<cx:ImageButton id="btnBadges" skinClass="skins.ButtonSkin" imageSkin="{Images.btnBadge_up}" imageSkinOver="{Images.btnBadge_over}" imageSkinDown="{Images.btnBadge_down}" imageSkinDisabled="{Images.btnBadge_disabled}" click="btnBadges_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>			
+			<s:Group clipAndEnableScrolling="true" width="225" height="36">
+				<s:Group id="grpVolume" mouseOver="grpVolume_mouseOverHandler(event)" mouseOut="grpVolume_mouseOutHandler(event)">
+					<s:BitmapImage source="{Images.menuInfo}"></s:BitmapImage>					
+					<s:Label id="lblVolume" text="Volume:" styleName="Label" top="14" left="13"></s:Label>
+					<s:HSlider id="hsVolume" top="14" left="70" liveDragging="false" width="140" minimum="0" maximum="100" dataTipPrecision="0" stepSize="1" toolTip="Adjust volume" buttonMode="true" change="hsVolume_changeHandler(event)"></s:HSlider>					
+				</s:Group>
+				<s:Group id="grpTicker">
+					<s:BitmapImage source="{Images.menuInfo}"></s:BitmapImage>
+					<cx:Ticker id="ticker" top="7" left="7">
+						
+					</cx:Ticker>
+				</s:Group>				
+			</s:Group>					
+			<cx:ImageButton id="btnAudio" skinClass="skins.ButtonSkin" imageSkin="{Images.btnSmall_up}" imageSkinOver="{Images.btnSmall_over}" imageSkinDown="{Images.btnSmall_down}" imageSkinDisabled="{Images.btnSmall_disabled}" imageIcon="{Images.iconVolume}" click="btnAudio_clickHandler(event)" mouseOver="btnAudio_mouseOverHandler(event)" mouseOut="btnAudio_mouseOutHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>
+			<cx:ImageButton id="btnQuit" skinClass="skins.ButtonSkin" label="Quit" imageSkin="{Images.btnMedium_up}" imageSkinOver="{Images.btnMedium_over}" imageSkinDown="{Images.btnMedium_down}" imageSkinDisabled="{Images.btnMedium_disabled}" click="btnQuit_clickHandler(event)" mouseDown="mouseDownHandler(event)"></cx:ImageButton>			
+		</s:HGroup>
+	</s:Group>
+	
+</s:SkinnableContainer>

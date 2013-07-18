@@ -1,0 +1,265 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* Animations */
+	Intro_Animation: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/animations/Intro.flv", mimeType="application/octet-stream");
+	BonusGameExit_Animation: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/BonusGame/BonusGame_Exit.flv", mimeType="application/octet-stream");
+		
+	/* Sprites */		
+	Sprite_C_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0001.png");		
+	Sprite_C_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0002.png");
+	Sprite_C_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0003.png");
+	Sprite_C_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0004.png");		
+	Sprite_C_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0005.png");
+	Sprite_C_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0006.png");
+	Sprite_C_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0007.png");
+	Sprite_C_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0008.png");
+	Sprite_C_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_C_0009.png");
+	
+	Sprite_E_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0001.png");		
+	Sprite_E_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0002.png");
+	Sprite_E_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0003.png");
+	Sprite_E_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0004.png");		
+	Sprite_E_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0005.png");
+	Sprite_E_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0006.png");
+	Sprite_E_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0007.png");
+	Sprite_E_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0008.png");
+	Sprite_E_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0009.png");
+	Sprite_E_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0010.png");
+	Sprite_E_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0011.png");
+	Sprite_E_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0012.png");
+	Sprite_E_13: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0013.png");
+	Sprite_E_14: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0014.png");
+	Sprite_E_15: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Sprite_E_0015.png");
+	
+	/* Images */
+	Skin: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Skin.png");
+	Skin1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Skin1.png");
+	SkinFreeSpins: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/SkinFreeSpins.png");
+	LineNumbersLeft: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/LineNumbers_Left.png");
+	LineNumbersRight: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/LineNumbers_Right.png");
+	InfoSkin: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/InfoSkin.jpg");	
+	InfoPaytableTitle: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/InfoPaytableTitle.png");
+	InfoNavigator: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/InfoNavigator.png");
+	InfoNext: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/InfoNext.png");		
+	InfoPrevious: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/InfoPrevious.png");
+	InfoBetLines: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/InfoBetLines.png");
+	InfoBonusGame: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/InfoBonusGame.png");
+	BackToGame: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/BackToGame.png");
+	BackToGame_over: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/BackToGame_over.png");
+	Transparent: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/Transparent.png");		
+	
+	/* Images - Reel Icons*/
+	ReelIcon_A: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A.png");
+	ReelIcon_A_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0001.png"); 		
+	ReelIcon_A_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0002.png");
+	ReelIcon_A_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0003.png");		
+	ReelIcon_A_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0004.png");		
+	ReelIcon_A_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0005.png");		
+	ReelIcon_A_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0006.png");		
+	ReelIcon_A_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0007.png");		
+	ReelIcon_A_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0008.png");
+	ReelIcon_A_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0009.png");
+	ReelIcon_A_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0010.png");
+	ReelIcon_A_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0011.png");
+	ReelIcon_A_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_A_0012.png");
+	
+	ReelIcon_B: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B.png");	
+	ReelIcon_B_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0001.png"); 		
+	ReelIcon_B_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0002.png");		
+	ReelIcon_B_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0003.png");		
+	ReelIcon_B_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0004.png");		
+	ReelIcon_B_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0005.png");		
+	ReelIcon_B_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0006.png");		
+	ReelIcon_B_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0007.png");		
+	ReelIcon_B_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0008.png");
+	ReelIcon_B_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0009.png");		
+	ReelIcon_B_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0010.png"); 		
+	ReelIcon_B_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0011.png");		
+	ReelIcon_B_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_B_0012.png");
+	
+	ReelIcon_C: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C.png");	
+	ReelIcon_C_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0001.png");
+	ReelIcon_C_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0002.png");		
+	ReelIcon_C_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0003.png");		
+	ReelIcon_C_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0004.png");		
+	ReelIcon_C_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0005.png");		
+	ReelIcon_C_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0006.png");		
+	ReelIcon_C_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0007.png");		
+	ReelIcon_C_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0008.png");
+	ReelIcon_C_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0009.png");		
+	ReelIcon_C_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0010.png"); 		
+	ReelIcon_C_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0011.png");		
+	ReelIcon_C_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_C_0012.png");
+	
+	ReelIcon_D: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D.png");	
+	ReelIcon_D_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0001.png"); 		
+	ReelIcon_D_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0002.png"); 		
+	ReelIcon_D_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0003.png");		
+	ReelIcon_D_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0004.png");
+	ReelIcon_D_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0005.png");
+	ReelIcon_D_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0006.png");		
+	ReelIcon_D_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0007.png");		
+	ReelIcon_D_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0008.png");
+	ReelIcon_D_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0009.png");		
+	ReelIcon_D_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0010.png"); 		
+	ReelIcon_D_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0011.png");		
+	ReelIcon_D_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_D_0012.png");
+	
+	ReelIcon_E: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E.png");	
+	ReelIcon_E_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0001.png"); 		
+	ReelIcon_E_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0002.png");		
+	ReelIcon_E_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0003.png");		
+	ReelIcon_E_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0004.png");
+	ReelIcon_E_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0005.png");		
+	ReelIcon_E_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0006.png");
+	ReelIcon_E_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0007.png");		
+	ReelIcon_E_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0008.png");
+	ReelIcon_E_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0009.png");		
+	ReelIcon_E_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0010.png"); 		
+	ReelIcon_E_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0011.png");		
+	ReelIcon_E_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_E_0012.png");
+	
+	ReelIcon_F: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F.png");	
+	ReelIcon_F_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0001.png"); 		
+	ReelIcon_F_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0002.png");		
+	ReelIcon_F_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0003.png");		
+	ReelIcon_F_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0004.png");
+	ReelIcon_F_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0005.png");		
+	ReelIcon_F_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0006.png");
+	ReelIcon_F_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0007.png");		
+	ReelIcon_F_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0008.png");
+	ReelIcon_F_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0009.png");		
+	ReelIcon_F_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0010.png"); 		
+	ReelIcon_F_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0011.png");		
+	ReelIcon_F_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_F_0012.png");
+	
+	ReelIcon_G: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G.png");	
+	ReelIcon_G_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0001.png");
+	ReelIcon_G_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0002.png");		
+	ReelIcon_G_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0003.png");		
+	ReelIcon_G_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0004.png");
+	ReelIcon_G_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0005.png");		
+	ReelIcon_G_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0006.png");
+	ReelIcon_G_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0007.png");		
+	ReelIcon_G_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0008.png");
+	ReelIcon_G_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0009.png");		
+	ReelIcon_G_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0010.png"); 		
+	ReelIcon_G_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0011.png");		
+	ReelIcon_G_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_G_0012.png");
+	
+	ReelIcon_H: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H.png");	
+	ReelIcon_H_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0001.png"); 		
+	ReelIcon_H_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0002.png"); 		
+	ReelIcon_H_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0003.png");
+	ReelIcon_H_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0004.png");
+	ReelIcon_H_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0005.png");		
+	ReelIcon_H_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0006.png");		
+	ReelIcon_H_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0007.png");		
+	ReelIcon_H_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0008.png");
+	ReelIcon_H_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0009.png");		
+	ReelIcon_H_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0010.png"); 		
+	ReelIcon_H_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0011.png");		
+	ReelIcon_H_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_H_0012.png");
+	
+	ReelIcon_I: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I.png");	
+	ReelIcon_I_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0001.png"); 		
+	ReelIcon_I_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0002.png"); 		
+	ReelIcon_I_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0003.png");
+	ReelIcon_I_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0004.png");
+	ReelIcon_I_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0005.png");		
+	ReelIcon_I_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0006.png");		
+	ReelIcon_I_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0007.png");		
+	ReelIcon_I_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0008.png");
+	ReelIcon_I_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0009.png");		
+	ReelIcon_I_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0010.png"); 		
+	ReelIcon_I_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0011.png");		
+	ReelIcon_I_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_I_0012.png");
+	
+	ReelIcon_J: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J.png");	
+	ReelIcon_J_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0001.png"); 		
+	ReelIcon_J_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0002.png"); 		
+	ReelIcon_J_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0003.png");
+	ReelIcon_J_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0004.png");
+	ReelIcon_J_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0005.png");		
+	ReelIcon_J_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0006.png");		
+	ReelIcon_J_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0007.png");		
+	ReelIcon_J_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0008.png");
+	ReelIcon_J_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0009.png");		
+	ReelIcon_J_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0010.png"); 		
+	ReelIcon_J_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0011.png");		
+	ReelIcon_J_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_J_0012.png");
+	
+	ReelIcon_K: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K.png");	
+	ReelIcon_K_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0001.png"); 		
+	ReelIcon_K_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0002.png"); 		
+	ReelIcon_K_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0003.png");
+	ReelIcon_K_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0004.png");
+	ReelIcon_K_5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0005.png");		
+	ReelIcon_K_6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0006.png");		
+	ReelIcon_K_7: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0007.png");		
+	ReelIcon_K_8: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0008.png");
+	ReelIcon_K_9: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0009.png");		
+	ReelIcon_K_10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0010.png"); 		
+	ReelIcon_K_11: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0011.png");		
+	ReelIcon_K_12: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_K_0012.png");
+	
+	ReelIcon_x1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x1.png");
+	ReelIcon_x2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x2.png");
+	ReelIcon_x3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x3.png");
+	ReelIcon_x4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x4.png");
+	ReelIcon_x5: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x5.png");
+	ReelIcon_x6: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x6.png");
+	ReelIcon_x10: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x10.png");
+	ReelIcon_x25: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x25.png");
+	ReelIcon_x50: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x50.png");
+	ReelIcon_x100: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_x100.png");
+	
+	ReelIcon_50: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_50.png");
+	ReelIcon_100: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_100.png");
+	ReelIcon_200: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_200.png");
+	ReelIcon_250: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_250.png");
+	ReelIcon_400: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_400.png");
+	ReelIcon_500: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_500.png");
+	ReelIcon_800: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_800.png");
+	ReelIcon_1000: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_1000.png");
+	ReelIcon_2000: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_2000.png");
+	ReelIcon_4000: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/images/ReelIcon_4000.png");
+	
+	/* Bonus Images */
+	FreeSpins: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/BonusGame/images/FreeSpins.jpg");	
+	
+	/* Sounds */
+	Background_Audio: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/BackgroundAudio.mp3");
+	Spin_Start: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Spin_Start.mp3");		
+	Spin_Stop: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Spin_Stop.mp3");
+	
+	/* Winning Lines */
+	LineWin_A: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_A.mp3"); /* Played for ReelIcon_A */	
+	LineWin_B: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_B.mp3"); /* Played for ReelIcon_B */
+	LineWin_C: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_C.mp3"); /* Played for ReelIcon_C */	
+	LineWin_D: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_D.mp3"); /* Played for ReelIcon_D */
+	LineWin_E: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_E.mp3"); /* Played for ReelIcon_E */
+	LineWin_F: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_F.mp3"); /* Played for ReelIcon_F */
+	LineWin_G: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_G.mp3"); /* Played for ReelIcon_G */
+	LineWin_H: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_H.mp3"); /* Played for ReelIcon_H */
+	LineWin_I: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_I.mp3"); /* Played for ReelIcon_I */
+	LineWin_J: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_J.mp3"); /* Played for ReelIcon_J */	
+	LineWin_High: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_High.mp3"); /* Played for ReelIcon_D, E, F */ 				
+	LineWin_Low: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/LineWin_Low.mp3"); /* Played for ReelIcon_G, H, I, J */						
+						
+	/* Scatter Icons */
+	Scatter_Anticipation: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Scatter_Anticipation.mp3");
+	Scatter_Win: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Scatter_Win.mp3");
+	Scatter_0: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Scatter_0.mp3");	
+	Scatter_1: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Scatter_1.mp3");	
+	Scatter_2: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Scatter_2.mp3");	
+	Scatter_3: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Scatter_3.mp3");	
+	Scatter_4: Embed(source="/../../../assets/VideoSlots/EmeraldEruption/sounds/Scatter_4.mp3");
+	
+	/* Fonts */
+	bradyBunch: Embed( source='/../../../assets/VideoSlots/EmeraldEruption/fonts/bradbunr.ttf', fontFamily='bradyBunch', mimeType='application/x-font' );
+	sherwood: Embed( source='/../../../assets/VideoSlots/EmeraldEruption/fonts/sherwood.ttf', fontFamily='sherwood', mimeType='application/x-font' );
+}

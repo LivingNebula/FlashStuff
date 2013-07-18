@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VideoSlots:VideoSlotsBonusGame xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								xmlns:s="library://ns.adobe.com/flex/spark" 
+								xmlns:mx="library://ns.adobe.com/flex/mx" 
+								xmlns:cx="components.*"
+								xmlns:VideoSlots="components.VideoSlots.*"
+								width="800" height="560"
+								initialize="init(event)">
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser"/>
+		<s:Linear id="linearEaser" easeInFraction="0" easeOutFraction="0"/>	
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.SkinManager;
+			
+			import mx.core.UIComponent;
+			import mx.effects.Tween;
+			import mx.events.FlexEvent;
+			
+			import utils.DebugHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( EmeraldEruption_BonusGame );				
+			
+			private var animationByteArray:ByteArray;
+			private var animationClass:Class;			
+			
+			private var connect_nc:NetConnection;
+			private var stream_ns:NetStream;
+			private var video:Video;			
+			
+			private var exitSound:SoundChannel;
+			private var gameCompleted:Boolean = false;
+			private var lastFrame:int = 0;
+			private var freeSpinTimeout:uint = uint.MIN_VALUE;
+			
+			protected function init( event:FlexEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+				
+				// Set the source of the background image
+				imgFreeSpins.source = SkinManager.getSkinAsset( styleManager, "FreeSpins" );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override public function setParameters( betAmount:int, curLines:int, bonusWin:int, winAmount:int, startingAmount:int = 0 ):void
+			{
+				// Log Activity
+				logger.pushContext( "setParameters", arguments );
+				super.setParameters( betAmount, curLines, bonusWin, winAmount, startingAmount );
+				playFreeSpins( bonusWin );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override public function resetAndPlay():void
+			{
+				// Log Activity
+				logger.pushContext( "resetAndPlay", arguments );
+				
+				// Reset game completed
+				gameCompleted = false;				
+				ddWinAmountExit.displayAmount = 0;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles playing the free spins transition animation
+			private function playFreeSpins( freeSpinCount:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "playFreeSpins", arguments );
+				
+				// Set the free spin count
+				ddFreeSpins.displayAmount = freeSpinCount;
+				
+				// Play the transition animation
+				grpLayer1.alpha = 0;
+				grpLayer1.visible = true;
+				
+				var obj:Object = new Object();
+				obj.onTweenUpdate = function( i:Number ):void {
+					grpLayer1.alpha = i;
+				};
+				
+				obj.onTweenEnd = function( i:Number ):void {
+					freeSpinTimeout = setTimeout( freeSpinTimeoutHandler, 1500 );
+				};
+				
+				var twn:Tween = new Tween( obj, 0, 1, 1500 );
+				
+				// Clear Context
+				logger.popContext();				
+			}					
+			
+			// Handles the freeSpinTimeout
+			private function freeSpinTimeoutHandler():void
+			{
+				// Log Activity
+				logger.pushContext( "freeSpinTimeoutHandler", arguments );							
+				clearTimeout( freeSpinTimeout );
+				_onPlayFreeSpins( this );
+				grpLayer1.visible = false;	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles playing the exit
+			override public function playExit( winAmount:int, isCurrency:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "playExit", arguments );
+				
+				// Set the exit win amount
+				ddWinAmountExit.displayAmount = winAmount;
+				ddWinAmountExit.isCurrency = isCurrency;
+				
+				// Load the animation class
+				animationClass = SkinManager.getSkinAsset( styleManager, "BonusGameExit_Animation" );					
+				animationByteArray = new animationClass();
+				
+				// Initialize the net connection
+				connect_nc = new NetConnection();
+				connect_nc.connect( null );
+				
+				// Initialize the net stream
+				stream_ns = new NetStream( connect_nc );
+				stream_ns.client = this;
+				stream_ns.client = { onMetaData:function( obj:Object ):void{} }
+				stream_ns.addEventListener( NetStatusEvent.NET_STATUS, exitNetStatusHandler );
+				stream_ns.play( null );
+				stream_ns.appendBytes( animationByteArray );
+				
+				// Initialize the animation
+				video = new Video( 800, 560 );
+				video.attachNetStream( stream_ns );		
+				
+				var ui:UIComponent = new UIComponent();
+				ui.addChild( DisplayObject( video ) );
+				grpLayer2.addElementAt( ui, 0 );
+				grpLayer2.visible = true;
+				grpLayer1.visible = false;
+				
+				// Set the exit win amount
+				ddWinAmountExit.displayAmount = winAmount;
+				ddWinAmountExit.isCurrency = isCurrency;	
+				ddWinAmountExit.visible = true;
+				
+				// Hide the exit win amount at the appropriate time
+				setTimeout( function():void { ddWinAmountExit.visible = false }, 4000 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'Net Status' event of the Net Stream
+			protected function exitNetStatusHandler( event:NetStatusEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "exitNetStatusHandler", arguments.concat( event.info.code ) );
+				if( event.info.code == "NetStream.Play.Stop" || event.info.code == "NetStream.Buffer.Empty" )
+				{
+					stopExit();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes all the event listeners and elements from the container and dispatches a stop event
+			public function stopExit():void
+			{
+				// Log Activity
+				logger.pushContext( "stopExit", arguments );
+				
+				if( stream_ns != null )
+				{
+					stream_ns.removeEventListener( NetStatusEvent.NET_STATUS, exitNetStatusHandler );
+					stream_ns.close();
+					stream_ns = null;
+				}
+				
+				if( connect_nc != null )
+				{
+					connect_nc.close();
+					connect_nc = null;
+				}
+				
+				grpLayer2.removeElementAt( 0 );					
+				
+				// Call the game finished event
+				GameFinished();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Group id="grpLayer1" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" depth="1" visible="false">
+		<mx:Image id="imgFreeSpins" width="800" height="560" x="0" y="0"></mx:Image>
+		<cx:DigitDisplay id="ddFreeSpins" x="274" y="285" width="250" height="80" displayAmount="0" fontSize="48" textAlign="center" verticalAlign="middle" depth="2" color="0xFFFFFF" isCurrency="false" />
+	</s:Group>
+	
+	<s:Group id="grpLayer2" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" depth="2">
+		<cx:DigitDisplay id="ddWinAmountExit" x="245" y="360" width="308" height="70" displayAmount="0" fontSize="48" textAlign="center" verticalAlign="middle" depth="2" color="0xFFFFFF" isCurrency="true" visible="false" />
+	</s:Group>	
+</VideoSlots:VideoSlotsBonusGame>

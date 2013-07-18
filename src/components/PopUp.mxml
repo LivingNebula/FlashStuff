@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:cx="components.*"
+					  width="375" height="225" 
+					  horizontalCenter="0" verticalCenter="0"
+					  creationComplete="init()">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import mx.managers.PopUpManager;
+			
+			import services.SweepsAPI;
+			
+			import utils.DebugHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( PopUp );				
+			
+			private var _title:String;
+			private var _message:String;
+			private var _isError:Boolean = false;
+			private var _isLogout:Boolean = false;
+			private var _scale:Number;			
+			private var _removePopupCallback:Function;
+	
+			private var isErrorChanged:Boolean = false;	
+			private var scaleChanged:Boolean = false;
+			
+			private var entries:int = 0.0;
+			private var winnings:int = 0.0;		
+			private var progressiveBalance:int = 0.0;
+			
+			public function set title( value:String ):void
+			{
+				if( _title != value )
+				{
+					lblTitle.text = _title = value;
+				}
+			}
+			
+			public function set message( value:String ):void
+			{
+				if( _message != value )
+				{
+					lblMessage.text = _message = value;
+				}
+			}
+			
+			public function set isError( value:Boolean ):void
+			{
+				if( _isError != value )
+				{					
+					_isError = value;
+					isErrorChanged = true;
+					invalidateProperties();
+				}
+			}
+			
+			public function set isLogout( value:Boolean ):void
+			{
+				if( _isLogout != value )
+				{
+					_isLogout = value;
+				}
+			}
+			
+			public function set scale( value:Number ):void
+			{
+				if( _scale != value )
+				{
+					_scale = value;
+					scaleChanged = true;
+					invalidateProperties();
+					invalidateSize();
+					invalidateDisplayList();
+				}
+			}
+			
+			public function set removePopupCallback( value:Function ):void
+			{
+				if( _removePopupCallback != value )
+				{
+					_removePopupCallback = value;
+				}
+			}			
+						
+			// Initializes the control
+			private function init():void 
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+				
+				btnOk.setFocus();
+				
+				// Set the account entries
+				entries = Sweeps.Entries;
+				
+				// Set the account winnings
+				winnings = Sweeps.Winnings;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected override function commitProperties():void
+			{
+				if( isErrorChanged )
+				{
+					isErrorChanged = false;
+					if( _isError )
+					{
+						btnOk.enabled = false;
+						updateBalance();
+					}
+				}
+				
+				if( scaleChanged )
+				{
+					scaleChanged = false;
+					scaleX = scaleY = _scale;
+					x = stage.stageWidth / 2 - ( width * scaleX ) / 2;
+					y = stage.stageHeight / 2 - ( height * scaleY ) / 2;						
+				}
+				
+				super.commitProperties();			
+			}
+			
+			// Handle the close/cancel button.
+			private function closePopUp():void 
+			{
+				// Log Activity
+				logger.pushContext( "closePopUp", arguments );
+				
+				if( _isLogout )
+				{
+					// Log out the user
+					Sweeps.getInstance().logout();
+				}
+				else
+				{
+					// Check if the callback function is available
+					if( _removePopupCallback != null )
+					{
+						// Dispatch a redeem response event
+						_removePopupCallback( entries, winnings );
+					}
+				}
+				
+				this.visible = false; // Hide the current control
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{						
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+			}
+			
+			// Updates the account balance
+			private function updateBalance():void
+			{
+				// Log Activity
+				logger.pushContext( "updateBalance", arguments );
+				
+				var username:String = Sweeps.Username;
+				var password:String = Sweeps.Password;
+								
+				// Send the request to the service API
+				SweepsAPI.getBalance( username, password, handleBalanceSuccess, handleBalanceError );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Checks the status of the update
+			private function handleBalanceSuccess( newEntries:int, newWinnings:int, newProgressiveBalance:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleBalanceSuccess", arguments );
+				
+				// Enable the OK button
+				btnOk.enabled = true;
+				
+				// Store the returned values
+				entries = newEntries;
+				winnings = newWinnings;
+				progressiveBalance = newProgressiveBalance;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles balance errors
+			private function handleBalanceError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleBalanceError" ).error.apply( null, arguments );
+				
+				// Enable the OK button
+				btnOk.enabled = true;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						lblTitle.text = "Unauthorized";
+						lblMessage.text = "We're sorry, but your account can only be logged in to one computer at a time.";
+						_isLogout = true;
+						break;
+										
+					default:
+						lblTitle.text = "Oops!";
+						lblMessage.text = "We're sorry, but there was an issue while trying to complete this request.";
+						break;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:BitmapImage source="{Images.messageBox}"></s:BitmapImage>
+	<s:Group width="100%" height="100%" horizontalCenter="0">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>
+		<s:Label id="lblTitle" styleName="Title" paddingTop="7"></s:Label>		
+		<s:Label id="lblMessage" styleName="Label" width="300" paddingTop="30" textAlign="center"/>					
+	</s:Group>
+	<cx:ImageButton id="btnOk" label="OK" click="closePopUp();" skinClass="skins.ButtonSkin" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" horizontalCenter="0" bottom="20" mouseDown="mouseDownHandler(event)"/>
+	
+</s:SkinnableContainer>

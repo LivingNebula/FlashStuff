@@ -1,0 +1,279 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* Animations */
+	Intro_Animation: Embed(source="/../../../assets/VideoSlots/LuckyDucky/animations/Intro.swf", mimeType="application/octet-stream");
+	BonusGameIntro_Animation: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/BonusGame_Intro.swf", mimeType="application/octet-stream");	
+	BonusGameIcon_Animation: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/BonusGame_Icon.swf", mimeType="application/octet-stream");
+	BonusGameExit_Animation: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/BonusGame_Exit.swf", mimeType="application/octet-stream");
+		
+	/* Sprites */
+	Sprite_C: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_C.png");		
+	Sprite_C_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_C_1.png");		
+	Sprite_C_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_C_2.png");
+	Sprite_C_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_C_3.png");
+	Sprite_C_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_C_4.png");		
+	Sprite_C_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_C_5.png");
+	Sprite_C_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_C_6.png");
+	
+	Sprite_D_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_1.png");		
+	Sprite_D_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_2.png");
+	Sprite_D_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_3.png");
+	Sprite_D_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_4.png");	
+	Sprite_D_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_5.png");
+	Sprite_D_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_6.png");
+	Sprite_D_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_7.png");
+	Sprite_D_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_D_8.png"); 		
+	
+	Sprite_E: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_E.png");
+	Sprite_E_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_E_1.png");
+	Sprite_E_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_E_2.png");
+	Sprite_E_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_E_3.png");
+	Sprite_E_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_E_4.png");
+	Sprite_E_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_E_5.png");
+	Sprite_E_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Sprite_E_6.png");
+	
+	/* Images */
+	Skin: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Skin.png");
+	Skin1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Skin1.png");
+	SkinFreeSpins: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/SkinFreeSpins.png");
+	LineNumbersLeft: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/LineNumbers_Left.png");
+	LineNumbersRight: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/LineNumbers_Right.png");
+	InfoSkin: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/InfoSkin.jpg");	
+	InfoPaytableTitle: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/InfoPaytableTitle.png");
+	InfoNavigator: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/InfoNavigator.png");
+	InfoNext: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/InfoNext.png");		
+	InfoPrevious: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/InfoPrevious.png");
+	InfoBetLines: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/InfoBetLines.png");
+	InfoBonusGame: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/InfoBonusGame.png");
+	BackToGame: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/BackToGame.png");
+	BackToGame_over: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/BackToGame_over.png");
+	Transparent: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Transparent.png");	
+	Bonus2xBig: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Bonus2xBig.png");
+	Bonus2xSmall: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/Bonus2xSmall.png");	
+	
+	/* Images - Reel Icons*/
+	ReelIcon_A: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A.png");
+	ReelIcon_A_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_1.png"); 		
+	ReelIcon_A_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_2.png");
+	ReelIcon_A_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_3.png");		
+	ReelIcon_A_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_4.png");		
+	ReelIcon_A_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_5.png");		
+	ReelIcon_A_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_6.png");		
+	ReelIcon_A_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_7.png");		
+	ReelIcon_A_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_8.png");
+	
+	ReelIcon_A_Vertical: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical.png");
+	ReelIcon_A_Vertical_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_1.png"); 		
+	ReelIcon_A_Vertical_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_2.png");
+	ReelIcon_A_Vertical_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_3.png");		
+	ReelIcon_A_Vertical_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_4.png");		
+	ReelIcon_A_Vertical_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_5.png");		
+	ReelIcon_A_Vertical_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_6.png");		
+	ReelIcon_A_Vertical_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_7.png");
+	
+	ReelIcon_A_Vertical_NonWin_Top: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top.png");
+	ReelIcon_A_Vertical_NonWin_Top_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top_1.png"); 		
+	ReelIcon_A_Vertical_NonWin_Top_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top_2.png");
+	ReelIcon_A_Vertical_NonWin_Top_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top_3.png");		
+	ReelIcon_A_Vertical_NonWin_Top_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top_4.png");		
+	ReelIcon_A_Vertical_NonWin_Top_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top_5.png");
+	ReelIcon_A_Vertical_NonWin_Top_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top_6.png");
+	ReelIcon_A_Vertical_NonWin_Top_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Top_7.png");
+	
+	ReelIcon_A_Vertical_NonWin: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin.png");
+	ReelIcon_A_Vertical_NonWin_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_1.png"); 		
+	ReelIcon_A_Vertical_NonWin_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_2.png");
+	ReelIcon_A_Vertical_NonWin_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_3.png");		
+	ReelIcon_A_Vertical_NonWin_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_4.png");		
+	ReelIcon_A_Vertical_NonWin_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_5.png");		
+	ReelIcon_A_Vertical_NonWin_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_6.png");
+	ReelIcon_A_Vertical_NonWin_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_7.png");
+	
+	ReelIcon_A_Vertical_NonWin_Bottom: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom.png");
+	ReelIcon_A_Vertical_NonWin_Bottom_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom_1.png"); 		
+	ReelIcon_A_Vertical_NonWin_Bottom_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom_2.png");
+	ReelIcon_A_Vertical_NonWin_Bottom_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom_3.png");		
+	ReelIcon_A_Vertical_NonWin_Bottom_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom_4.png");		
+	ReelIcon_A_Vertical_NonWin_Bottom_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom_5.png");
+	ReelIcon_A_Vertical_NonWin_Bottom_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom_6.png");		
+	ReelIcon_A_Vertical_NonWin_Bottom_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_A_Vertical_NonWin_Bottom_7.png");
+	
+	ReelIcon_B: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B.png");	
+	ReelIcon_B_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_1.png"); 		
+	ReelIcon_B_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_2.png");		
+	ReelIcon_B_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_3.png");		
+	ReelIcon_B_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_4.png");		
+	ReelIcon_B_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_5.png");		
+	ReelIcon_B_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_6.png");		
+	ReelIcon_B_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_7.png");		
+	ReelIcon_B_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_8.png");
+	ReelIcon_B_9: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_9.png");		
+	ReelIcon_B_10: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_10.png"); 		
+	ReelIcon_B_11: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_11.png");		
+	ReelIcon_B_12: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_B_12.png");
+	
+	ReelIcon_C: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C.png");	
+	ReelIcon_C_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_1.png");
+	ReelIcon_C_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_2.png");		
+	ReelIcon_C_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_3.png");		
+	ReelIcon_C_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_4.png");		
+	ReelIcon_C_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_5.png");		
+	ReelIcon_C_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_6.png");		
+	ReelIcon_C_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_7.png");		
+	ReelIcon_C_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_8.png");
+	ReelIcon_C_9: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_9.png");		
+	ReelIcon_C_10: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_10.png"); 		
+	ReelIcon_C_11: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_11.png");		
+	ReelIcon_C_12: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_C_12.png");
+	
+	ReelIcon_D: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D.png");	
+	ReelIcon_D_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_1.png"); 		
+	ReelIcon_D_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_2.png"); 		
+	ReelIcon_D_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_3.png");		
+	ReelIcon_D_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_4.png");
+	ReelIcon_D_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_5.png");
+	ReelIcon_D_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_6.png");		
+	ReelIcon_D_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_7.png");		
+	ReelIcon_D_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_8.png");
+	ReelIcon_D_9: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_9.png");		
+	ReelIcon_D_10: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_10.png"); 		
+	ReelIcon_D_11: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_11.png");		
+	ReelIcon_D_12: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_D_12.png");
+	
+	ReelIcon_E: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E.png");	
+	ReelIcon_E_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_1.png"); 		
+	ReelIcon_E_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_2.png");		
+	ReelIcon_E_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_3.png");		
+	ReelIcon_E_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_4.png");
+	ReelIcon_E_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_5.png");		
+	ReelIcon_E_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_6.png");
+	ReelIcon_E_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_7.png");		
+	ReelIcon_E_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_8.png");
+	ReelIcon_E_9: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_9.png");		
+	ReelIcon_E_10: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_10.png"); 		
+	ReelIcon_E_11: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_11.png");		
+	ReelIcon_E_12: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_E_12.png");
+	
+	ReelIcon_F: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F.png");	
+	ReelIcon_F_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_1.png"); 		
+	ReelIcon_F_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_2.png");		
+	ReelIcon_F_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_3.png");		
+	ReelIcon_F_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_4.png");
+	ReelIcon_F_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_5.png");		
+	ReelIcon_F_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_6.png");
+	ReelIcon_F_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_7.png");		
+	ReelIcon_F_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_8.png");
+	ReelIcon_F_9: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_9.png");		
+	ReelIcon_F_10: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_10.png"); 		
+	ReelIcon_F_11: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_11.png");		
+	ReelIcon_F_12: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_F_12.png");
+	
+	ReelIcon_G: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G.png");	
+	ReelIcon_G_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_1.png");
+	ReelIcon_G_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_2.png");		
+	ReelIcon_G_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_3.png");		
+	ReelIcon_G_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_4.png");
+	ReelIcon_G_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_5.png");		
+	ReelIcon_G_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_6.png");
+	ReelIcon_G_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_7.png");		
+	ReelIcon_G_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_8.png");
+	ReelIcon_G_9: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_9.png");		
+	ReelIcon_G_10: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_10.png"); 		
+	ReelIcon_G_11: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_11.png");		
+	ReelIcon_G_12: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_G_12.png");
+	
+	ReelIcon_H: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H.png");	
+	ReelIcon_H_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_1.png"); 		
+	ReelIcon_H_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_2.png"); 		
+	ReelIcon_H_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_3.png");
+	ReelIcon_H_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_4.png");
+	ReelIcon_H_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_5.png");		
+	ReelIcon_H_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_6.png");		
+	ReelIcon_H_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_7.png");		
+	ReelIcon_H_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_H_8.png");
+	
+	ReelIcon_I: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I.png");	
+	ReelIcon_I_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_1.png");
+	ReelIcon_I_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_2.png");		
+	ReelIcon_I_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_3.png");		
+	ReelIcon_I_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_4.png");
+	ReelIcon_I_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_5.png");		
+	ReelIcon_I_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_6.png");		
+	ReelIcon_I_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_7.png");
+	ReelIcon_I_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_I_8.png");
+	
+	ReelIcon_J: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J.png");	
+	ReelIcon_J_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_1.png");
+	ReelIcon_J_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_2.png");		
+	ReelIcon_J_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_3.png");		
+	ReelIcon_J_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_4.png");
+	ReelIcon_J_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_5.png");		
+	ReelIcon_J_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_6.png");		
+	ReelIcon_J_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_7.png");
+	ReelIcon_J_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_J_8.png");
+	
+	ReelIcon_K: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K.png");
+	ReelIcon_K_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_1.png");
+	ReelIcon_K_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_2.png");		
+	ReelIcon_K_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_3.png");		
+	ReelIcon_K_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_4.png");		
+	ReelIcon_K_5: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_5.png");		
+	ReelIcon_K_6: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_6.png");		
+	ReelIcon_K_7: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_7.png");
+	ReelIcon_K_8: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_8.png");
+	ReelIcon_K_9: Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_9.png");
+	ReelIcon_K_10:Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_10.png"); 
+	ReelIcon_K_11:Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_11.png"); 
+	ReelIcon_K_12:Embed(source="/../../../assets/VideoSlots/LuckyDucky/images/ReelIcon_K_12.png"); 
+	
+	/* Bonus Images */
+	BonusBG: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/images/BonusBG.jpg");
+	BonusWinDisplay: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/images/BonusWinDisplay.png");			
+	BonusIconExit: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/images/BonusIconExit.png");
+	FreeSpins: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/images/FreeSpins.jpg");
+	
+	/* Sounds */
+	Intro_Audio: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/IntroAudio.mp3");
+	Background_Audio: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/BackgroundAudio.mp3");
+	Bonus_Audio: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/BonusAudio.mp3");
+	Spin_Start: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Spin_Start.mp3");		
+	Spin_Stop: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Spin_Stop.mp3");			
+	
+	/* Winning Lines */
+	LineWin_A: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_A.mp3"); /* Played for ReelIcon_A */	
+	LineWin_B: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_B.mp3"); /* Played for ReelIcon_B */
+	LineWin_C: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_C.mp3"); /* Played for ReelIcon_C */	
+	LineWin_D: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_D.mp3"); /* Played for ReelIcon_D */
+	LineWin_E: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_E.mp3"); /* Played for ReelIcon_E */
+	LineWin_F: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_F.mp3"); /* Played for ReelIcon_F */
+	LineWin_G: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_G.mp3"); /* Played for ReelIcon_G */
+	LineWin_H: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_H.mp3"); /* Played for ReelIcon_H */
+	LineWin_I: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_I.mp3"); /* Played for ReelIcon_I */
+	LineWin_J: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_J.mp3"); /* Played for ReelIcon_J */	
+	LineWin_High: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_High.mp3"); /* Played for ReelIcon_D, E, F */ 				
+	LineWin_Low: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/LineWin_Low.mp3"); /* Played for ReelIcon_G, H, I, J */						
+						
+	/* Scatter Icons */
+	Scatter_Anticipation: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Scatter_Anticipation.mp3");
+	Scatter_Win: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Scatter_Win.mp3");
+	Scatter_0: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Scatter_0.mp3");	
+	Scatter_1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Scatter_1.mp3");	
+	Scatter_2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Scatter_2.mp3");	
+	Scatter_3: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Scatter_3.mp3");	
+	Scatter_4: Embed(source="/../../../assets/VideoSlots/LuckyDucky/sounds/Scatter_4.mp3");	
+	
+	/* Bonus Sounds */
+	Intro: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/sounds/Intro.mp3");
+	End: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/sounds/End.mp3");
+	Exit: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/sounds/Exit.mp3");
+	Ambience: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/sounds/Ambience.mp3");
+	Win1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/sounds/Win1.mp3");
+	Win2: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/sounds/Win2.mp3");
+	Lose1: Embed(source="/../../../assets/VideoSlots/LuckyDucky/BonusGame/sounds/Lose1.mp3");	
+	
+	/* Fonts */
+	bradyBunch: Embed( source='/../../../assets/VideoSlots/LuckyDucky/fonts/bradbunr.ttf', fontFamily='bradyBunch', mimeType='application/x-font' );
+}

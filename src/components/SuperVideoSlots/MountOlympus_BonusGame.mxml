@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperVideoSlots:SuperVideoSlotsBonusGame xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								xmlns:s="library://ns.adobe.com/flex/spark" 
+								xmlns:mx="library://ns.adobe.com/flex/mx" 
+								xmlns:cx="components.*"
+								xmlns:SuperVideoSlots="components.SuperVideoSlots.*"
+								width="800" height="560"
+								initialize="videoslotsbonusgame1_initializeHandler(event)">
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser"/>
+		<s:Linear id="linearEaser" easeInFraction="0.0" easeOutFraction="0.0" />
+		<s:Power id="powerEaser" easeInFraction="0" exponent="3" />	
+	</fx:Declarations>
+	
+	<fx:Style>
+		.WheelNumber {
+			fontFamily: "disneyHeroic";
+			fontSize: 32;
+			color: #000000;
+			textAlign: "center";
+			verticalAlign: "middle";
+		}
+	</fx:Style>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.SkinManager;
+			import assets.SoundManager;
+			
+			import flash.display.Loader;
+			
+			import mx.core.UIComponent;
+			import mx.effects.Tween;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			
+			import spark.components.Label;
+			import spark.effects.Move;
+			import spark.effects.Rotate;
+			import spark.effects.Scale;
+			
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( MountOlympus_BonusGame );
+			
+			private var animationByteArray:ByteArray;
+			private var animationClass:Class;
+			
+			private var connect_nc:NetConnection;
+			private var stream_ns:NetStream;
+			private var video:Video;					
+			
+			private var introLoader:Loader;						// Loads the intro animation
+			private var lastFrame:int;							// Keeps track of the frame number while playing a clip
+			private var mcIntroExit:MovieClip;					// Movie Clip reference for the intro and exit animations
+			private var gameCompleted:Boolean = false;			// Set when the game is completed to limit additional interaction
+			private var aMeterBar:Scale;						// Animation that controls moving the meter bar
+			private var lastRot:Number = 0.0;					// Tracks the rotation of the wheel for purposes of audio
+			private var targetIndex:int = 0;					// The index of the target label we'll display our win amount
+			private var flasher:Timer;							// Flashes our win amount on the wheel
+			private var bonusSound:SoundChannel;
+			
+			protected function videoslotsbonusgame1_initializeHandler( event:FlexEvent ):void
+			{
+				// Set the source of the background image
+				imgBG.source = SkinManager.getSkinAsset( styleManager, "BonusBG" );	
+				imgWheel.source = SkinManager.getSkinAsset( styleManager, "BonusWheel" );
+				imgWheelStand.source = SkinManager.getSkinAsset( styleManager, "BonusWheelStand" );
+				imgBorder.source = SkinManager.getSkinAsset( styleManager, "BonusBorder" );
+				imgPowerMeter.source = SkinManager.getSkinAsset( styleManager, "BonusPowerMeter" );
+				imgPowerMeter.mask = grpPowerMeterMask;
+				imgSpinButton.source = SkinManager.getSkinAsset( styleManager, "BonusSpinButton" );
+				
+				// Build the labels
+				var labelPositions:Array = MathHelper.getNPointsOnCircle( new Point( 0, 0 ), 246, 16 );
+				for( var i:int = 0; i < labelPositions.length; i++ )
+				{
+					var pt:Point = labelPositions[i] as Point;
+					var lbl:Label = new Label();
+					lbl.id = "lblWheelNumber" + i;
+					lbl.alpha = 0.8;
+					lbl.width = lbl.height = 50;
+					lbl.x = pt.x + ( grpWheel.x + grpWheel.width / 2 ) - 14;
+					lbl.y = pt.y + ( grpWheel.y + grpWheel.height / 2 ) - 74;
+					lbl.text = MathHelper.randomNumber( 1, 99 ).toString();
+					lbl.styleName = "WheelNumber";
+					lbl.rotationZ = i / 16 * 360;
+					lbl.transformZ = lbl.transformX = lbl.transformY =  lbl.width / 2;
+					
+					grpWheel.addElement( lbl );
+				}
+			}
+			
+			override public function setParameters( betAmount:int, curLines:int, bonusWin:int, winAmount:int, startingAmount:int = 0 ):void
+			{
+				// Log Activity
+				logger.pushContext( "setParamters", arguments );
+				
+				super.setParameters( betAmount, curLines, bonusWin, winAmount, startingAmount );
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			override public function resetAndPlay():void
+			{
+				// Log Activity
+				logger.pushContext( "resetAndPlay", arguments );
+				
+				// Reset game completed
+				gameCompleted = false;
+				ddWinAmountExit.displayAmount = 0;
+				mcIntroExit = null;
+				if( introLoader != null )
+				{
+					introLoader.unloadAndStop( true );
+				}
+				
+				// Set the wheel rotation
+				var rot:Rotate = new Rotate(grpWheel);
+				rot.angleTo = 0;
+				rot.duration = 1;
+				rot.autoCenterTransform = true;
+				rot.play();
+				
+				// Calculate the winnings and play the intro
+				playIntro();
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			// Handles playing the intro
+			private function playIntro():void
+			{				
+				// Log Activity
+				logger.pushContext( "playIntro", arguments );
+				
+				// Load the animation class
+				animationClass = SkinManager.getSkinAsset( styleManager, "BonusGameIntro_Animation" );					
+				animationByteArray = new animationClass();
+				
+				// Initialize the net connection
+				connect_nc = new NetConnection();
+				connect_nc.connect( null );
+				
+				// Initialize the net stream
+				stream_ns = new NetStream( connect_nc );
+				stream_ns.client = this;
+				stream_ns.client = { onMetaData:function( obj:Object ):void{} }
+				stream_ns.addEventListener( NetStatusEvent.NET_STATUS, introNetStatusHandler );
+				stream_ns.play( null );
+				stream_ns.appendBytes( animationByteArray );
+				
+				// Initialize the animation
+				video = new Video( 800, 560 );
+				video.attachNetStream( stream_ns );
+				
+				// Add the animation to the stage
+				var ui:UIComponent = new UIComponent();
+				ui.addChild( DisplayObject( video ) );
+				grpLayer2.addElement( ui );
+				grpLayer2.visible = true;
+				grpLayer0.visible = false;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'Net Status' event of the Net Stream
+			protected function introNetStatusHandler( event:NetStatusEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "introNetStatusHandler", arguments.concat( event.info.code ) );
+				
+				if( event.info.code == "NetStream.Play.Stop" || event.info.code == "NetStream.Buffer.Empty" )
+				{									
+					stopIntro();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes all the event listeners and elements from the container and dispatches a stop event
+			public function stopIntro():void
+			{
+				// Log Activity
+				logger.pushContext( "stopIntro", arguments );
+				
+				if( stream_ns != null )
+				{
+					stream_ns.removeEventListener( NetStatusEvent.NET_STATUS, introNetStatusHandler );
+					stream_ns.close();
+					stream_ns = null;
+				}
+				
+				if( connect_nc != null )
+				{
+					connect_nc.close();
+					connect_nc = null;
+				}
+								
+				grpLayer0.visible = true;
+				grpLayer2.visible = false;
+				grpLayer2.removeElementAt( 1 );
+				
+				// Play the bonus audio
+				bonusSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Bonus_Audio" ), bonusSound, true, true, 50, int.MAX_VALUE, 100, 25 );				
+				
+				startMeterBar();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+				
+			private function startMeterBar():void
+			{				
+				// Log Activity
+				logger.pushContext( "startMeterBar", arguments );
+				
+				// Start the meter bar animation
+				aMeterBar = AnimationManager.getScaleAnimation( grpPowerMeterMask, 1, 0, 1, 1, 2000, 0, 1, 0 );
+				aMeterBar.addEventListener( EffectEvent.EFFECT_END, aMeterBar_endHandler );
+				aMeterBar.play();
+				
+				imgSpinButton.buttonMode = true;
+				imgSpinButton.addEventListener( MouseEvent.CLICK, grpMeter_clickHandler );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function aMeterBar_endHandler( event:EffectEvent ):void
+			{
+				var t:Number = aMeterBar.scaleYFrom
+				aMeterBar.scaleYFrom = aMeterBar.scaleYTo;
+				aMeterBar.scaleYTo = t;
+				aMeterBar.play();
+			}		
+			
+			private function grpMeter_clickHandler( event:MouseEvent ):void
+			{
+				imgSpinButton.buttonMode = false;
+				imgSpinButton.removeEventListener( MouseEvent.CLICK, grpMeter_clickHandler );
+				
+				aMeterBar.removeEventListener( EffectEvent.EFFECT_END, aMeterBar_endHandler );
+				aMeterBar.stop();
+				
+				var powerPercent:Number = grpPowerMeterMask.scaleY;
+				spinWheel( 1 + ( 3 * powerPercent ) );
+			}
+			
+			// Handles spinning the wheel
+			private function spinWheel( speed:Number ):void
+			{				
+				// Log Activity
+				logger.pushContext( "spinWheel", arguments );
+				
+				targetIndex = MathHelper.randomNumber( 0, 15 );
+				var rotations:int = Math.pow( 3, Math.floor( speed ) );
+				var spinSpeed:int = 4000;
+				var duration:int = 0;
+				for( var i:int = 0; i < rotations; i++ )
+				{
+					duration += spinSpeed;
+					spinSpeed *= 0.8;
+				}
+				
+				var rot:Rotate = new Rotate( grpWheel );
+				rot.autoCenterTransform = true;
+				rot.easer = powerEaser;
+				rot.duration = duration;
+				rot.repeatCount = 1;
+				rot.angleBy = ( ( rotations * 360 ) - ( targetIndex * ( 360 / 16 ) ) ) + MathHelper.randomNumber( 360 / 16 * -.35, 360 / 16 * .35 );
+				rot.addEventListener( EffectEvent.EFFECT_UPDATE, spinWheel_updateHandler );
+				rot.addEventListener( EffectEvent.EFFECT_END, spinWheel_endHandler );
+				rot.play();		
+				
+				// Just to be safe, immediately set the targetIndex value
+				Label( grpWheel.getElementAt( targetIndex + 1 ) ).text = winAmount.toString();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function spinWheel_updateHandler( event:EffectEvent ):void
+			{				
+				if( Math.abs( grpWheel.rotationZ - lastRot ) > ( 360 / 16 ) )
+				{
+					SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Wheel_Click" ), 0, 1 );
+					lastRot = grpWheel.rotationZ;
+					
+					var offScreenIndex:int = MathHelper.mod( 2 - Math.round( lastRot / 360 * 16 ), 15 );										
+					if( offScreenIndex == targetIndex ) {
+						Label( grpWheel.getElementAt( targetIndex + 1 ) ).text = winAmount.toString();
+					}
+					else
+					{
+						Label( grpWheel.getElementAt( offScreenIndex + 1 ) ).text = MathHelper.randomNumber( 1, 99 ).toString();
+					}
+				}
+			}
+			
+			private function spinWheel_endHandler( event:EffectEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "spinWheel_endHandler", arguments );
+				
+				playFreeSpins( winAmount );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles playing the free spins transition animation
+			private function playFreeSpins( freeSpinCount:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "playFreeSpins", arguments );
+								
+				// Create an animation timer to highlight how many free spins we wont
+				flasher = new Timer( 500, 8 );
+				flasher.addEventListener( TimerEvent.TIMER, flasherFired );
+				flasher.addEventListener( TimerEvent.TIMER_COMPLETE, flasherComplete );
+				flasher.start();
+				
+				// Play the transition animation
+				grpLayer0.visible = true;
+				grpLayer2.visible = false;
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			// Handles the flasher fired
+			private function flasherFired( event:TimerEvent ):void
+			{
+				var lbl:Label = Label( grpWheel.getElementAt( targetIndex + 1 ) );
+				lbl.setStyle( "color", flasher.currentCount % 2 != 0 ? "#FFFFFF" : "#000000" );
+			}			
+			
+			// Handles the flasher complete
+			private function flasherComplete( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "flasherComplete", arguments );
+				
+				flasher.removeEventListener( TimerEvent.TIMER, flasherFired );
+				flasher.removeEventListener( TimerEvent.TIMER_COMPLETE, flasherComplete );
+				
+				// Stop the bonus audio
+				bonusSound = SoundManager.toggleSound( SkinManager.getSkinAsset( styleManager, "Bonus_Audio" ), bonusSound, false, true, 0, 1, 25 );				
+				
+				_onPlayFreeSpins( this );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles playing the exit
+			override public function playExit( winAmount:int, isCurrency:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "playExit", arguments );
+				
+				// Load the animation class
+				animationClass = SkinManager.getSkinAsset( styleManager, "BonusGameExit_Animation" );					
+				animationByteArray = new animationClass();
+				
+				// Initialize the net connection
+				connect_nc = new NetConnection();
+				connect_nc.connect( null );
+				
+				// Initialize the net stream
+				stream_ns = new NetStream( connect_nc );
+				stream_ns.client = this;
+				stream_ns.client = { onMetaData:function( obj:Object ):void{} }
+				stream_ns.addEventListener( NetStatusEvent.NET_STATUS, exitNetStatusHandler );
+				stream_ns.play( null );
+				stream_ns.appendBytes( animationByteArray );
+				
+				// Initialize the animation
+				video = new Video( 800, 560 );
+				video.attachNetStream( stream_ns );
+				
+				// Add the animation to the stage
+				var ui:UIComponent = new UIComponent();
+				ui.addChild( DisplayObject( video ) );
+				ui.depth = 0;
+				grpLayer2.addElement( ui );
+				grpLayer2.visible = true;
+				grpLayer0.visible = false;
+				
+				// Set the exit win amount
+				ddWinAmountExit.displayAmount = winAmount;
+				ddWinAmountExit.isCurrency = isCurrency;	
+				ddWinAmountExit.visible = true;
+				
+				// Hide the exit win amount at the appropriate time
+				setTimeout( function():void { ddWinAmountExit.visible = false }, 4000 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'Net Status' event of the Net Stream
+			protected function exitNetStatusHandler( event:NetStatusEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "exitNetStatusHandler", arguments.concat( event.info.code ) );
+				
+				if( event.info.code == "NetStream.Play.Stop" || event.info.code == "NetStream.Buffer.Empty" )
+				{									
+					stopExit();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Removes all the event listeners and elements from the container and dispatches a stop event
+			public function stopExit():void
+			{
+				// Log Activity
+				logger.pushContext( "stopExit", arguments );
+				
+				if( stream_ns != null )
+				{
+					stream_ns.removeEventListener( NetStatusEvent.NET_STATUS, exitNetStatusHandler );
+					stream_ns.close();
+					stream_ns = null;
+				}
+				
+				if( connect_nc != null )
+				{
+					connect_nc.close();
+					connect_nc = null;
+				}
+				
+				grpLayer0.visible = true;
+				grpLayer2.visible = false;
+				grpLayer2.removeElementAt( 1 );
+				
+				GameFinished();
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			override protected function GameFinished():void
+			{
+				// Log Activity
+				logger.pushContext( "GameFinished", arguments );
+				
+				ddWinAmountExit.visible = false;
+				super.GameFinished();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				
+				if( bonusSound != null )
+				{
+					bonusSound.stop();
+					bonusSound = null;
+				}
+				
+				super.dispose();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Group id="grpLayer0" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" visible="false" depth="0">
+		
+		
+		<s:Group id="grpMeter" x="722" y="209" width="37" height="240">
+			<s:Rect width="37" height="240">
+				<s:fill>
+					<s:SolidColor color="0x000000"></s:SolidColor>
+				</s:fill>				
+			</s:Rect>
+			<s:BitmapImage id="imgPowerMeter" width="37" height="240" x="0" y="0"></s:BitmapImage>
+			<s:Group id="grpPowerMeterMask" width="37" height="240" x="0" y="0" bottom="0">
+				<s:Rect id="rctPowerMeterMask" width="37" height="240" x="0" y="0" bottom="0">
+					<s:fill>
+						<s:SolidColor color="0x000000"></s:SolidColor>
+					</s:fill>
+				</s:Rect>				
+			</s:Group>
+		</s:Group>
+		
+		<s:BitmapImage id="imgBG" width="800" height="560" x="0" y="0"></s:BitmapImage>
+		
+		<s:Group id="grpWheel" width="553" height="553" x="-10" y="51">
+			<s:Image id="imgWheel" width="553" height="553" horizontalCenter="0" verticalCenter="0"></s:Image>
+		</s:Group>
+		
+		<s:Image id="imgWheelStand" width="298" height="238" x="109" y="260"></s:Image>
+		
+		<s:BitmapImage id="imgBorder" width="800" height="560" x="0" y="0"></s:BitmapImage>
+		
+		<mx:Image id="imgSpinButton" width="131" height="46" x="569" y="299"></mx:Image>	
+		
+		<s:Group id="grpIcons" width="757" height="454" x="22" y="16" clipAndEnableScrolling="true"></s:Group>
+	</s:Group>
+	
+	<s:Group id="grpLayer2" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" depth="2">
+		<cx:DigitDisplay id="ddWinAmountExit" x="185" y="335" width="433" displayAmount="0" fontSize="56" depth="2" isCurrency="true" visible="false" textAlign="center" />
+	</s:Group>	
+</SuperVideoSlots:SuperVideoSlotsBonusGame>

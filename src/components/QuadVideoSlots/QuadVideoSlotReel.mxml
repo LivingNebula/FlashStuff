@@ -1,0 +1,739 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 implements="interfaces.IDisposable"
+		 clipAndEnableScrolling="true">
+	
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser"/>
+		<s:Linear id="linearEaser" easeInFraction="0" easeOutFraction="0"/>
+		<s:Linear id="blinkEaser" easeInFraction="0.2" easeOutFraction="0.2" />
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.SkinManager;
+			
+			import components.SpriteUIComponent;
+			
+			import flash.filters.ColorMatrixFilter;
+			
+			import mx.effects.Effect;
+			import mx.effects.Sequence;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			import mx.graphics.BitmapSmoothingQuality;
+			
+			import objects.ReelPosition;
+			
+			import spark.effects.Animate;
+			import spark.effects.Move;
+			import spark.effects.Scale;
+			import spark.effects.animation.SimpleMotionPath;
+			import spark.effects.easing.IEaser;
+			
+			import utils.ArrayHelper;
+			import utils.DebugHelper;
+			import utils.MathHelper;	
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( QuadVideoSlotReel );
+			
+			private var _slotValues:Array = [];
+			private var _slotImages:Array = [];
+			private var _reelSize:int = 0;
+			private var _targetSlot:int = -1;
+			private var _nudgeSlots:Array = [];
+			private var _isStopping:Boolean = false;
+			private var _currentSlot:int = 0;
+			private var _desiredRotations:int = 0;
+			private var _currentRotations:int = 0;
+			private var _finalSpin:Boolean = false;
+			private var _spinning:Boolean = false;
+			private var _bounceDuration:int = 0;
+			private var _rotationDuration:int = 0;
+			private var _doSubliminalWilds:Boolean = false;
+			private var eventListeners:Object = {};
+			
+			private var _blinkTimer:Timer;
+			private var _blinkingCount:int = 0;
+			
+			private var aMove:Animate;
+			private var aSpin:Animate;
+			private var aSlide:Move;
+			
+			private var _onSpinStopped:Function;
+			private var _onPlayAudio:Function;
+			private var _onNudgeReady:Function;
+			
+			public function set onSpinStopped( value:Function ):void
+			{
+				_onSpinStopped = value;
+			}
+			
+			public function set onPlayAudio( value:Function ):void
+			{
+				_onPlayAudio = value;
+			}
+			
+			public function set onNudgeReady( value:Function ):void
+			{
+				_onNudgeReady = value;
+			}
+			
+			public function get isStopping():Boolean
+			{
+				return _isStopping;
+			}
+			
+			public function get isSpinning():Boolean
+			{
+				return _spinning && !_isStopping;
+			}
+			
+			public function getImageOffset( icon:String ):int
+			{
+				return -( _slotImages.indexOf( icon ) * 61 );
+			}
+			
+			public function getIcon( slotIndex:int ):String
+			{
+				return  _slotValues[ MathHelper.mod(slotIndex, _reelSize) ];
+			}
+			
+			// Initializes the reel by providing the values for each position on the reel and the images to display for those values
+			public function initReel( slotValues:Array ):void
+			{
+				// Log Activity
+				logger.pushContext( "initReel", [slotValues.map( function(icon:String, index:int, arr:Array):String{ return icon.replace( "ReelIcon_", ""); } )] );
+				
+				_slotValues = slotValues;
+				_reelSize = _slotValues.length;
+
+				// Create the reel image
+				generateReelImage();
+				
+				// Set default reel positions
+				imgReel0.x = getImageOffset( getIcon( _currentSlot - 4 ) );
+				imgReel1.x = getImageOffset( getIcon( _currentSlot - 3 ) );
+				imgReel2.x = getImageOffset( getIcon( _currentSlot - 2 ) );
+				imgReel3.x = getImageOffset( getIcon( _currentSlot - 1 ) );
+				imgReel4.x = getImageOffset( getIcon( _currentSlot - 0 ) );
+				imgReel5.x = getImageOffset( getIcon( _currentSlot + 1 ) );	
+				
+				// Clear Context
+				logger.popContext();
+				
+			}
+			
+			public function toggleGrayscale( enable:Boolean, exclusionList:Array ):void
+			{
+				// Log Activity
+				logger.pushContext( "toggleGrayScale", arguments );
+				
+				generateReelImage( enable, exclusionList );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function generateReelImage( greyScale:Boolean = false, exclusionList:Array = null ):void
+			{								
+				var cmx:ColorMatrixFilter = new ColorMatrixFilter([
+					.33, .33, .33, 0, 0,
+					.33, .33, .33, 0, 0,
+					.33, .33, .33, 0, 0,
+					0,   0,   0, 1, 0
+				]);
+				
+				_slotImages = ArrayHelper.getUnique( _slotValues ).sort();
+				var spr:Sprite = new Sprite();				
+				for( var i:int = 0; i < _slotImages.length; i++ )
+				{
+					var bmpD:BitmapData = ( new ( SkinManager.getSkinAsset( styleManager, _slotImages[i] ) )() as Bitmap ).bitmapData;
+					var bmpS:BitmapData = new BitmapData( 61, 57, true, 0x000000 );
+					var mat:Matrix = new Matrix();
+					mat.scale( 61 / bmpD.width, 57 / bmpD.height );
+					bmpS.draw( bmpD, mat, null, null, null, true );
+					if( greyScale && exclusionList.indexOf( _slotImages[i] ) < 0 )
+					{
+						bmpS.applyFilter( bmpS, new Rectangle (0, 0, 61, 57 ), new Point( 0, 0 ), cmx );
+					}
+					
+					spr.graphics.beginBitmapFill( bmpS );
+					spr.graphics.drawRect( i * 61, 0, 61, 57 );
+					spr.graphics.endFill();
+				}
+				
+				
+				imgReel0.width = spr.width;
+				imgReel1.width = spr.width;
+				imgReel2.width = spr.width;
+				imgReel3.width = spr.width;
+				imgReel4.width = spr.width;
+				imgReel5.width = spr.width;
+				
+				imgReel0.source = spr;
+				imgReel1.source = spr;
+				imgReel2.source = spr;
+				imgReel3.source = spr;
+				imgReel4.source = spr;
+				imgReel5.source = spr;	
+			}
+			
+			// Returns an array of the visible icons on the reel
+			public function getVisibleReel():Vector.<ReelPosition>
+			{
+				var visibleReel:Vector.<ReelPosition> = new Vector.<ReelPosition>();
+				
+				visibleReel.push( new ReelPosition( _slotValues[ MathHelper.mod( _currentSlot - 1, _reelSize ) ], MathHelper.mod( _currentSlot - 1, _reelSize ) ) );
+				visibleReel.push( new ReelPosition( _slotValues[_currentSlot], _currentSlot ) );
+				visibleReel.push( new ReelPosition( _slotValues[ MathHelper.mod( _currentSlot + 1, _reelSize ) ], MathHelper.mod( _currentSlot + 1, _reelSize ) ) );
+				
+				return visibleReel;
+			}	
+			
+			// Returns an array of the virtual icons on the reel
+			public function getVirtualReel( currentSlot:int ):Vector.<ReelPosition>
+			{
+				var virtualReel:Vector.<ReelPosition> = new Vector.<ReelPosition>();
+				
+				virtualReel.push( new ReelPosition( _slotValues[ MathHelper.mod( currentSlot - 1, _reelSize ) ], MathHelper.mod( currentSlot - 1, _reelSize ) ) );
+				virtualReel.push( new ReelPosition( _slotValues[currentSlot], currentSlot ) );
+				virtualReel.push( new ReelPosition( _slotValues[ MathHelper.mod( currentSlot + 1, _reelSize ) ], MathHelper.mod( currentSlot + 1, _reelSize ) ) );
+				
+				return virtualReel;
+			}
+			
+			// Sets the visible icons on the reel
+			public function setVisibleReel( currentSlot:int ):void
+			{
+				_currentSlot = currentSlot;
+				
+				// Set reel positions
+				imgReel0.x = getImageOffset( getIcon( _currentSlot - 4 ) );
+				imgReel1.x = getImageOffset( getIcon( _currentSlot - 3 ) );
+				imgReel2.x = getImageOffset( getIcon( _currentSlot - 2 ) );
+				imgReel3.x = getImageOffset( getIcon( _currentSlot - 1 ) );
+				imgReel4.x = getImageOffset( getIcon( _currentSlot - 0 ) );
+				imgReel5.x = getImageOffset( getIcon( _currentSlot + 1 ) );
+			}
+			
+			// Sets the reel to stop on the next rotation, with the given slot index in the middle of the reel
+			public function setTargetPosition( targetSlot:int ):void
+			{
+				_targetSlot = targetSlot;
+			}				
+			
+			public function blink( repititions:int, blinkDuration:int, startDelay:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "blink", arguments );
+				
+				if( !_spinning )
+				{					
+					_targetSlot = -1;
+					_isStopping = false;
+					_desiredRotations = repititions;
+					_currentRotations = 0;
+					_rotationDuration = blinkDuration;
+					_doSubliminalWilds = false;
+					
+					// Define our animations
+					_blinkTimer = new Timer( _rotationDuration, 0 );
+					_blinkTimer.addEventListener( TimerEvent.TIMER, blinkTimer_Timer );
+					
+					setTimeout( function():void{						
+						_blinkTimer.start();
+						blinkTimer_Timer( new TimerEvent( TimerEvent.TIMER ) );						
+					}, startDelay );
+					
+					_spinning = true;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function blinkTimer_Timer( event:TimerEvent ):void
+			{
+				var choices:Array = [1,2,3,4,4,4,5,5,5,6,6,6,7];
+				var blinkChoice:int = choices[ MathHelper.randomNumber( 0, choices.length - 1 ) ];
+				
+				if( [1, 4, 6, 7].indexOf( blinkChoice ) >= 0 || _finalSpin )
+				{
+					scaleOut( grpReel3, MathHelper.randomNumber( _rotationDuration * .2, _rotationDuration ) );
+					_blinkingCount++;
+				}
+				
+				if( [2, 4, 5, 7].indexOf( blinkChoice ) >= 0 || _finalSpin )
+				{
+					scaleOut( grpReel4, MathHelper.randomNumber( _rotationDuration * .2, _rotationDuration ) );
+					_blinkingCount++;
+				}
+				
+				if( [3, 5, 6, 7].indexOf( blinkChoice ) >= 0 || _finalSpin )
+				{
+					scaleOut( grpReel5, MathHelper.randomNumber( _rotationDuration * .2, _rotationDuration ) );
+					_blinkingCount++;
+				}
+			}
+			
+			private function scaleOut( target:Group, duration:Number ):void
+			{
+				var delay:Number = MathHelper.randomNumber( 0, duration * 0.25 );
+				var scale:Scale = AnimationManager.getScaleAnimation( target, 1, 1, 0, 0, duration * 0.5 - delay, delay, 1, 0, blinkEaser );
+				scale.addEventListener( EffectEvent.EFFECT_UPDATE, scale_Update );
+				scale.addEventListener( EffectEvent.EFFECT_END, scaleOut_Ended );
+				scale.play();
+			}
+			
+			private function scaleOut_Ended( event:EffectEvent ):void
+			{
+				var scale:Scale = event.target as Scale;
+				scale.removeEventListener( EffectEvent.EFFECT_UPDATE, scale_Update );
+				scale.removeEventListener( EffectEvent.EFFECT_END, scaleIn );				
+				scaleIn( scale.target as Group, scale.duration );				
+				scale = null;
+			}
+			
+			private function scaleIn( target:Group, duration:Number ):void
+			{
+				var offset:int = [grpReel3, grpReel4, grpReel5].indexOf( target ) - 1;
+				BitmapImage( target.getElementAt( 0 ) ).x = getImageOffset( getIcon( _currentSlot - 3 + offset ) );
+				
+				var delay:Number = MathHelper.randomNumber( 0, duration * 0.25 );
+				var scale:Scale = AnimationManager.getScaleAnimation( target, 0, 0, 1, 1, duration * 0.5 - delay, delay, 1, 0, blinkEaser );
+				scale.addEventListener( EffectEvent.EFFECT_UPDATE, scale_Update );
+				scale.addEventListener( EffectEvent.EFFECT_END, scaleIn_Ended );
+				scale.play();
+			}
+			
+			private function scaleIn_Ended( event:EffectEvent ):void
+			{
+				var scale:Scale = event.target as Scale;
+				scale.removeEventListener( EffectEvent.EFFECT_UPDATE, scale_Update );
+				scale.removeEventListener( EffectEvent.EFFECT_END, scaleIn );							
+				scale = null;
+				
+				_blinkingCount--;
+				if( _blinkingCount == 0 )
+				{
+					blinkComplete();
+				}
+			}
+			
+			private function scale_Update( event:EffectEvent ):void
+			{
+				var scale:Scale = event.target as Scale;
+				var grp:Group = scale.target as Group;
+				
+				grp.x = 61 * 0.5 * ( 1 - grp.scaleX );
+				grp.y = ctrSlot.getElementIndex( grp ) * 63 + ( 63 * 0.5 * ( 1 - grp.scaleY ) );
+			}
+			
+			private function blinkComplete():void
+			{
+				_currentRotations++;
+				_currentSlot = MathHelper.mod( _currentSlot - 3, _reelSize );
+				
+				// If we're not on our final spin
+				if( !_finalSpin )
+				{
+					if( _currentRotations >= _desiredRotations && !_finalSpin )
+					{
+						if( _targetSlot >= 0 && _isStopping == true )
+						{
+							_finalSpin = true;
+							_currentSlot = _targetSlot + 3;
+						}
+					}
+				}	
+				else
+				{
+					_blinkTimer.stop();
+					_blinkTimer.removeEventListener( TimerEvent.TIMER, blinkTimer_Timer );
+					_blinkTimer = null;
+					_isStopping = false;
+					_currentSlot = _targetSlot;
+					_finalSpin = false;
+					_spinning = false;
+					
+					// Dispatch our play audio and stop events
+					_onPlayAudio( this );
+					_onSpinStopped( this, true );
+				}
+			}
+			
+			// Sets a reel up to be nudge
+			public function preNudge( secondaryTargetSlot:int, direction:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "preNudge", arguments );
+				
+				_currentRotations = 0;
+				_spinning = true;
+				_finalSpin = false;
+				
+				imgReel0.x = getImageOffset( getIcon( secondaryTargetSlot - 1 ) );
+				imgReel1.x = getImageOffset( getIcon( secondaryTargetSlot ) );
+				imgReel2.x = getImageOffset( getIcon( secondaryTargetSlot + 1 ) );
+				
+				grpReel0.y = grpReel3.y;
+				grpReel1.y = grpReel4.y;
+				grpReel2.y = grpReel5.y;
+				
+				if( direction.toUpperCase() == "LEFT" )
+				{
+					_nudgeSlots = [ secondaryTargetSlot, _targetSlot ];
+					grpReel0.x = grpReel3.x - grpReel3.width;	
+					grpReel1.x = grpReel4.x - grpReel4.width;
+					grpReel2.x = grpReel5.x - grpReel5.width;
+					aSlide = AnimationManager.getMoveAnimation( null, grpReel0.x, grpReel0.y, grpReel0.x + ( grpReel0.width * 0.5 ), grpReel0.y, 500, 0, 1, 0, bounceEaser );
+					aSlide.addEventListener( EffectEvent.EFFECT_UPDATE, aSlide_effectUpdateHandler );
+					aSlide.addEventListener( EffectEvent.EFFECT_END, aSlide_effectEndHandler );
+				}
+				else
+				{
+					_nudgeSlots = [ _targetSlot, secondaryTargetSlot ];
+					grpReel0.x = grpReel3.x + grpReel3.width;	
+					grpReel1.x = grpReel4.x + grpReel4.width;
+					grpReel2.x = grpReel5.x + grpReel5.width;
+					aSlide = AnimationManager.getMoveAnimation( null, grpReel0.x, grpReel0.y, grpReel0.x - ( grpReel0.width * 0.5 ), grpReel0.y, 500, 0, 1, 0, bounceEaser );
+					aSlide.addEventListener( EffectEvent.EFFECT_UPDATE, aSlide_effectUpdateHandler );
+					aSlide.addEventListener( EffectEvent.EFFECT_END, aSlide_effectEndHandler );
+				}
+				
+				aSlide.play( [ grpReel0, grpReel1, grpReel2 ] );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			public function nudge( direction:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "nudge", arguments );
+				
+				if( direction.toUpperCase() == "RIGHT" || ( direction == "LOSING" && _targetSlot == _nudgeSlots[1] ) )
+				{
+					_currentSlot = _nudgeSlots[ 1 ];
+					aSlide = AnimationManager.getMoveAnimation( null, grpReel0.x, grpReel0.y, grpReel0.x - ( grpReel0.width * 0.5 ), grpReel0.y, 500, 0, 1, 0, bounceEaser );
+					aSlide.addEventListener( EffectEvent.EFFECT_UPDATE, aSlide_effectUpdateHandler );
+					aSlide.addEventListener( EffectEvent.EFFECT_END, aSlide_effectEndHandler );					
+				}
+				else
+				{
+					_currentSlot = _nudgeSlots[ 0 ];
+					aSlide = AnimationManager.getMoveAnimation( null, grpReel0.x, grpReel0.y, grpReel0.x + ( grpReel0.width * 0.5 ), grpReel0.y, 500, 0, 1, 0, bounceEaser );
+					aSlide.addEventListener( EffectEvent.EFFECT_UPDATE, aSlide_effectUpdateHandler );
+					aSlide.addEventListener( EffectEvent.EFFECT_END, aSlide_effectEndHandler );					
+				}
+				
+				aSlide.play( [ grpReel0, grpReel1, grpReel2 ] );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function aSlide_effectUpdateHandler( event:EffectEvent ):void
+			{
+				var move:Move = event.target as Move;
+				grpReel0.y = grpReel3.y;
+				grpReel1.y = grpReel4.y;
+				grpReel2.y = grpReel5.y;
+				
+				grpReel3.x = grpReel0.x + ( grpReel0.width * ( grpReel3.x > grpReel0.x ? 1 : - 1 ) );
+				grpReel4.x = grpReel1.x + ( grpReel0.width * ( grpReel4.x > grpReel1.x ? 1 : - 1 ) );
+				grpReel5.x = grpReel2.x + ( grpReel0.width * ( grpReel5.x > grpReel2.x ? 1 : - 1 ) );
+			}
+			
+			private function aSlide_effectEndHandler( event:EffectEvent ):void
+			{
+				_currentRotations++;
+				
+				grpReel0.y = grpReel3.y;
+				grpReel1.y = grpReel4.y;
+				grpReel2.y = grpReel5.y;
+				
+				grpReel3.x = grpReel0.x + grpReel0.width * ( aSlide.xFrom < aSlide.xTo ? 1 : - 1 );
+				grpReel4.x = grpReel1.x + grpReel1.width * ( aSlide.xFrom < aSlide.xTo ? 1 : - 1 );
+				grpReel5.x = grpReel2.x + grpReel2.width * ( aSlide.xFrom < aSlide.xTo ? 1 : - 1 );				
+				
+				if( _currentRotations == 3 )
+				{
+					_currentRotations = 0;
+					aSlide.removeEventListener( EffectEvent.EFFECT_UPDATE, aSlide_effectUpdateHandler );
+					aSlide.removeEventListener( EffectEvent.EFFECT_END, aSlide_effectEndHandler );	
+					aSlide = null;
+					
+					if( !_finalSpin )
+					{
+						_finalSpin = true;					
+						_onNudgeReady( this );
+					}
+					else
+					{
+						_isStopping = false;
+						_finalSpin = false;
+						_spinning = false;
+						
+						// Reset our images
+						resetImageLocationsAndSources();
+						
+						// Dispatch our play audio and stop events
+						_onPlayAudio( this );
+						_onSpinStopped( this, true );						
+					}
+				}
+			}
+			
+			// Initiates the spin animation using the supplied properties
+			public function spin( rotations:int, rotationDuration:int, bounceDuration:int = 300, doSubliminalWilds:Boolean = false ):void
+			{				
+				// Log Activity
+				logger.pushContext( "spin", arguments );
+				
+				if( !_spinning ) 
+				{
+					// Reset the target slot and rotations
+					_targetSlot = -1;
+					_isStopping = false;
+					_desiredRotations = rotations;
+					_currentRotations = 0;
+					_rotationDuration = rotationDuration;
+					_bounceDuration = bounceDuration;
+					_doSubliminalWilds = doSubliminalWilds;
+					
+					// Swap in a wild icon if necessary
+					if( _doSubliminalWilds )
+					{
+						imgReel2.source = SkinManager.getSkinAsset( styleManager, "ReelIcon_A" );
+					}
+					
+					// Define our animation and play it
+					var duration:int = _rotationDuration;
+					var repeatCount:int = 0;
+					var vFrom:int = -189;
+					var vTo:int = 0;
+					aSpin = AnimationManager.getAnimatedItem( ctrSlot, "y", duration, repeatCount, vFrom, vTo, linearEaser );
+					aSpin.addEventListener( EffectEvent.EFFECT_START, spin_effectStartHandler );
+					aSpin.addEventListener( EffectEvent.EFFECT_REPEAT, spin_effectRepeatHandler );
+					aSpin.addEventListener( EffectEvent.EFFECT_END, spin_effectEndHandler );
+					aSpin.play()
+					
+					_spinning = true;
+				}
+				else if( !_isStopping )
+				{
+					aSpin.pause()					
+					_desiredRotations = 1;
+					aSpin.duration = duration;
+					aSpin.resume();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'effect start' event of the animation
+			protected function spin_effectStartHandler( event:EffectEvent ):void
+			{
+
+			}		
+			
+			// Handles the 'effect repeat' event of the animation
+			protected function spin_effectRepeatHandler( event:EffectEvent ):void
+			{
+				_currentRotations++;
+				_currentSlot = MathHelper.mod( _currentSlot - 3, _reelSize );
+				
+				// If we're not on our final spin
+				if( !_finalSpin )
+				{
+					if( _currentRotations >= _desiredRotations && !_finalSpin )
+					{
+						if( _targetSlot >= 0 && _isStopping == true )
+						{
+							aSpin.end();
+							return;
+						}
+					}
+				}
+				
+				// Swap in the next images in the reel
+				if( _doSubliminalWilds && !_finalSpin && _currentRotations == 1 )
+				{
+					imgReel0.x = getImageOffset( getIcon( _currentSlot - 4 ) );
+					imgReel1.x = getImageOffset( getIcon( _currentSlot - 3 ) );
+					imgReel2.x = getImageOffset( getIcon( _currentSlot - 2 ) );
+					imgReel3.x = getImageOffset( getIcon( _currentSlot - 1 ) );
+					imgReel4.x = getImageOffset( getIcon( _currentSlot - 0 ) );
+					imgReel5.x = getImageOffset( "ReelIcon_A" );					
+				}
+				else
+				{
+					imgReel0.x = getImageOffset( getIcon( _currentSlot - 4 ) );
+					imgReel1.x = getImageOffset( getIcon( _currentSlot - 3 ) );
+					imgReel2.x = getImageOffset( getIcon( _currentSlot - 2 ) );
+					imgReel3.x = getImageOffset( getIcon( _currentSlot - 1 ) );
+					imgReel4.x = getImageOffset( getIcon( _currentSlot - 0 ) );
+					imgReel5.x = getImageOffset( getIcon( _currentSlot + 1 ) );
+				}				
+			}			
+			
+			// Handles the 'effect end' event of the aSpin animation
+			protected function spin_effectEndHandler( event:EffectEvent ):void
+			{
+				if( !_finalSpin )
+				{
+					// We're on our final spin, so swap in the target images
+					imgReel0.x = getImageOffset( getIcon( _targetSlot - 1 ) );
+					imgReel1.x = getImageOffset( getIcon( _targetSlot - 0 ) );
+					imgReel2.x = getImageOffset( getIcon( _targetSlot + 1 ) );
+					imgReel3.x = getImageOffset( getIcon( _currentSlot - 1 ) );
+					imgReel4.x = getImageOffset( getIcon( _currentSlot - 0 ) );
+					imgReel5.x = getImageOffset( getIcon( _currentSlot + 1 ) );		
+					
+					// Since we stopped on a repeat command, we may not be exactly at y - 0.
+					// so we offset our start point to try and avoid the "jump" you see
+					var simpleMotionPath:SimpleMotionPath = aSpin.motionPaths[0] as SimpleMotionPath;
+					simpleMotionPath.valueFrom = -189;					
+					
+					aSpin.repeatCount = 1;																
+					aSpin.play();
+					
+					_finalSpin = true;					
+				}
+				else
+				{
+					_isStopping = false;
+					_currentSlot = _targetSlot;
+					
+					// We're finished our final spin, so reset the images
+					resetImageLocationsAndSources();
+					
+					// Remove the event listeners from our primary animations
+					aSpin.removeEventListener( EffectEvent.EFFECT_START, spin_effectStartHandler );
+					aSpin.removeEventListener( EffectEvent.EFFECT_REPEAT, spin_effectRepeatHandler );
+					aSpin.removeEventListener( EffectEvent.EFFECT_END, spin_effectEndHandler );	
+					
+					// Dispatch our play audio and stop events
+					_onPlayAudio( this );
+					_onSpinStopped( this, false );					
+					
+					// Setup and play our secondary animation
+					aMove = AnimationManager.getAnimatedItem( ctrSlot, "y", _bounceDuration, 1, ctrSlot.y + 10, ctrSlot.y, bounceEaser );	
+					aMove.addEventListener( EffectEvent.EFFECT_END, move_effectEndHandler );
+					aMove.play();				
+				}
+			}
+			
+			// Handles the 'effect end' event of the aMove animation
+			protected function move_effectEndHandler( event:EffectEvent ):void
+			{
+				// Remove the event listeners from our secondary animation
+				aMove.removeEventListener( EffectEvent.EFFECT_END, move_effectEndHandler );
+				
+				// Reset our spinning variables and dispatch the stop event
+				_finalSpin = false;
+				_spinning = false;		
+				_onSpinStopped( this, true );	
+			}	
+			
+			
+			// Stops the reel from spinning
+			public function stop( additionalRotations:int = 0 ):void
+			{
+				// Log Activity
+				logger.pushContext( "stop", arguments );
+				
+				if( _spinning && !_isStopping && !_finalSpin )
+				{
+					_desiredRotations = _currentRotations + additionalRotations;
+					_isStopping  = true;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			// Fixes the image locations and sources after a spin
+			private function resetImageLocationsAndSources():void
+			{
+				// Log Activity
+				logger.pushContext( "resetImageLocationsAndSources", arguments );
+				
+				// Set the image positions in case we called blink before
+				grpReel0.x = 0;
+				grpReel0.y = 0;
+				grpReel1.x = 0;
+				grpReel1.y = 63;
+				grpReel2.x = 0;
+				grpReel2.y = 126;
+				grpReel3.x = 0;
+				grpReel3.y = 189;
+				grpReel4.x = 0;
+				grpReel4.y = 252;
+				grpReel5.x = 0;
+				grpReel5.y = 315;	
+				
+				ctrSlot.y = -189;
+				imgReel0.x = getImageOffset( getIcon( _currentSlot - 4 ) );
+				imgReel1.x = getImageOffset( getIcon( _currentSlot - 3 ) );
+				imgReel2.x = getImageOffset( getIcon( _currentSlot - 2 ) );
+				imgReel3.x = getImageOffset( getIcon( _currentSlot - 1 ) );
+				imgReel4.x = getImageOffset( getIcon( _currentSlot ) );
+				imgReel5.x = getImageOffset( getIcon( _currentSlot + 1 ) );	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				
+				// TODO:Cleanup animations
+				
+				// Clear Context
+				logger.popContext();
+			}
+			
+			override public function toString():String
+			{
+				return this.id.split( "." ).pop();
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Group id="ctrSlot" x="0" y="-189" width="61" height="378" clipAndEnableScrolling="true">
+		<s:Group id="grpReel0" x="0" y="0" width="61" height="57" clipAndEnableScrolling="true">
+			<s:BitmapImage id="imgReel0" x="0" y="0" width="61" height="57" />
+		</s:Group>
+		
+		<s:Group id="grpReel1" x="0" y="63" width="61" height="57" clipAndEnableScrolling="true">
+			<s:BitmapImage id="imgReel1" x="0" y="0" width="61" height="57" />
+		</s:Group>
+		
+		<s:Group id="grpReel2" x="0" y="126" width="61" height="57" clipAndEnableScrolling="true">
+			<s:BitmapImage id="imgReel2" x="0" y="0" width="61" height="57" />
+		</s:Group>
+		
+		<s:Group id="grpReel3" x="0" y="189" width="61" height="57" clipAndEnableScrolling="true">
+			<s:BitmapImage id="imgReel3" x="0" y="0" width="61" height="57" />
+		</s:Group>
+		
+		<s:Group id="grpReel4" x="0" y="252" width="61" height="57" clipAndEnableScrolling="true">
+			<s:BitmapImage id="imgReel4" x="0" y="0" width="61" height="57" />
+		</s:Group>
+		
+		<s:Group id="grpReel5" x="0" y="315" width="61" height="57" clipAndEnableScrolling="true">
+			<s:BitmapImage id="imgReel5" x="0" y="0" width="61" height="57" />
+		</s:Group>
+	</s:Group>	
+	
+</s:Group>

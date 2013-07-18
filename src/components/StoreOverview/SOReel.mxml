@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 clipAndEnableScrolling="true">
+
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser"/>
+		<s:Linear id="linearEaser" easeInFraction="0" easeOutFraction="0"/>
+	</fx:Declarations>
+
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+
+			import mx.effects.Sequence;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+
+			import spark.effects.Animate;
+			import spark.effects.animation.SimpleMotionPath;
+			import spark.effects.easing.IEaser;
+
+			import utils.MathHelper;
+
+			private var _onSpinStopped:Function;
+			private var _reelSize:int = 0;
+			private var _slotHeight:int = 0;
+			private var _slotWidth:int = 0;
+			private var _slotValues:Array = new Array();
+			private var _targetSlot:int = -1;
+			private var _spinning:Boolean = false;
+			private var _reelImage:Class;
+			private var _reelBlurredImage:Class;
+
+			private var aMove:Animate;
+			private var aSpin:Animate;
+
+			public function set onSpinStopped( value:Function ):void
+			{
+				_onSpinStopped = value;
+			}
+
+			public function get onSpinStopped():Function
+			{
+				return _onSpinStopped;
+			}
+
+			public function set slotValues( newValues:Array ):void
+			{
+				_slotValues = newValues;
+				_reelSize = newValues.length;
+				_targetSlot = MathHelper.randomNumber( 0, _reelSize - 1 );
+				ctrSlot.y = getTargetSlotPosition( _targetSlot );
+			}
+
+			public function set slotHeight( newHeight:int ):void
+			{
+				_slotHeight = newHeight;
+			}
+
+			public function get slotHeight():int
+			{
+				return _slotHeight;
+			}
+
+			public function set slotWidth( newWidth:int ):void
+			{
+				_slotWidth = newWidth;
+			}
+
+			public function get slotWidth():int
+			{
+				return _slotWidth;
+			}
+
+			public function get slotValues():Array
+			{
+				return _slotValues;
+			}
+
+			public function get targetSlot():int
+			{
+				return _targetSlot;
+			}
+
+			public function set reelImage( newImage:Class ):void
+			{
+				_reelImage = newImage;
+				imgReel.source = newImage;
+			}
+
+			public function get reelImage():Class
+			{
+				return _reelImage;
+			}
+
+			public function set reelBlurredImage( newImage:Class ):void
+			{
+				_reelBlurredImage = newImage;
+			}
+
+			public function get reelBlurredImage():Class
+			{
+				return _reelBlurredImage;
+			}
+
+			public function get slotValue():String
+			{
+				return slotValues[_targetSlot];
+			}
+
+			// Initiates the spin animation using the supplied properties
+			public function spin( rotationDuration:int ):void
+			{
+				if( !_spinning )
+				{
+					// Reset the target slot position
+					_targetSlot = -1;
+
+					// Setup the initial move animation to start the spin
+					aMove = AnimationManager.getAnimatedItem( ctrSlot, "y", 175, 1, ctrSlot.y, ctrSlot.y + 80 );
+
+					// Setup the spin animation
+					var duration:int = rotationDuration;
+					var repeatCount:int = 0;
+					var vFrom:int = getTargetSlotPosition( _reelSize - 1 );
+					var vTo:int = getTargetSlotPosition( 0 ) + slotHeight;
+					aSpin = AnimationManager.getAnimatedItem( ctrSlot, "y", duration, repeatCount, vFrom, vTo, linearEaser );
+					aSpin.addEventListener( EffectEvent.EFFECT_START, spin_effectStartHandler );
+					aSpin.addEventListener( EffectEvent.EFFECT_STOP, spin_effectEndHandler );
+
+					// Set the two previous animations to play in a sequence and start them
+					var sequence:Sequence = new Sequence();
+					sequence.addChild( aMove );
+					sequence.addChild( aSpin );
+					sequence.play();
+
+					_spinning = true;
+				}
+			}
+
+			// Sets the target slot position
+			public function setTargetPosition( targetPosition:int, moveReel:Boolean = false ):void
+			{
+				_targetSlot = targetPosition;
+				if( moveReel && !_spinning )
+				{
+					ctrSlot.y = getTargetSlotPosition( _targetSlot );
+				}
+			}
+
+			// Returns the target slot position
+			public function getTargetPosition():int
+			{
+				return _targetSlot;
+			}
+
+			// Stops the reel from spinning
+			public function stop():void
+			{
+				if( _targetSlot == -1 )
+				{
+				 	throw new Error( "You must set the target slot before calling stop on reel!" );
+					return;
+				}
+
+				if( _spinning )
+				{
+					aSpin.stop();
+				}
+			}
+
+			// Handles the 'effect start' event of the animation
+			protected function spin_effectStartHandler( event:EffectEvent ):void
+			{
+				imgReel.source = reelBlurredImage;
+			}
+
+			// Handles the 'effect end' event of the animation
+			protected function spin_effectEndHandler( event:EffectEvent ):void
+			{
+				// Just to be sure, force the reel into the right position before remove the blur filter
+				ctrSlot.y = getTargetSlotPosition( _targetSlot );
+				imgReel.source = reelImage;
+
+				// Play the bounce animation
+				aMove = AnimationManager.getAnimatedItem( ctrSlot, "y", 300, 1, ctrSlot.y + 10, ctrSlot.y, bounceEaser );
+				aMove.play();
+
+				// Remove the event listeners
+				aSpin.removeEventListener( EffectEvent.EFFECT_START, spin_effectStartHandler );
+				aSpin.removeEventListener( EffectEvent.EFFECT_STOP, spin_effectEndHandler );
+
+				// Reset spin variables and dispatch our stopped event
+				_spinning = false;
+				_onSpinStopped( this );
+			}
+
+			// Returns the Y position of a given slot on the reel
+			private function getTargetSlotPosition( targetSlot:int ):int
+			{
+				var offset:int = this.height - slotHeight / 2;
+
+				return offset + ( ( targetSlot + 2 ) * ( -slotHeight ) );
+			}
+		]]>
+	</fx:Script>
+
+	<s:BorderContainer id="ctrSlot" x="0" y="0">
+		<mx:Image id="imgReel" x="0" y="0" />
+	</s:BorderContainer >
+
+</s:Group>

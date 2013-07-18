@@ -1,0 +1,2451 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:cx="components.*"
+			   backgroundColor="#000000"
+			   width="1024"
+			   height="768"
+			   implements="interfaces.ILoginHandler"
+			   applicationComplete="initApp(event)" xmlns:StoreOverview="components.StoreOverview.*">
+
+	<s:layout>
+		<s:BasicLayout />
+	</s:layout>
+
+	<fx:Declarations>
+		<s:GlowFilter id="glowFilter" color="0xFFFFFF" strength="1" alpha="1" blurX="16" blurY="16" />
+	</fx:Declarations>
+
+	<fx:Style source="styles/MainStyles.css"/>
+
+	<fx:Style>
+		.progressiveTitle {
+			color: #FFFFFF;
+			font-size: 72px;
+			font-weight: bold;
+			font-family: "Soopafresh";
+		}
+
+		.progressiveText {
+			color: #FFFFFF;
+			font-size: 32px;
+			font-weight: bold;
+			font-family: "Arial";
+		}
+
+		.progressiveWinner {
+			color: #FFFFFF;
+			font-size: 72px;
+			font-weight: bold;
+			font-family: "Soopafresh";
+		}
+
+		.progressiveWin {
+			color: #FFFFFF;
+			font-size: 72px;
+			font-weight: bold;
+			font-family: "Soopafresh";
+		}
+
+		.communityTitle {
+			color: #FFFFFF;
+			font-size: 72px;
+			font-weight: bold;
+			font-family: "Soopafresh";
+		}
+
+		.communityText_Small {
+			color: #FFFFFF;
+			font-size: 36px;
+			font-weight: bold;
+			font-family: "Soopafresh";
+		}
+
+		.communityText {
+			color: #FFFFFF;
+			font-size: 72px;
+			font-weight: bold;
+			font-family: "Soopafresh";
+		}
+	</fx:Style>
+
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+
+			import objects.ErrorMessage;
+
+			import assets.Config;
+			import assets.Fonts;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+
+			import components.AnimatedImage;
+			import components.Login;
+			import components.SoundPitchShift;
+			import components.SpriteUIComponent;
+			import components.StoreOverview.SOCommunityReels;
+			import components.StoreOverview.SOCountdownTimer;
+			import components.StoreOverview.SOFirework;
+			import components.StoreOverview.SOPopUp;
+			import components.StoreOverview.SOPowerMeter;
+			import components.StoreOverview.SOProgressiveJackpot;
+
+			import flash.utils.clearInterval;
+
+			import interfaces.ILoginHandler;
+
+			import mx.charts.AreaChart;
+			import mx.core.FlexGlobals;
+			import mx.core.UIComponent;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+
+			import objects.FLVByteArray;
+			import objects.ProgressiveBalanceResponse;
+
+			import services.SweepsAPI;
+
+			import spark.components.Image;
+			import spark.effects.Animate;
+			import spark.effects.Fade;
+			import spark.effects.Move;
+			import spark.effects.animation.RepeatBehavior;
+
+			import utils.DebugHelper;
+			import utils.FormatHelper;
+			import utils.MathHelper;
+
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( SweepsStoreOverview );
+
+			public static const DEBUG:Boolean = Config.Debug; 					// Flag for Release/Debug mode - (False: Release | True: Debug)
+			public static const DEBUG_W_API:Boolean = Config.Debug_w_api;		// Flag to enable API calls in Debug mode
+			public static const RELEASE_VERSION:String = Config.Build_Version; 	// Release version indicator
+
+			private static const SWEEPSTOPIA_LOGOUT_FUNCTION:String = "sweepstopiaLogout";
+			private static const ASSETS_LOCATION:String 			= "assets";
+			private static const POLL_INTERVAL:int 					= 15000; // 15 seconds
+			private static const COUNTDOWN_POLL_INTERVAL:int		= 10000; // 10 seconds
+			private static const SIREN_DURATION:int 				= 5000;  // 5 seconds
+			private static const SOCKET_ENABLED:Boolean 			= false;
+
+			private static var instance:SweepsStoreOverview;
+			private static var username:String = "";
+			private static var password:String = "";
+			private static var version:String = "";
+			private static var socketEnabled:String = "";
+			private static var directLogin:Boolean = false
+			private static var progressiveBalance:int = 0.0;
+			private static var isFullScreen:Boolean = false;
+
+			private static var progressiveJackpotTimeout:int = 0;
+			private static var isCommunityJackpotActive:Boolean = false;
+			private static var displayWinnerInProgress:Boolean = false;
+			private static var communityBalance:int = 0.0;
+			private static var communityBalanceTriggeredAt:int = 0.0;
+			private static var communityJackpotInProgress:Boolean = false;
+			private static var communityCountdownCompleted:Boolean = false;
+			private static var communityJackpotWinAmount:int = 0;
+			private static var communityJackpotWin:Boolean = false;
+			private static var communityJackpotTimeout:int = 0;
+			private static var communityCustomerCount:int = 0;
+			private static var communityCustomerWin:int = 0;
+			private static var communitySpinTimeout:int = 0;
+			private static var communitySpinStopTimeout:int = 0;
+			private static var communitySpinCount:int = 0;
+
+			private var ui:UIComponent;
+			private var connect_nc:NetConnection;
+			private var stream_ns:NetStream;
+			private var video:Video;
+
+			private var border_nc:NetConnection;
+			private var border_ns:NetStream;
+			private var border_vd:Video;
+			private var borderInterval:uint;
+			private var borderRepeatCount:int = 0;
+			private var borderAnimation:Class;
+			private var borderAnimationBytes:FLVByteArray;
+
+			private var animationClass:Class;
+			private var animationByteArray:ByteArray;
+
+			private var scLogin:Login;
+			private var scProgressive:SOProgressiveJackpot;
+			private var scCommunity:SOProgressiveJackpot;
+			private var scPopUp:SOPopUp;
+			private var	pollTimer:Timer;
+			private var scale:Number = 1.0;
+			private var balanceInProgress:Boolean = false;
+			private var checkWinInProgress:Boolean = false;
+
+			// Background Animation Support
+			private var hex:MovieClip;
+			private var bgLoader:Loader;
+			private var bgAnimation:MovieClip;
+			private var bgUIComponent:UIComponent;
+
+			// Firework Animation Support
+			private var grpHighWinner:Group;
+			private var grpFireworks:Group;
+			private var grpMask:Group;
+			private var xLen:int = 0;
+			private var yLen:int = 0;
+			private var xFrom:Number = 0;
+			private var yFrom:Number = 0;
+			private var xTo:Number = 0;
+			private var yTo:Number = 0;
+			private var fireworks:Object = {};
+
+			// Coin Animation
+			private var coins:Array = [];
+			private var coinAnimations:Array = [];
+			private var coinDrop:SoundChannel;
+
+			// Siren Animation
+			private var sirens:Array = [];
+			private var sirenAnimations:Array = [];
+			private var sirenSound:SoundChannel;
+			private var aiSirenLeft:AnimatedImage;
+			private var uiSirenLeft:SpriteUIComponent;
+			private var aiSirenRight:AnimatedImage;
+			private var uiSirenRight:SpriteUIComponent;
+
+			// Community Jackpot Countdown
+			private var countdownInfo:Label;
+			private var countdownBGSound:String;
+			private var soundChannelCountdownBackground:SoundPitchShift;
+			private var scTimer:SOCountdownTimer;
+			private var scPowerMeter:SOPowerMeter;
+			private var increasePercentage:Number = 0;
+			private var goal:int = 0;
+			private var increase:int = 0;
+			private var increasePercent:Number = 0;
+			private var pitchShift:Number = 0;
+
+			// Community Jackpot Reels
+			private var scCommunityReels:SOCommunityReels;
+
+			private var glowSequence:Animate;
+			private var sweepsLoadTime:Number = flash.utils.getTimer();
+
+			public static function getInstance():SweepsStoreOverview
+			{
+				return instance;
+			}
+
+			// Initializes the application
+			private function initApp( event:Event ):void
+			{
+				// Log Activity
+				DebugHelper.isDebug = SweepsStoreOverview.DEBUG && !SweepsStoreOverview.DEBUG_W_API;
+				logger.pushContext( "initApp", arguments );
+
+				// Initialize the API
+				SweepsAPI.debug = SweepsStoreOverview.DEBUG;
+				SweepsAPI.debug_w_api = SweepsStoreOverview.DEBUG_W_API;
+				SweepsAPI.release_version = SweepsStoreOverview.RELEASE_VERSION;
+
+				// Initialize the global listeners
+				createListeners();
+
+				// Save our instance
+				instance = this;
+
+				// Register our fonts
+				Font.registerFont( assets.Fonts.Soopafresh );
+				Font.registerFont( assets.Fonts.digital7 );
+
+				// Initalize the 'Login' control
+				createLogin();
+
+				// Check the initialization variables
+				checkFlashVars();
+
+				// Establish socket
+				/* Commented out as part of the Socket Functionality Rollback
+				if( SocketEnabled && ( !DEBUG || DEBUG_W_API ) )
+				{
+					SweepsAPI.establishSocketConnection();
+				}
+				*/
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates the global listeners
+			protected function createListeners():void
+			{
+				// Log Activity
+				logger.pushContext( "createListeners", arguments );
+
+				// Add the fullscreen event handler
+				stage.addEventListener( FullScreenEvent.FULL_SCREEN, fullScreenScale );
+
+				// Add the resize event handler
+				stage.addEventListener( Event.RESIZE, resizeDisplay );
+
+				// Create the global error handler
+				loaderInfo.uncaughtErrorEvents.addEventListener( UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtError );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the global listeners
+			protected function removeListeners():void
+			{
+				// Log Activity
+				logger.pushContext( "removeListeners", arguments );
+
+				// Remove the full screen event handler
+				stage.removeEventListener( FullScreenEvent.FULL_SCREEN, fullScreenScale );
+
+				// Remove the resize event handler
+				stage.removeEventListener( Event.RESIZE, resizeDisplay );
+
+				// Remove the global error handler
+				loaderInfo.uncaughtErrorEvents.removeEventListener( UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtError );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Checks the flash initialization variables
+			protected function checkFlashVars():void
+			{
+				// Log Activity
+				logger.pushContext( "checkFlashVars", arguments );
+
+				// Retrieve & store the initalization variables
+				var flashVars:Object = getFlashVars();
+				if( flashVars.username != null && flashVars.username != "" ) { username = flashVars.username; }
+				if( flashVars.password != null && flashVars.password != "" ) { password = flashVars.password; }
+				if( flashVars.version != null && flashVars.version != "" ){ version = flashVars.version; }
+				/* Commented out as part of the Socket Functionality Rollback
+				if( flashVars.socketEnabled != null && flashVars.socketEnabled != "" ) { socketEnabled = flashVars.socketEnabled; }
+				*/
+
+				// Check if the username & password were passed in
+				if( username != "" && password != "" )
+				{
+					logger.debug( username, password, version );
+
+					directLogin = true;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Retrieves the flash variables
+			private function getFlashVars():Object
+			{
+				// Log Activity
+				logger.pushContext( "getFlashVars", arguments );
+
+				var flash_Vars:Object = new Object();
+				try
+				{
+					flash_Vars = FlexGlobals.topLevelApplication.parameters;
+				}
+				catch( e:Error )
+				{
+					logger.error( "Error getting FlashVars: " + e.toString() );
+				}
+
+				// Clear Context
+				logger.popContext();
+
+				return flash_Vars;
+			}
+
+			public static function get SocketEnabled():Boolean
+			{
+				/* Commented out as part of the Socket Functionality Rollback
+				var isSocketEnabled:Boolean = SOCKET_ENABLED;
+				if( socketEnabled != "" )
+				{
+					try
+					{
+						socketEnabled = socketEnabled.toLowerCase();
+						isSocketEnabled = (socketEnabled == "true" || socketEnabled == "1");
+					}
+					catch( e:Error )
+					{
+						logger.error( "Error parsing Socket value: " + e.toString() );
+					}
+				}
+
+				return isSocketEnabled;
+				*/
+				
+				return false;
+			}
+
+			// Retrieves the an instance of Sweeps Store Overview
+			public function getInstance():SweepsStoreOverview
+			{
+				return instance;
+			}
+
+			// Creates the "Login" control
+			protected function createLogin():void
+			{
+				// Log Activity
+				logger.pushContext( "createLogin", arguments );
+
+				scLogin = new Login();
+				scLogin.loginHandler = this;
+				scLogin.skipAuthentication = true;
+				scLogin.addEventListener( FlexEvent.CREATION_COMPLETE, loginCreationComplete );
+				grpMain.addElement( scLogin );
+				directLogin = false;
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the "Login" control
+			protected function removeLogin():void
+			{
+				// Log Activity
+				logger.pushContext( "removeLogin", arguments );
+
+				if( scLogin != null )
+				{
+					grpMain.removeElement( scLogin );
+					scLogin = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles complete event - (Login)
+			public function loginCreationComplete( event:FlexEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "loginCreationComplete", arguments );
+
+				if( scLogin != null )
+				{
+					scLogin.removeEventListener( FlexEvent.CREATION_COMPLETE, loginCreationComplete );
+
+					// Check if the username & password were passed in
+					if( directLogin && username != "" && password != "" )
+					{
+						scLogin.visible = false;
+						scLogin.set( username, password );
+						scLogin.autoLogin();
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles successful logins - (Login)
+			public function loginSuccess( user:String, pass:String ):void
+			{
+				logger.pushContext( "loginSuccess", arguments );
+
+				// Store the username & password
+				username = user;
+				password = pass;
+
+				// Remove the 'Login' control
+				removeLogin();
+
+				// Load the background
+				createBackground();
+
+				// Create the highwinner fireworks
+				createHighWinner();
+
+				// Refresh balance
+				refreshBalanceFromServer( SweepsAPI.SOPROGRESSIVE_ACTION_BALANCE );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			public function createHighWinner():void
+			{
+				grpHighWinner = new Group();
+				grpHighWinner.width = 1024 - 50;
+				grpHighWinner.height = 768 - 50;
+				grpHighWinner.x = grpHighWinner.y = 25;
+				addElementAt( grpHighWinner, 2 );
+
+				grpFireworks = new Group();
+				grpFireworks.width = grpHighWinner.width;
+				grpFireworks.height = grpHighWinner.height;
+				grpHighWinner.addElement( grpFireworks );
+
+				grpMask = new Group();
+				grpMask.width = grpFireworks.width;
+				grpMask.height = grpFireworks.height;
+				grpHighWinner.addElement( grpMask );
+				xLen = Math.ceil( grpHighWinner.width / 14 );
+				yLen = Math.ceil( grpHighWinner.height / 14 );
+
+				grpMask.graphics.beginFill( 0xFFFFFF );
+				for( var y:int = 0; y < yLen; y++ )
+				{
+					for( var x:int = 0; x < xLen; x++ )
+					{
+						grpMask.graphics.drawCircle( ( x * 14 ) + 7, ( y * 14 ) + 7, 5 );
+					}
+				}
+				grpMask.graphics.endFill();
+				grpFireworks.mask = grpMask;
+
+				createFireworks();
+			}
+
+			public function createFireworks():void
+			{
+				logger.pushContext( "createFireworks", arguments );
+
+				// Create 5 firework animations
+				for( var i:int = 0; i < 5; i++ )
+				{
+					grpFireworks.addElement( new SOFirework() );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			public function launchFireworks( count:int ):void
+			{
+				// Log activity
+				logger.pushContext( "launchFireworks", arguments );
+
+				for( var i:int = 0; i < count; i++ )
+				{
+					xFrom = MathHelper.randomNumber( 0, grpFireworks.width );
+					yFrom = MathHelper.randomNumber( 0, grpFireworks.height );
+					xTo = MathHelper.randomNumber( 0, grpFireworks.width );
+					yTo = MathHelper.randomNumber( 0, grpFireworks.height );
+
+					SOFirework( grpFireworks.getElementAt( i ) ).launch( xFrom, yFrom, xTo, yTo );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			public function createBackground():void
+			{
+				logger.pushContext( "createBackground", arguments );
+
+				// Load the intro animation
+				bgLoader = new Loader();
+				bgLoader.contentLoaderInfo.addEventListener( Event.COMPLETE, bgLoader_completeHandler );
+				bgLoader.loadBytes( new assets.Images.SOProgressiveBGAnimation() );
+
+				// Add the animation to the stage
+				bgUIComponent = new UIComponent();
+				bgUIComponent.addChild( DisplayObject( bgLoader ) );
+				grpBackground.addElement( bgUIComponent );
+
+				// Create the border animation
+				createBorderAnimation();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			protected function bgLoader_completeHandler( event:Event ):void
+			{
+				// Log Activity
+				logger.pushContext( "bgLoader_completeHandler", arguments );
+
+				// Cleanup the event listener, play our intro sound and show the intro
+				bgLoader.contentLoaderInfo.removeEventListener( Event.COMPLETE, bgLoader_completeHandler );
+
+				// Cast the loader.content in our movie clip and listen for the enter frame event
+				bgAnimation = bgLoader.content as MovieClip;
+
+				if ( bgAnimation != null && bgAnimation is MovieClip )
+				{
+					// Start the intro
+					stopBackground();
+				}else{
+					var errMsg:ErrorMessage = new ErrorMessage( "SweepsStoreOverview:Background Loader Complete handler fired, but intro Movie Clip is not available.", "", "", "" );
+					if( DEBUG && !DEBUG_W_API )
+					{
+						throw new Error( errMsg.toString() );
+					}
+					else
+					{
+						SweepsAPI.reportError( errMsg );
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			public function animateBackground():void
+			{
+				logger.pushContext( "animateBackground", arguments );
+
+				// Make sure to not throw an exceptions
+				if( !( bgAnimation != null && bgAnimation is MovieClip ) )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				// bgAnimation represents the main timeline - tell it to goto frame 2 and stop
+				bgAnimation.gotoAndStop( 2 );
+
+				// Open the doors
+				bgAnimation.mcDoors.addEventListener( Event.ENTER_FRAME, mcDoors_onEnterFrame);
+				bgAnimation.mcDoors.gotoAndPlay( 2 );
+				SoundManager.playSound( assets.Sounds.torchWeldingSpark, 500, 1 );
+
+				// Access all the "hex" movie clips on frame 2 and setup their randomization
+				for( var i:int = 1; i <= 18; i++ )
+				{
+					// All the "hex" move clips have instances names of "mcHex1" to "mcHex18" in the SWF
+					hex = bgAnimation["mcHex" + i.toString()];
+
+					// And an enter frame event to each of them
+					if( !hex.hasEventListener( Event.ENTER_FRAME ) )
+					{
+						hex.addEventListener( Event.ENTER_FRAME, hex_onEnterFrame );
+					}
+
+					// Restart the animation at the end, so it picks up the enterFrameEvent on Frame 1
+					hex.gotoAndPlay( hex.totalFrames );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// HAndles the enter frame event(s) for the bgAnimation.hex1/hex18 movieClip(s)
+			private function hex_onEnterFrame( event:Event ):void
+			{
+				var mc:MovieClip = event.target as MovieClip;
+				if( mc != null )
+				{
+					// On frames 1 and 40, randomly goto a spot in the next 40 frames and keep playing
+					if( mc.currentFrame == 1 || mc.currentFrame == 40 )
+					{
+						mc.gotoAndPlay( MathHelper.randomNumber( mc.currentFrame, mc.currentFrame + 40 ) );
+					}
+				}
+			}
+
+			// Handles the enter frame event for the bgAnimation.mcDoors movieClip
+			private function mcDoors_onEnterFrame( event:Event ):void
+			{
+				var mc:MovieClip = event.target as MovieClip;
+				if( mc != null )
+				{
+					if( mc.currentFrame == 73 )
+					{
+						SoundManager.playSound( assets.Sounds.vaultDoorsOpening, 150, 1 );
+					}
+
+					if( mc.currentFrame == 105 )
+					{
+						animateBackgroundCompleted();
+					}
+
+					if( mc.currentFrame >= 150 )
+					{
+						bgAnimation.mcDoors.removeEventListener( Event.ENTER_FRAME, mcDoors_onEnterFrame );
+						displayCommunityLoss( 2 );
+					}
+				}
+			}
+
+			public function stopBackground():void
+			{
+				logger.pushContext( "stopBackground", arguments );
+
+				// Make sure to not throw an exceptions
+				if( !( bgAnimation != null && bgAnimation is MovieClip ) )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				// Stop the background on frame 1
+				bgAnimation.gotoAndStop( 1 );
+
+				// Stop the doors
+				bgAnimation.mcDoors.gotoAndStop( 1 );
+
+				// Show the background
+				bgAnimation.visible = true;
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function createPollTimer( interval:Number = POLL_INTERVAL ):void
+			{
+				// Log Activity
+				logger.pushContext( "createPollTimer", arguments );
+
+				if( pollTimer == null )
+				{
+					pollTimer = new Timer( interval, Math.floor( ( 60 * 60 * 1000 ) / interval ) );
+					pollTimer.addEventListener( TimerEvent.TIMER, pollTimer_Timer );
+					pollTimer.addEventListener( TimerEvent.TIMER_COMPLETE, pollTimer_TimerComplete );
+					pollTimer.start();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function pollTimer_Timer( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "pollTimer_Timer", arguments );
+
+				refreshBalanceFromServer( SweepsAPI.SOPROGRESSIVE_ACTION_BALANCE );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function pollTimer_TimerComplete( event:TimerEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "pollTimer_TimerComplete", arguments );
+
+				var interval:int = pollTimer.delay;
+
+				stopPollTimer();
+				createPollTimer( interval );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function stopPollTimer():void
+			{
+				// Log Activity
+				logger.pushContext( "stopPollTimer", arguments );
+
+				if( pollTimer != null )
+				{
+					pollTimer.removeEventListener( TimerEvent.TIMER, pollTimer_Timer );
+					pollTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, pollTimer_TimerComplete );
+					pollTimer.stop();
+					pollTimer = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Plays/Stops the countdown audio
+			private function playCountdownAudio( play:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "playCountdownAudio", arguments );
+
+				if( !play ) // Stop
+				{
+					if( soundChannelCountdownBackground != null )
+					{
+						soundChannelCountdownBackground.removeEventListener( Event.SOUND_COMPLETE, soundComplete );
+						soundChannelCountdownBackground.stop();
+						soundChannelCountdownBackground = null;
+					}
+				}
+				else // Play
+				{
+					// Create the soundChannel if it doesn't exist
+					if( soundChannelCountdownBackground == null )
+					{
+						soundChannelCountdownBackground = SoundManager.playShiftPitchSound( Sounds[ countdownBGSound ], 0, 0 );
+						soundChannelCountdownBackground.addEventListener( Event.SOUND_COMPLETE, soundComplete );
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function soundComplete( event:Event ):void
+			{
+				// Log Activity
+				logger.pushContext( "soundComplete", arguments );
+
+				if( soundChannelCountdownBackground != null )
+				{
+					soundChannelCountdownBackground.playAgain();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates the power meter and countdown timer
+			public function createCountdown():void
+			{
+				logger.pushContext( "createCountdown", arguments );
+
+				// Hide the progressive jackpot
+				grpProgressive.visible = false;
+				grpProgressive.includeInLayout = false;
+
+				// Update the display of the main group
+				vlMain.horizontalAlign = "";
+				vlMain.verticalAlign = "";
+
+				// Hide the community jackpot
+				grpCommunity.visible = false;
+
+				// Show the countdown timer panel
+				scCountdown.visible = true;
+
+				// Create the countdown info label
+				countdownInfo = new Label();
+				countdownInfo.percentWidth = 100;
+				countdownInfo.alpha = 0;
+				countdownInfo.horizontalCenter = 0;
+				countdownInfo.verticalCenter = 0;
+				countdownInfo.setStyle( "textAlign", "center" );
+				countdownInfo.styleName = "communityText";
+				countdownInfo.text = "Keep playing to\ncharge the power meter.";
+				scCountdown.addElement( countdownInfo );
+
+				// Fade in the Countdown info screen
+				var f:Fade = AnimationManager.getFadeAnimation( countdownInfo, 0, 1, 3000, 0, 1 );
+				f.addEventListener( EffectEvent.EFFECT_END, removeCountdownInfoEnd );
+				f.play();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the fade effect end event of the countdown info timer
+			private function removeCountdownInfoEnd( event:EffectEvent ):void
+			{
+				logger.pushContext( "removeCountdownInfoEnd", arguments );
+
+				var f:Fade = event.target as Fade;
+				f.removeEventListener( EffectEvent.EFFECT_END, removeCountdownInfoEnd );
+				f = null;
+
+				// Remove any existing controls
+				if( scCountdown != null )
+				{
+					scCountdown.removeAllElements();
+				}
+
+				// Start the background animation
+				animateBackground();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			public function animateBackgroundCompleted():void
+			{
+				// Log Activity
+				logger.pushContext( "animationBackgroundCompleted", arguments );
+
+				// Show the community jackpot
+				grpCommunity.visible = true;
+
+				// Update the display of the community jackpot
+				scCommunity.scaleX = 0.30;
+				scCommunity.scaleY = 0.30;
+				scCommunity.horizontalCenter = 5;
+				scCommunity.verticalCenter = 5;
+
+				// Toggle the countdown completed flag
+				communityCountdownCompleted = false;
+
+				// Create the power meter
+				scPowerMeter = new SOPowerMeter();
+				scPowerMeter.x = ( 1024 / 2 ) - ( scPowerMeter.width / 2 );
+				scPowerMeter.y = ( 768 / 2 ) - ( scPowerMeter.height / 2 );
+				scCountdown.addElement( scPowerMeter );
+
+				// Create the timer
+				scTimer = new SOCountdownTimer();
+				scTimer.width = 300;
+				scTimer.height = 150;
+				scTimer.x = ( 1024 / 2 ) - ( scTimer.width / 2 );
+				scTimer.y = ( 768 / 2 ) - ( scTimer.height / 2 ) - 23;
+				scTimer.setCountdownSeconds = 60;
+				scTimer.setCountdownFormat = scTimer.MINUTES;
+				scTimer.setCountdownStart = scTimer.IMMEDIATELY;
+				scTimer.setCountdownAlmostCompletedCallback = countdownTimerAlmostCompleted;
+				scTimer.setCountdownCompletedCallback = countdownTimerCompleted;
+				scCountdown.addElement( scTimer );
+
+				// Redisplay the countdown label
+				countdownInfo.percentWidth = NaN;
+				countdownInfo.bottom = 10;
+				countdownInfo.right = 10;
+				countdownInfo.horizontalCenter = undefined;
+				countdownInfo.verticalCenter = undefined;
+				countdownInfo.styleName = "communityText_Small";
+				countdownInfo.filters = [glowFilter];
+				scCountdown.addElement( countdownInfo );
+
+				// Animate the countdown lable's glow
+				glowSequence = AnimationManager.getFadeAnimation( glowFilter, 1, 0, 500, 0, 0, 0 );
+				glowSequence.repeatBehavior = RepeatBehavior.REVERSE;
+				glowSequence.play();
+
+				// Play the countdown audio
+				countdownBGSound = "countdownBackground" + MathHelper.randomNumber( 1, 3 );
+				playCountdownAudio( true );
+
+				// Start the balance timer
+				createPollTimer( COUNTDOWN_POLL_INTERVAL );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Called when the community jackpot timer is almost complete
+			public function countdownTimerAlmostCompleted( seconds:Number ):void
+			{
+				logger.pushContext( "countdownTimerAlmostCompleted", arguments );
+
+				// Reduce the volume on the background audio
+				if( soundChannelCountdownBackground != null )
+				{
+					if( soundChannelCountdownBackground.Sound_Channel != null )
+					{
+						pitchShift = 0;
+						if( seconds > 5 )
+						{
+							pitchShift = 1.025;
+						}
+						else if( seconds > 0 )
+						{
+							pitchShift = 1.05;
+						}
+
+						var soundTransform:SoundTransform = new SoundTransform( 0.75 );
+						soundChannelCountdownBackground.pitchShiftFactor = pitchShift;
+						soundChannelCountdownBackground.Sound_Channel.soundTransform = soundTransform;
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Called when the community jackpot timer finishes counting down
+			public function countdownTimerCompleted():void
+			{
+				logger.pushContext( "countdownTimerCompleted", arguments );
+
+				// Display a notification message
+				countdownInfo.text = "Time's Up!"
+				countdownInfo.styleName = "communityText";
+
+				// Clear any existing polls
+				stopPollTimer();
+
+				// Toggle the countdown completed flag
+				communityCountdownCompleted = true;
+
+				// Stop the countdown audio
+				playCountdownAudio( false );
+
+				// Refresh the balance, checking for a community win
+				refreshBalanceFromServer( SweepsAPI.SOPROGRESSIVE_ACTION_CHECKWIN );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the power meter and countdown timer
+			public function removeCountdownTimer():void
+			{
+				logger.pushContext( "removeCountdownTimer", arguments );
+
+				if( scTimer != null )
+				{
+					// Fade out the countdown timer
+					var f:Fade = AnimationManager.getFadeAnimation( scTimer, 1, 0, 2000, 0, 1 );
+					f.addEventListener( EffectEvent.EFFECT_END, removeCountdownTimerEnd );
+					f.play();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the fade effect end event of the countdown timer
+			private function removeCountdownTimerEnd( event:EffectEvent ):void
+			{
+				logger.pushContext( "removeCountdownTimerEnd", arguments );
+
+				var f:Fade = event.target as Fade;
+				f.removeEventListener( EffectEvent.EFFECT_END, removeCountdownTimerEnd );
+				f = null;
+
+				// Remove the timer
+				if( scTimer != null )
+				{
+					scCountdown.removeElement( scTimer );
+					scTimer = null;
+				}
+
+				// Show the community jackpot reels
+				createCommunityReels();
+
+				// Hide the info text & stop the pulse
+				glowSequence.end();
+				glowSequence = null;
+				scCountdown.removeElement( countdownInfo );
+				countdownInfo.visible = false;
+				countdownInfo.filters = [];
+				countdownInfo = null;
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates the community jackpot reels
+			public function createCommunityReels():void
+			{
+				// Log Activity
+				logger.pushContext( "createCommunityReels", arguments );
+
+				// Create the reels
+				scCommunityReels = new SOCommunityReels();
+				scCommunityReels.alpha = 0;
+				scCommunityReels.horizontalCenter = -1;
+				scCommunityReels.verticalCenter = 0;
+				scCommunityReels.setSpinWin = false;
+				scCommunityReels.setSpinCompletedCallback = reelsSpinCompleted;
+				scCountdown.addElement( scCommunityReels );
+
+				// Fade in the community reels
+				var f:Fade = AnimationManager.getFadeAnimation( scCommunityReels, 0, 1, 2000, 0, 1 );
+				f.addEventListener( EffectEvent.EFFECT_END, showCommunityReelsEnd );
+				f.play();
+
+				// Spin the reels after they're faded in
+				communitySpinTimeout = setTimeout( spinCommunityReels, 2500 );
+
+				// Play the countdown audio
+				playCountdownAudio( true );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the fade effect end event of the community reels
+			private function showCommunityReelsEnd( event:EffectEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "showCommunityReelsEnd", arguments );
+
+				var f:Fade = event.target as Fade;
+				f.removeEventListener( EffectEvent.EFFECT_END, showCommunityReelsEnd );
+				f = null;
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles spinning the community reels
+			private function spinCommunityReels():void
+			{
+				// Log Activity
+				logger.pushContext( "spinCommunityReels", arguments );
+
+				scCommunityReels.setSpinWin = communityJackpotWin && MathHelper.randomNumber( 1, communitySpinCount * communitySpinCount ) == 1;
+				scCommunityReels.spin();
+
+				communitySpinCount--;
+				scPowerMeter.setPowerLevel( ( communitySpinCount * 4 ) / scPowerMeter.totalLEDCount );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Called when the community jackpot reel finishes spinning
+			public function reelsSpinCompleted( isWin:Boolean ):void
+			{
+				logger.pushContext( "reelsSpinCompleted", arguments );
+
+				// Clear the spin timer
+				clearTimeout( communitySpinTimeout );
+				communitySpinTimeout = uint.MIN_VALUE;
+
+				// Determine if we won or not and play the proper animation(s)
+				if( communityJackpotWin && isWin )
+				{
+					// Clear our spin count
+					communitySpinCount = 0;
+
+					// Increase the power meter to 100%
+					scPowerMeter.setPowerLevel( 1 );
+
+					// Show win indicator
+					communityJackpotTimeout = setTimeout( displayCommunityWin, 3000 );
+				}
+				else if( communitySpinCount > 0 )
+				{
+					// Spin the reels again
+					communitySpinTimeout = setTimeout( spinCommunityReels, 1000 );
+				}
+				else
+				{
+					// Show loss indicator
+					communityJackpotTimeout = setTimeout( displayCommunityLoss, 3000 );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the community jackpot reels
+			public function removeCommunityReels():void
+			{
+				logger.pushContext( "removeCommunityReels", arguments );
+
+				if( scCommunityReels != null )
+				{
+					scCountdown.removeElement( scCommunityReels );
+					scCommunityReels = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates and starts the community spin
+			public function startCommunitySpin():void
+			{
+				logger.pushContext( "startCommunitySpin", arguments );
+
+				// Remove the countdown timer
+				removeCountdownTimer();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Stops the community spin
+			public function stopCommunitySpin():void
+			{
+				logger.pushContext( "stopCommunitySpin", arguments );
+
+				// Clear the stop timer
+				clearTimeout( communitySpinStopTimeout );
+				communitySpinStopTimeout = uint.MIN_VALUE;
+
+				// Reset the background
+				stopBackground();
+
+				// Restart the border
+				restartBorderStream();
+
+				// Show the progressive
+				grpProgressive.visible = true;
+				grpProgressive.includeInLayout = true;
+
+				// Update the display of the community jackpot
+				scCommunity.scaleX = 1.0;
+				scCommunity.scaleY = 1.0;
+				scCommunity.horizontalCenter = 0;
+				scCommunity.verticalCenter = 0;
+				scCommunity.visible = true;
+
+				// Cleanup the power meter
+				if( scPowerMeter != null )
+				{
+					scPowerMeter.dispose();
+					scPowerMeter = null;
+				}
+
+				// Cleanup the countdown label
+				if( countdownInfo != null )
+				{
+					countdownInfo = null;
+				}
+
+				// Cleanup the countdown label glow
+				if( glowSequence != null )
+				{
+					glowSequence = null;
+				}
+
+				// Hide the countdown timer panel
+				scCountdown.visible = false;
+
+				// Hide the community result panel
+				scCommunityResult.visible = scCommunityResult.includeInLayout = false;
+				bmpCommunityWinBG.visible = bmpCommunityWinBG.includeInLayout = false;
+				grpCommunityWin.visible = grpCommunityWin.includeInLayout = false;
+				lblCommunityWin.visible = lblCommunityWin.includeInLayout = false;
+				lblCommunityLoss.visible = lblCommunityLoss.includeInLayout = false;
+
+				// Update the display of the main group
+				vlMain.horizontalAlign = "center";
+				vlMain.verticalAlign = "middle";
+
+				// Reset the community jackpot progress flag
+				communityCountdownCompleted = false;
+				communityJackpotInProgress = false;
+
+				// Start the balance refresh again
+				refreshBalanceFromServer( SweepsAPI.SOPROGRESSIVE_ACTION_BALANCE );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Displays a losing community jackpot screen
+			public function displayCommunityLoss( phase:int = 1 ):void
+			{
+				logger.pushContext( "displayCommunityLoss", arguments );
+
+				// Clear the timer value
+				clearTimeout( communityJackpotTimeout );
+				communityJackpotTimeout = uint.MIN_VALUE;
+
+				// For phase one, hide the countdown, reels, powerMeter and close the vault doors on the background
+				if( phase == 1 )
+				{
+					// Hide the community jackpot panel
+					scCommunity.visible = false;
+
+					// Hide the countdown timer panel
+					scCountdown.visible = false;
+
+					// Remove the reels
+					removeCommunityReels();
+
+					// Stop the countdown audio
+					playCountdownAudio( false );
+
+					// Remove any remaining controls
+					scCountdown.removeElement( scPowerMeter );
+					scCountdown.removeAllElements();
+					scPowerMeter.dispose();
+					scPowerMeter = null;
+
+					// Close the doors in the background
+					bgAnimation.mcDoors.gotoAndPlay( 118 );
+					SoundManager.playSound( assets.Sounds.vaultDoorsClosing, 0, 1 );
+				}
+				// For phase two, show the loss screen and set a timeout to go back to the main screen
+				else if( phase == 2 )
+				{
+					scCommunityResult.visible = scCommunityResult.includeInLayout = true;
+					lblCommunityLoss.includeInLayout = true;
+					lblCommunityLoss.alpha = 0;
+
+					var f:Fade = AnimationManager.getFadeAnimation( lblCommunityLoss, 0, 1, 2000, 0, 1 );
+					f.addEventListener( EffectEvent.EFFECT_END, showCommunityResultEnd );
+					f.play();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the fade effect end event of the community result
+			public function showCommunityResultEnd( event:EffectEvent ):void
+			{
+				logger.pushContext( "showCommunityResultEnd", arguments );
+
+				var f:Fade = event.target as Fade;
+				f.removeEventListener( EffectEvent.EFFECT_END, showCommunityResultEnd );
+				f = null;
+
+				// Stop the community spin
+				communitySpinStopTimeout = setTimeout( stopCommunitySpin, 5000 );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Displays a winning community jackpot screen
+			public function displayCommunityWin( phase:int = 1 ):void
+			{
+				logger.pushContext( "displayCommunityWin", arguments );
+
+				// Clear the timer value
+				clearTimeout( communityJackpotTimeout );
+				communityJackpotTimeout = uint.MIN_VALUE;
+
+				// For phase one , hide the countdown, reels, show the glass break animation
+				if( phase == 1 )
+				{
+					// Hide the community jackpot panel
+					scCommunity.visible = false;
+
+					// Hide the background
+					bgAnimation.visible = false;
+
+					// Stop the countdown audio
+					playCountdownAudio( false );
+
+					// Show the glass break animation
+					createCommunityWinAnimation();
+				}
+				// For phase two, show the win screen and set a timeout to go back to the main screen
+				else if( phase == 2 )
+				{
+					// Hide the countdown timer panel
+					scCountdown.visible = false;
+
+					// Remove the reels
+					removeCommunityReels();
+
+					// Remove any remaining controls
+					scCountdown.removeElement( scPowerMeter );
+					scCountdown.removeAllElements();
+					scPowerMeter.dispose();
+					scPowerMeter = null;
+
+					// Show the community win result and generate the win text
+					scCommunityResult.visible = scCommunityResult.includeInLayout = true;
+					bmpCommunityWinBG.visible = bmpCommunityWinBG.includeInLayout = true;
+					grpCommunityWin.visible = grpCommunityWin.includeInLayout = true;
+					lblCommunityWin.visible = lblCommunityWin.includeInLayout = true;
+					lblCommunityWin.text = "Triggered for\n*WIN_AMOUNT*\nEach Player Wins\n*CUSTOMER_WIN_AMOUNT*"
+					lblCommunityWin.text = lblCommunityWin.text.replace( "*WIN_AMOUNT*", communityJackpotWinAmount );
+					lblCommunityWin.text = lblCommunityWin.text.replace( "*CUSTOMER_WIN_AMOUNT*", communityCustomerWin );
+					grpCommunityWin.alpha = 0;
+
+					// Fade in the community win
+					var f:Fade = AnimationManager.getFadeAnimation( grpCommunityWin, 0, 1, 2000, 0, 1 );
+					f.addEventListener( EffectEvent.EFFECT_END, showCommunityResultEnd );
+					f.play();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates the border animation
+			public function createBorderAnimation():void
+			{
+				logger.pushContext( "createBorderAnimation", arguments );
+
+				// Load the skin image
+				borderAnimation = Images.SOProgressiveBorderAnimation;
+
+				// Convert the animation to a byte array
+				borderAnimationBytes = new FLVByteArray( new borderAnimation() );
+
+				// Initialize the net connection
+				border_nc = new NetConnection();
+				border_nc.connect( null );
+
+				// Initialize the net stream
+				border_ns = new NetStream( border_nc );
+				border_ns.client = { onMetaData:function( obj:Object ):void{ } };
+
+				// Initialize the animation
+				border_vd = new Video( 1024, 768 );
+				border_vd.attachNetStream( border_ns );
+
+				// Initialize the timer
+				restartBorderStream();
+
+				// Add the animation to the stage
+				ui = new UIComponent();
+				ui.addChild( DisplayObject( border_vd ) );
+				grpBackground.addElement( ui );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function restartBorderStream():void
+			{
+				// Log Activity
+				logger.pushContext( "restartBorderStream", arguments );
+
+				// Show the borders
+				border_vd.visible = true;
+
+				// Start the netStream
+				border_ns.play(null);
+				border_ns.seek(0);
+				border_ns.appendBytesAction( NetStreamAppendBytesAction.RESET_BEGIN );
+				border_ns.appendBytes( borderAnimationBytes.getBytesCopy() );
+				border_ns.appendBytes( borderAnimationBytes.clone().shiftTimeStamps( borderAnimationBytes.getDuration() ).getBytesCopy( false ) );
+
+				borderRepeatCount = 0;
+				borderInterval = setInterval( refillBorderStream, borderAnimationBytes.getDuration() );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function stopBorderStream():void
+			{
+				// Log Activity
+				logger.pushContext( "stopBorderStream", arguments );
+
+				// Hide the borders
+				border_vd.visible = false;
+
+				// Reset the stream and clear the interval
+				border_ns.close();
+				clearInterval( borderInterval );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the 'Timer' event of the Border Timer
+			protected function refillBorderStream():void
+			{
+				// Log Activity
+				logger.pushContext( "refillBorderStream", arguments );
+
+				var flvArray:FLVByteArray;
+				var loops:int = 0;
+
+				while( border_ns.bufferLength < ( borderAnimationBytes.getDuration() / 1000 ) * 2 )
+				{
+					// Log loop
+					logger.debug( border_ns.bufferLength, ( borderAnimationBytes.getDuration() / 1000 ) * 2 );
+
+					// Increment the repeat count and loops count
+					borderRepeatCount++;
+					loops++;
+
+					// Clone the original byte array, update the timestamps, strip off the header and then append it to the netStream.
+					flvArray = borderAnimationBytes.clone();
+					flvArray.shiftTimeStamps( ( borderRepeatCount + 1 ) * flvArray.getDuration() );
+					border_ns.appendBytes( flvArray.getBytesCopy( false ) );
+
+					// If we've looped more than twice, there is an issue - but we'll use three to be safe
+					if( loops >= 3 )
+					{
+						stopBorderStream();
+						restartBorderStream();
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates the win animation for the Community Jackpot
+			public function createCommunityWinAnimation():void
+			{
+				logger.pushContext( "createCommunityWinAnimation", arguments );
+
+				// Load the skin image and sound classes
+				animationClass = Images.SOCommunityWinAnimation;
+
+				// Convert the animation to a byte array
+				animationByteArray = new animationClass();
+
+				// Initialize the net connection
+				connect_nc = new NetConnection();
+				connect_nc.connect( null );
+
+				// Initialize the net stream
+				stream_ns = new NetStream( connect_nc );
+				stream_ns.client = this;
+				stream_ns.client = { onMetaData:function( obj:Object ):void{} }
+				stream_ns.addEventListener( NetStatusEvent.NET_STATUS, netStatusHandler );
+				stream_ns.play( null );
+				stream_ns.appendBytes( animationByteArray );
+
+				// Initialize the animation
+				video = new Video( 1024, 768 );
+				video.attachNetStream( stream_ns );
+
+				// Add the animation to the stage
+				ui = new UIComponent();
+				ui.addChild( DisplayObject( video ) );
+				scCountdown.addElement( ui );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the 'Net Status' event of the Net Stream
+			protected function netStatusHandler( event:NetStatusEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "netStatusHandler", arguments );
+
+				if( event.info.code == "NetStream.Play.Stop" || event.info.code == "NetStream.Buffer.Empty" )
+				{
+					stream_ns.removeEventListener( NetStatusEvent.NET_STATUS, netStatusHandler );
+					stream_ns.close();
+					stream_ns = null;
+
+					connect_nc.close();
+					connect_nc = null;
+
+					ui.removeChildAt( 0 );
+					scCountdown.removeElement( ui );
+					ui = null;
+
+					video.attachNetStream( null );
+					video = null;
+
+					displayCommunityWin( 2 );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles failed logins - (Login)
+			public function loginFailed( user:String, pass:String, reason:String ):void
+			{
+				logger.pushContext( "loginFailed", arguments );
+
+				directLogin = false;
+				scLogin.visible = true;
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Logs out the user
+			public function logout():void
+			{
+				// Log Activity
+				logger.pushContext( "logout", arguments );
+
+				// Remove the pop up
+				if( scPopUp != null )
+				{
+					PopUpManager.removePopUp( scPopUp );
+					scPopUp = null;
+				}
+
+				// Remove the progressive panel
+				if( scProgressive != null )
+				{
+					grpProgressive.removeElement( scProgressive );
+					scProgressive = null;
+				}
+
+				// Create the 'Login' control
+				createLogin();
+
+				// Make an external JavaScript call on Logout
+				if( ExternalInterface.available )
+				{
+					ExternalInterface.call( "setTimeout(" + SWEEPSTOPIA_LOGOUT_FUNCTION + ", 1)" );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles exit commands - (Login)
+			public function exit( reason:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "exit", arguments );
+
+				// Remove the 'Login' control
+				removeLogin();
+
+				// Remove the global listeners
+				removeListeners();
+
+				// Make an external JavaScript call on Exit
+				if( ExternalInterface.available )
+				{
+					ExternalInterface.call( "setTimeout(" + SWEEPSTOPIA_LOGOUT_FUNCTION + ", 1, '" + reason + "')" );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates the "Progressive Jackpot" control
+			protected function createProgressive( title:String = "Progressive Jackpot" ):void
+			{
+				// Log Activity
+				logger.pushContext( "createProgressive", arguments );
+
+				scProgressive = new SOProgressiveJackpot();
+				scProgressive.title = title;
+				scProgressive.x = 2;
+				scProgressive.y = 0;
+				grpProgressive.addElement( scProgressive );
+				scProgressive.setBalance( progressiveBalance );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the "Progressive Jackpot" control
+			protected function removeProgressive():void
+			{
+				// Log Activity
+				logger.pushContext( "removeProgressive", arguments );
+
+				if( scProgressive != null )
+				{
+					grpProgressive.removeElement( scProgressive );
+					scProgressive = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates the "Community Jackpot" control
+			protected function createCommunity( title:String = "Community Jackpot" ):void
+			{
+				// Log Activity
+				logger.pushContext( "createCommunity", arguments );
+
+				isCommunityJackpotActive = true;
+
+				scCommunity = new SOProgressiveJackpot();
+				scCommunity.title = title;
+				scCommunity.x = 2;
+				scCommunity.y = 0;
+				grpCommunity.addElement( scCommunity );
+				scCommunity.setBalance( communityBalance );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the "Community Jackpot" control
+			protected function removeCommunity():void
+			{
+				// Log Activity
+				logger.pushContext( "removeCommunity", arguments );
+
+				if( scCommunity != null )
+				{
+					grpCommunity.removeElement( scCommunity );
+					scCommunity = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Updates the account balance
+			public function refreshBalanceFromServer( action:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "refreshBalanceFromServer", arguments );
+
+				if( balanceInProgress || checkWinInProgress )
+				{
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+
+				// Flag that we have a call in progress
+				balanceInProgress =  action == SweepsAPI.SOPROGRESSIVE_ACTION_BALANCE;
+				checkWinInProgress =  action == SweepsAPI.SOPROGRESSIVE_ACTION_CHECKWIN;
+
+				// If we're in demo mode, increase the progressive balance on each call
+				if( DEBUG && !DEBUG_W_API )
+				{
+					var betAmount:int = ( [1, 2, 5, 10, 20][MathHelper.randomNumber( 0, 4 )]  * 25 );
+					SweepsAPI.progressiveBalanceDemo += betAmount * 0.2;
+					SweepsAPI.communityBalanceDemo += betAmount * 0.1;
+				}
+
+				// Assign the proper callback based on the action
+				switch( action )
+				{
+					case SweepsAPI.SOPROGRESSIVE_ACTION_CHECKWIN:
+						SweepsAPI.getSOProgressiveBalance( username, password, action, handleCheckWinSuccess, handleCheckWinError );
+						break;
+
+					default:
+						SweepsAPI.getSOProgressiveBalance( username, password, action, handleBalanceSuccess, handleBalanceError );
+						break;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles update balance success
+			private function handleBalanceSuccess( response:ProgressiveBalanceResponse ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleBalanceSuccess", arguments );
+
+				// Clear the progress flag
+				balanceInProgress = false;
+
+				// Create our controls if they don't exist
+				if( scProgressive == null )
+				{
+					createProgressive( response.CommunityBalance >= 0 ? "Rapid Jackpot" : "Progressive Jackpot" );
+				}
+
+				if( scCommunity == null && response.CommunityBalance >= 0 )
+				{
+					createCommunity();
+				}
+
+				// First, check to see if we're running the right version of the marquee
+				if( response.MarqueeVersion != "" && response.MarqueeVersion != null )
+				{
+					if( response.MarqueeVersion != version )
+					{
+						// Logout out of the marquee (and reload the page) if the version we're running it out of date
+						exit( "Incorrect Marquee Version" );
+
+						// Clear Context
+						logger.popContext();
+						return;
+					}
+				}
+
+				// Display fireworks
+				if( response.Fireworks > 0 && !displayWinnerInProgress && !communityJackpotInProgress )
+				{
+					launchFireworks( response.Fireworks );
+				}
+
+				// If we're supposed to be showing a countdown, but haven't started it - start it
+				if( isCommunityJackpotActive && response.CommunityCountdown == true && !communityJackpotInProgress )
+				{
+					// Stop the polls
+					stopPollTimer();
+
+					// Set the community variables
+					communityJackpotInProgress = true;
+					communityBalanceTriggeredAt = response.CommunityBalance;
+					displayProgressiveBalance( response.ProgressiveBalance, response.CommunityBalance, true, SIREN_DURATION );
+
+					// Display the sirens and provide a callback for it to remove the sirens and display the community jackpot countdown
+					stopBorderStream();
+					displaySirens( SIREN_DURATION, function ():void {
+						removeSirens();
+						createCountdown();
+					} );
+				}
+				else if( isCommunityJackpotActive && communityJackpotInProgress )
+				{
+					// Update the power meter
+					increasePercentage = getIncreasedPercentage( communityBalanceTriggeredAt, response.CommunityBalance );
+					scPowerMeter.setPowerLevel( increasePercentage, COUNTDOWN_POLL_INTERVAL );
+
+					// Update the progressive balance
+					displayProgressiveBalance( response.ProgressiveBalance, response.CommunityBalance, true, COUNTDOWN_POLL_INTERVAL );
+
+					// Stop the balance polls if the countdown is over
+					if( communityCountdownCompleted )
+					{
+						stopPollTimer();
+
+						if( !checkWinInProgress )
+						{
+							// Refresh the balance, checking for a community win
+							refreshBalanceFromServer( SweepsAPI.SOPROGRESSIVE_ACTION_CHECKWIN );
+						}
+					}
+					else if( pollTimer == null )
+					{
+						createPollTimer( COUNTDOWN_POLL_INTERVAL );
+					}
+				}
+				// If we have a winner, display them
+				else if( response.ProgressiveWinUsername != null && response.ProgressiveWinUsername != "" && response.ProgressiveWinAmount > 0 && !communityJackpotInProgress )
+				{
+					// Stop the polls
+					stopPollTimer();
+
+					// Quickly animate the progressive balance to our win amount
+					displayProgressiveBalance( response.ProgressiveWinAmount, response.CommunityBalance, true, SIREN_DURATION );
+
+					// Set the variables
+					displayWinnerInProgress = true;
+
+					// Display the sirens and provide a callback for it to remove the sirens and display the winner
+					stopBorderStream();
+					displaySirens( SIREN_DURATION, function ():void {
+						removeSirens();
+						displayWinner( response.ProgressiveWinUsername, response.ProgressiveWinAmount );
+					} );
+				}
+				else
+				{
+					// Display the new balance
+					displayProgressiveBalance( response.ProgressiveBalance, response.CommunityBalance, true );
+
+					// Stop the balance polls if the countdown is over
+					if( communityCountdownCompleted && communityJackpotInProgress )
+					{
+						stopPollTimer();
+
+						if( !checkWinInProgress )
+						{
+							// Refresh the balance, checking for a community win
+							refreshBalanceFromServer( SweepsAPI.SOPROGRESSIVE_ACTION_CHECKWIN );
+						}
+					}
+					else if( pollTimer == null )
+					{
+						createPollTimer();
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles update balance errors
+			private function handleBalanceError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleBalanceError" ).error.apply( null, arguments );
+
+				// Clear the progress flag
+				balanceInProgress = false;
+
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						createPopUp( "Unauthorized", "Invalid Login. Please try logging in again.", false, true );
+						break;
+
+					default:
+						// Do nothing
+						break;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles check win success
+			private function handleCheckWinSuccess( response:ProgressiveBalanceResponse ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleCheckWinSuccess", arguments );
+
+				// Clear the progress flag
+				checkWinInProgress = false;
+
+				// If we're in the middle of a community jackpot and our countdown has completed
+				if( communityJackpotInProgress && communityCountdownCompleted )
+				{
+					// Update the power meter
+					increasePercentage = getIncreasedPercentage( communityBalanceTriggeredAt, response.CommunityBalance );
+					scPowerMeter.setPowerLevel( increasePercentage );
+
+					// Save the win amount and win flag
+					communityJackpotWinAmount = response.CommunityBalance;
+					communityJackpotWin = response.CommunityWin;
+
+					// Save the customer count and win amount
+					communityCustomerCount = response.CommunityCustomerCount;
+					communityCustomerWin = response.CommunityCustomerWin;
+
+					// Set the spin count
+					communitySpinCount = Math.ceil( scPowerMeter.litLEDCount / 4 );
+
+					// Animate to the last balance
+					displayProgressiveBalance( response.ProgressiveBalance, response.CommunityBalance, true, 2000 );
+
+					// Start the community jackpot spin
+					startCommunitySpin();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles update balance errors
+			private function handleCheckWinError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handleBalanceError" ).error.apply( null, arguments );
+
+				// Clear the progress flag
+				checkWinInProgress = false;
+
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						createPopUp( "Unauthorized", "Invalid Login. Please try logging in again.", false, true );
+						break;
+
+					default:
+						setTimeout( refreshBalanceFromServer, 1000, SweepsAPI.SOPROGRESSIVE_ACTION_CHECKWIN );
+						break;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Creates a modal pop up
+			public function createPopUp( title:String, message:String, isError:Boolean, isLogout:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "createPopUp", arguments );
+
+				scPopUp = PopUpManager.createPopUp( this, SOPopUp, true ) as SOPopUp;
+				PopUpManager.centerPopUp( scPopUp );
+				scPopUp.Title = title;
+				scPopUp.Message = message;
+				scPopUp.IsLogout = isLogout;
+				scPopUp.setScale( scale );
+				scPopUp.setCallback( removePopUp );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the modal popup
+			protected function removePopUp():void
+			{
+				// Log Activity
+				logger.pushContext( "removePopUp", arguments );
+
+				// Remove the pop up
+				PopUpManager.removePopUp( scPopUp );
+				scPopUp = null;
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Displays the progressive balance
+			public function displayProgressiveBalance( newProgressiveBalance:int, newCommunityBalance:int, animate:Boolean = false, animationDuration:int = 25000 ):void
+			{
+				logger.pushContext( "displayProgressiveBalance", arguments );
+
+				// Updates the local copy of progressiveBalance
+				progressiveBalance = newProgressiveBalance;
+				if( scProgressive != null )
+				{
+					if( animate )
+					{
+						scProgressive.displayBalance( progressiveBalance, animationDuration );
+					}
+					else
+					{
+						scProgressive.setBalance( progressiveBalance );
+					}
+				}
+
+				// Updates the local copy of communityBalance
+				communityBalance = newCommunityBalance;
+				if( scCommunity != null )
+				{
+					if( animate )
+					{
+						scCommunity.displayBalance( communityBalance, animationDuration );
+					}
+					else
+					{
+						scCommunity.setBalance( communityBalance );
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Diplays the winning sirens
+			public function displaySirens( length:int, callback:Function = null ):void
+			{
+				// Log Activity
+				logger.pushContext( "displaySirens", arguments );
+
+				// Create the coins array if necessary
+				if( sirens == null || sirens.length == 0 )
+				{
+					sirens = [];
+					for( var num:int = 1; num <= 14; num++ )
+					{
+						sirens.push( assets.Images["SOJackpotPoliceLight" + FormatHelper.padString( num.toString(), 2, "0", FormatHelper.PAD_DIRECTION_LEFT )] );
+					}
+				}
+
+				// Create the sirens
+				aiSirenLeft = new AnimatedImage( sirens );
+				uiSirenLeft = new SpriteUIComponent( aiSirenLeft );
+
+				aiSirenRight = new AnimatedImage( sirens );
+				uiSirenRight = new SpriteUIComponent( aiSirenRight );
+
+				scSirens.addElement( uiSirenLeft );
+				uiSirenLeft.scaleX = uiSirenLeft.scaleY = .5;
+				uiSirenLeft.x = 25;
+				uiSirenLeft.y = 0;
+				aiSirenLeft.start_loop( 25, length / ( 25 * sirens.length ), 0, false, null );
+
+				scSirens.addElement( uiSirenRight );
+				uiSirenRight.scaleX = uiSirenRight.scaleY = .5;
+				uiSirenRight.x = 1024 - ( 175 + 25 );
+				uiSirenRight.y = 0;
+				aiSirenRight.start_loop( 25, length / ( 25 * sirens.length ), 0, false, callback );
+
+				// Start playing the jackpot win audio
+				sirenSound = assets.SoundManager.playSound( assets.Sounds.jackpotWin, 0, 0 );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Removes the winning sirens
+			public function removeSirens():void
+			{
+				// Log Activity
+				logger.pushContext( "removeSirens", arguments );
+
+				// Remove the components
+				if( aiSirenLeft != null )
+				{
+					aiSirenLeft.stop_loop();
+					aiSirenLeft.dispose();
+					aiSirenLeft = null;
+				}
+
+				if( aiSirenRight != null )
+				{
+					aiSirenRight.stop_loop();
+					aiSirenRight.dispose();
+					aiSirenRight = null;
+				}
+
+				if( uiSirenLeft != null )
+				{
+					uiSirenLeft.dispose();
+					uiSirenLeft = null;
+				}
+
+				if( uiSirenRight != null )
+				{
+					uiSirenRight.dispose();
+					uiSirenRight = null;
+				}
+
+				scSirens.removeAllElements();
+
+				// Close out the audio
+				if( sirenSound != null )
+				{
+					sirenSound.stop();
+					sirenSound = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Displays the progressive winner
+			public function displayWinner( progressiveWinner:String, progressiveWin:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "displayWinner", arguments );
+
+				// Set the progressive balance back to 0
+				progressiveBalance = 0;
+				scProgressive.setBalance( progressiveBalance );
+
+				// Show the jackpot winner panel
+				scJackpotWin.alpha = 1;
+				scJackpotWin.visible = true;
+
+				// Set the winning and amount
+				lblProgressiveWinner.text = progressiveWinner;
+				lblProgressiveWin.text = progressiveWin.toString();
+
+				// Create the coins array if necessary
+				if( coins == null || coins.length == 0 )
+				{
+					coins = [];
+					for( var num:int = 1; num <= 30; num++ )
+					{
+						coins.push( assets.Images["SOJackpotCoinFlip" + FormatHelper.padString( num.toString(), 4, "0", FormatHelper.PAD_DIRECTION_LEFT )] );
+					}
+				}
+
+				// Create the coins and animations
+				var ani:Move;
+				var uiCoin:SpriteUIComponent;
+				for( var i:int = 0; i < MathHelper.randomNumber( 30, 40 ); i++ )
+				{
+					uiCoin = assets.AnimationManager.getAnimatedImageFromArray( null, coins, MathHelper.randomNumber( 10, 100 ), 0, 0, false );
+					scCoins.addElement( uiCoin );
+
+					uiCoin.scaleX = uiCoin.scaleY = MathHelper.randomNumber( 35, 125 ) / 100;
+					uiCoin.x = MathHelper.randomNumber( 0, 1024 - uiCoin.width );
+					uiCoin.y = 0 - MathHelper.randomNumber( 1, 50 );
+
+					ani = AnimationManager.getMoveAnimation( uiCoin, uiCoin.x, uiCoin.y, uiCoin.x, 700, (500 / uiCoin.scaleX), 0, 20000 / (500 / uiCoin.scaleX), 0 );
+					ani.addEventListener( EffectEvent.EFFECT_REPEAT, onCoinRepeat );
+					ani.addEventListener( EffectEvent.EFFECT_END, onCoinEnd );
+					ani.play();
+					coinAnimations.push( ani );
+				}
+
+				// Start playing the coin drop audio
+				coinDrop = assets.SoundManager.playSound( assets.Sounds.coinDrop, 0, 0 );
+
+				// Setup a timer to remove the progressive winner
+				progressiveJackpotTimeout = setTimeout( removeWinner, 20000 );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function onCoinRepeat( event:EffectEvent ):void
+			{
+				var ani:Move = event.target as Move;
+				var uiCoin:SpriteUIComponent = ani.target as SpriteUIComponent;
+				ani.xFrom = ani.xTo = MathHelper.randomNumber( 0, 1024 - uiCoin.width );
+			}
+
+			private function onCoinEnd( event:EffectEvent ):void
+			{
+				var ani:Move = event.target as Move;
+				var uiCoin:SpriteUIComponent = ani.target as SpriteUIComponent;
+				uiCoin.visible = false;
+			}
+
+			private function removeWinner():void
+			{
+				// Log Activity
+				logger.pushContext( "removeWinner", arguments );
+
+				// Clear the variables
+				displayWinnerInProgress = false;
+
+				// Show the borders
+				restartBorderStream();
+
+				// Clear the timer
+				clearTimeout( progressiveJackpotTimeout );
+				progressiveJackpotTimeout = uint.MIN_VALUE;
+
+				// Stop the sound
+				if( coinDrop != null )
+				{
+					coinDrop.stop();
+					coinDrop = null;
+				}
+
+				// Remove the coin elements and stop the animations
+				for( var i:int = 0; i < coinAnimations.length; i++ )
+				{
+					var ani:Move = coinAnimations[i] as Move;
+					var uiCoin:SpriteUIComponent = ani.target as SpriteUIComponent;
+
+					ani.removeEventListener( EffectEvent.EFFECT_REPEAT, onCoinRepeat );
+					ani.removeEventListener( EffectEvent.EFFECT_REPEAT, onCoinEnd );
+					ani.stop();
+					ani = null;
+					uiCoin.dispose();
+					scCoins.removeElement( uiCoin );
+					uiCoin = null;
+				}
+
+				// Just in case, remove all elements and clear the animation array
+				scCoins.removeAllElements();
+				coinAnimations = [];
+
+				// Fade out the Progressive Winner panel
+				var f:Fade = AnimationManager.getFadeAnimation( scJackpotWin, 1, 0, 1000, 0, 1 );
+				f.addEventListener( EffectEvent.EFFECT_END, removeWinnerEnd );
+				f.play();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			private function removeWinnerEnd( event:EffectEvent ):void
+			{
+				var f:Fade = event.target as Fade;
+				f.removeEventListener( EffectEvent.EFFECT_END, removeWinnerEnd );
+				f = null;
+
+				scJackpotWin.visible = false;
+				scJackpotWin.alpha = 1;
+
+				// Start the progressive poll again
+				createPollTimer( POLL_INTERVAL );
+			}
+
+			private function getIncreasedPercentage( startAmount:int, currentAmount:int ):Number
+			{
+				goal = Math.ceil( startAmount * 0.05 );
+				increase = currentAmount - communityBalanceTriggeredAt;
+				increasePercent = increase / goal;
+
+				return increasePercent;
+			}
+
+			// Updates the stage scaling for Normal/Full screen mode
+			private function fullScreenScale( event:FullScreenEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "fullScreenScale", arguments );
+
+				if( event.fullScreen )
+				{
+					isFullScreen = true;
+					if( stage.stageWidth != width || stage.stageHeight != height )
+					{
+						if( width > height )
+						{
+							scale = stage.stageHeight / height;
+						}
+						else
+						{
+							scale = stage.stageWidth / width;
+						}
+
+						scaleX = scaleY = scale;
+						x = stage.stageWidth / 2 - ( width * scale ) / 2;
+						y = stage.stageHeight / 2 - ( height * scale ) / 2;
+					}
+				}
+				else
+				{
+					isFullScreen = false;
+					scaleX = scaleY = scale = 1.0; // Default
+					x = 0;
+					y = 0;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Updates the stage scaling on resize events
+			private function resizeDisplay( event:Event ):void
+			{
+				// Log Activity
+				logger.pushContext( "resizeDisplay", arguments );
+
+				if( stage.displayState != StageDisplayState.FULL_SCREEN && !isFullScreen )
+				{
+					if( stage.stageWidth != width || stage.stageHeight != height )
+					{
+						if( width > height )
+						{
+							scale = stage.stageHeight / height;
+						}
+						else
+						{
+							scale = stage.stageWidth / width;
+						}
+					}
+					else
+					{
+						scale = 1.0; // Default
+					}
+
+					scaleX = scaleY = scale;
+					x = stage.stageWidth / 2 - ( width * scale ) / 2;
+					y = stage.stageHeight / 2 - ( height * scale ) / 2;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles uncaught error events
+			protected function uncaughtError( event:UncaughtErrorEvent ):void
+			{
+				// Wrap in a try/catch to avoid endless loops if something goes seriously wrong
+				try
+				{
+					// Prevent the error from popping up in flash
+					event.preventDefault();
+
+					// Get the error details
+					var nonSevereErrorCodes:Array = [2063];
+					var name:String;
+					var message:String;
+					var stackTrace:String;
+					var typeName:String = mx.utils.ObjectUtil.getClassInfo( event['error'] ).name;
+					var isSevere:Boolean = true;
+					var errMsg:ErrorMessage;
+
+					// Get the error properties
+					if( event.hasOwnProperty( "error" ) )
+					{
+						if( event.error is Error )
+						{
+							var err:Error = event.error as Error;
+							if( err )
+							{
+								name = err.name;
+								message = err.toString();
+								stackTrace = err.getStackTrace();
+								isSevere = nonSevereErrorCodes.indexOf( err.errorID ) < 0;
+							}
+						}
+						else if( event.error is SecurityErrorEvent )
+						{
+							var secErrEv:SecurityErrorEvent = event.error as SecurityErrorEvent;
+							if( secErrEv )
+							{
+								name = typeName;
+								message = secErrEv.toString();
+								isSevere = nonSevereErrorCodes.indexOf( errEv.errorID ) < 0;
+							}
+						}
+						else if( event.error is ErrorEvent )
+						{
+							var errEv:ErrorEvent = event.error as ErrorEvent;
+							if( errEv )
+							{
+								name = typeName;
+								message = errEv.type + ( errEv.target != null ? "\nTARGET: " + errEv.target.toString() : "" );
+								stackTrace = errEv.toString();
+								isSevere = nonSevereErrorCodes.indexOf( errEv.errorID ) < 0;
+							}
+						}
+						else
+						{
+							name = typeName;
+							message = event.error.toString();
+							stackTrace = "";
+						}
+
+						// Construct the error message
+						errMsg = getErrorMessageBase( "SWEEPS STORE OVERVIEW:Unhandled Exception!", name, message, stackTrace );
+
+						// Send the error
+						SweepsAPI.reportError( errMsg, isSevere );
+					}
+				}
+				catch( e:* )
+				{
+					// Do nothing
+				}
+			}
+
+			public function getErrorMessageBase( title:String, type:String, message:String, stackTrace:String = "" ):ErrorMessage
+			{
+				var errMsg:ErrorMessage;
+				var timings:String;
+
+				// Get timings
+				timings = "Sweeps Store Overview Running Time: " + ( getTimer() - sweepsLoadTime ) + "ms\n";
+
+				errMsg = new ErrorMessage( title, type, message, stackTrace );
+				errMsg.append( "TIMINGS", timings );
+
+				return errMsg;
+			}
+		]]>
+	</fx:Script>
+
+	<!--- Houses the background animation -->
+	<s:Group id="grpBackground" width="1024" height="768"></s:Group>
+
+	<!--- Houses the main progressive jackpot and community jackpot screens -->
+	<s:Group id="grpMain" width="1024" height="768">
+		<s:layout>
+			<s:VerticalLayout id="vlMain" horizontalAlign="center" verticalAlign="middle"/>
+		</s:layout>
+		<s:Group id="grpProgressive"></s:Group>
+		<s:Group id="grpCommunity"></s:Group>
+	</s:Group>
+
+	<!--- Houses the winning police sirens -->
+	<s:Group id="scSirens" width="1024" height="768" visible="true"></s:Group>
+
+	<!--- Houses the countdown timer and power meter -->
+	<s:Group id="scCountdown" width="1024" height="768" visible="false"></s:Group>
+
+	<!--- Houses the community result -->
+	<s:Group id="scCommunityResult" width="1024" height="768" includeInLayout="false" visible="false">
+		<s:Label id="lblCommunityLoss" text="Didn't Win...{'\n'}Watch for next countdown." textAlign="center" styleName="communityText" horizontalCenter="0" verticalCenter="0" includeInLayout="false" visible="false"></s:Label>
+
+		<s:BitmapImage id="bmpCommunityWinBG" width="1024" height="768" source="{Images.SOCommunityJackpotWinBG}" visible="false" includeInLayout="false"></s:BitmapImage>
+		<s:VGroup id="grpCommunityWin" gap="20" horizontalCenter="0" verticalCenter="0" horizontalAlign="center" verticalAlign="middle" visible="false" includeInLayout="false">
+			<s:Group id="grpCommunityWinTitle" width="100%">
+				<s:Graphic maskType="alpha">
+					<s:Rect width="{lblCommunityWinTitle.width}" height="{lblCommunityWinTitle.height}">
+						<s:fill>
+							<s:LinearGradient rotation="90">
+								<s:entries>
+									<s:GradientEntry color="#FFF6AD" ratio="0.33"/>
+									<s:GradientEntry color="#FFC938" ratio="0.66"/>
+								</s:entries>
+							</s:LinearGradient>
+						</s:fill>
+					</s:Rect>
+					<s:mask>
+						<s:Label id="lblCommunityWinTitle" width="100%" textAlign="center" styleName="communityTitle" text="Community Jackpot!" />
+					</s:mask>
+				</s:Graphic>
+				<s:filters>
+					<s:GlowFilter blurX="8" blurY="8" color="#FFA41C" strength="2" />
+				</s:filters>
+			</s:Group>
+			<s:Label id="lblCommunityWin" text="" textAlign="center" styleName="communityText"></s:Label>
+		</s:VGroup>
+	</s:Group>
+
+	<!--- Houses winning progressive jackpot screen and animation -->
+	<s:SkinnableContainer id="scJackpotWin" width="1024" height="768" backgroundColor="#00000" visible="false">
+		<s:Group id="scCoins" width="1024" height="768"></s:Group>
+		<s:SkinnableContainer id="scText" width="1024" height="768" backgroundColor="#000000" backgroundAlpha="0.55">
+			<s:VGroup gap="20" horizontalCenter="0" verticalCenter="0" horizontalAlign="center" verticalAlign="middle">
+				<s:Group width="100%">
+					<s:Graphic maskType="alpha">
+						<s:Rect width="{lblTitle.width}" height="{lblTitle.height}">
+							<s:fill>
+								<s:LinearGradient rotation="90">
+									<s:entries>
+										<s:GradientEntry color="#FFF6AD" ratio="0.33"/>
+										<s:GradientEntry color="#FFC938" ratio="0.66"/>
+									</s:entries>
+								</s:LinearGradient>
+							</s:fill>
+						</s:Rect>
+						<s:mask>
+							<s:Label id="lblTitle" width="100%" textAlign="center" styleName="progressiveTitle" text="Progressive Winner!" />
+						</s:mask>
+					</s:Graphic>
+					<s:filters>
+						<s:GlowFilter blurX="8" blurY="8" color="#FFA41C" strength="2" />
+					</s:filters>
+				</s:Group>
+				<s:Label width="100%" textAlign="center" styleName="progressiveText" text="Congratulations To"></s:Label>
+				<s:Label id="lblProgressiveWinner" width="100%" textAlign="center" styleName="progressiveWinner" text=""></s:Label>
+				<s:Label width="100%" textAlign="center" styleName="progressiveText" text="Winner"></s:Label>
+				<s:Label id="lblProgressiveWin" width="100%" textAlign="center" styleName="progressiveWin" text=""></s:Label>
+				<s:Label width="100%" textAlign="center" styleName="progressiveText" text="Progressive Jackpot!"></s:Label>
+			</s:VGroup>
+		</s:SkinnableContainer>
+	</s:SkinnableContainer>
+
+</s:Application>

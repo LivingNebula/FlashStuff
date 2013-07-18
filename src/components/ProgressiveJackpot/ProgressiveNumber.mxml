@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 clipAndEnableScrolling="true"
+		 width="16" height="20">
+	
+	<fx:Declarations>
+		<s:Linear id="linearEaser" easeInFraction="0" easeOutFraction="0"/>					
+	</fx:Declarations>
+			 
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			
+			import spark.effects.Animate;
+			import spark.effects.animation.SimpleMotionPath;
+			import spark.effects.easing.IEaser;
+			import spark.filters.BlurFilter;
+			
+			private var _onAdded:Function;
+			private var _onRollOver:Function;
+			private var _onStopped:Function;
+			private var _slotHeight:int = 20;
+			private var _slotWidth:int = 20;
+			private var _numberReelImage:Class;
+			private var _backgroundColor:uint;
+			
+			private var aSpin:Animate;		
+			private var aFakeSpin:Animate;
+			private var repeatCount:int;
+			private var duration:int;
+			private var setTimer:Timer;
+			
+			private var _currentNumber:int = 0;
+			private var _numberHeight:int = 0;
+			
+			public function get currentNumber():int
+			{
+				return 10 - ( Math.abs( ctrSlot.y ) / _slotHeight );
+			}
+			
+			public function set onRollOver( value:Function ):void
+			{
+				_onRollOver = value;
+			}
+			
+			public function get onRollOver():Function
+			{
+				return _onRollOver;
+			}
+			
+			public function set onStopped( value:Function ):void
+			{
+				_onStopped = value;
+			}
+			
+			public function get onStopped():Function
+			{
+				return _onStopped;
+			}			
+			
+			public function set numberReelImage( newImage:Class ):void
+			{
+				_numberReelImage = newImage;
+				imgReel.source = newImage;
+			}
+			
+			public function get numberReelImage():Class
+			{
+				return _numberReelImage;
+			}		
+			
+			public function set backgroundColor( value:uint ):void
+			{
+				rectBackground.fill = new SolidColor( value );
+			}
+			
+			public function get backgroundColor():uint
+			{
+				return ( rectBackground.fill as SolidColor ).color;
+			}			
+			
+			public function get isSpinning():Boolean
+			{
+				return aSpin != null && aSpin.isPlaying;			
+			}
+			
+			public function get isFakeSpinning():Boolean
+			{
+				return aFakeSpin != null && aFakeSpin.isPlaying;			
+			}			
+									
+			public function set( value:int):void
+			{
+				if( isSpinning || isFakeSpinning )
+				{
+					stop();
+				}
+				
+				ctrSlot.y = getNumberPosition( value );
+			}
+			
+			public function fakeSpin( rotationDuration:int ):void
+			{
+				// Stop our animation if it's already going
+				stop();			
+				
+				// Setup our fake animation
+				var blur:int = 5000 / rotationDuration;
+				if( blur < 5 ) { blur = 5; }
+				if( blur > 100 ) { blur = 100; }
+				ctrSlot.filters = [ new BlurFilter( 0, blur, 1 ) ];		
+				aFakeSpin = AnimationManager.getAnimatedItem( ctrSlot, "y", rotationDuration, 0, getNumberPosition( 0 ), getNumberPosition( 10 ), linearEaser );
+				aFakeSpin.addEventListener( EffectEvent.EFFECT_END, fakeSpin_effectEndHandler );
+				aFakeSpin.play();				
+			}
+			
+			public function spin( rotationDuration:int, numberRotations:int ):void
+			{
+				// Stop our animation if it's already going
+				stop();
+				
+				// Setup the repeat count and duration
+				repeatCount = numberRotations;
+				duration = rotationDuration;
+				
+				// Setup the spin animation
+				var vFrom:int = ctrSlot.y;
+				var vTo:int = getNumberPosition( currentNumber + 1 );
+				aSpin = AnimationManager.getAnimatedItem( ctrSlot, "y", duration, 1, vFrom, vTo, linearEaser );
+				aSpin.addEventListener( EffectEvent.EFFECT_START, spin_effectStartHandler );	
+				aSpin.addEventListener( EffectEvent.EFFECT_END, spin_effectEndHandler );				
+				aSpin.play();				
+			}
+			
+			public function stop():void
+			{
+				// If we're currently still spinning, remove the listeners and clear our repeatCount
+				if( isFakeSpinning )
+				{					
+					aFakeSpin.end();					
+				}
+				else if( isSpinning )
+				{		
+					repeatCount = 0;	
+					aSpin.stop();
+				}								
+			}
+			
+			private function getNumberPosition( value:int ):int
+			{
+				return ( -_slotHeight * ( 10 - value ) );	
+			}
+			
+			// Handles the 'effect end' event of the animation
+			protected function fakeSpin_effectEndHandler( event:EffectEvent ):void
+			{
+				// Remove the filters
+				ctrSlot.filters = [];
+				
+				// Remove the event listeners
+				aFakeSpin.removeEventListener( EffectEvent.EFFECT_END, fakeSpin_effectEndHandler );	
+				aFakeSpin = null;
+				
+				// Call onstopped
+				if( _onStopped != null )
+				{
+					_onStopped( this );
+				}
+			}				
+			
+			// Handles the 'effect start' event of the animation
+			protected function spin_effectStartHandler( event:EffectEvent ):void
+			{
+				if( ctrSlot.y == -_slotHeight )
+				{
+					onRollOver( this, duration );
+				}				
+			}
+			
+			// Handles the 'effect end' event of the animation
+			protected function spin_effectEndHandler( event:EffectEvent ):void
+			{
+				// Decrement our repeat count
+				repeatCount--;
+				
+				// If we're at the top of the reel (0), adjust the reel so we're at the lower 0 and can scroll properly
+				if( ctrSlot.y >= 0 )
+				{
+					ctrSlot.y = ( 10 * -_slotHeight ) + ctrSlot.y;
+				}
+				
+				// If we're done counting up, remove the listener
+				if( repeatCount <= 0 )
+				{
+					// Remove the event listeners
+					aSpin.removeEventListener( EffectEvent.EFFECT_START, spin_effectStartHandler );
+					aSpin.removeEventListener( EffectEvent.EFFECT_END, spin_effectEndHandler );	
+					aSpin = null;
+					
+					// Call onstopped
+					if( _onStopped != null )
+					{
+						_onStopped( this );
+					}
+				}
+				// Otherwise, call onRollOver when we pass 9 and adjust our animation
+				else
+				{					
+					( aSpin.motionPaths[0] as SimpleMotionPath ).valueFrom = getNumberPosition( currentNumber );
+					( aSpin.motionPaths[0] as SimpleMotionPath ).valueTo = getNumberPosition( currentNumber + 1 );	
+					aSpin.play();
+				}
+			}			
+		]]>
+	</fx:Script>
+	
+	<s:Rect id="rectBackground" x="0" y="0" width="16" height="20">
+		<s:fill>
+			<s:SolidColor color="0xffffff"></s:SolidColor>
+		</s:fill>
+	</s:Rect>
+	
+	<s:BorderContainer id="ctrSlot" x="0" y="-200" width="16" height="220">		
+		<mx:Image id="imgReel" x="-1" y="-1" width="16" height="220" />
+	</s:BorderContainer >
+	
+</s:Group>

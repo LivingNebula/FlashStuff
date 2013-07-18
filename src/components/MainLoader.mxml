@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			  xmlns:s="library://ns.adobe.com/flex/spark" 
+			  xmlns:mx="library://ns.adobe.com/flex/mx" implements="interfaces.IDisposable">
+	
+	<fx:Script>
+		<![CDATA[
+			import interfaces.IDisposable;
+			
+			import mx.managers.SystemManager;
+			
+			private var eventListeners:Object = {};
+			
+			public override function addEventListener( type:String, listener:Function, useCapture:Boolean=false, priority:int=0, useWeakReference:Boolean=false ):void
+			{
+				if( eventListeners[type] == null )
+				{
+					eventListeners[type] = [];
+				}
+				
+				eventListeners[type].push( listener );
+				super.addEventListener( type, listener, useCapture, priority, useWeakReference );
+			}
+			
+			private function removeAllEventListeners():void
+			{
+				for( var type:String in eventListeners )
+				{
+					var arr:Array = eventListeners[type] as Array;
+					
+					if( arr != null )
+					{
+						for( var i:int = 0; i < arr.length; i++ )
+						{
+							removeEventListener( type, arr[i] );
+						}
+					}
+					
+					eventListeners[type] = [];
+				}
+			}	
+			
+			public function dispose():void
+			{
+				removeAllEventListeners();
+				if( this.numElements > 0 )
+				{
+					( this.getElementAt( 0 ) as IDisposable ).dispose();
+					this.removeElementAt( 0 );
+				}
+			}			
+		]]>
+	</fx:Script>
+	
+</s:Group>

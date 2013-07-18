@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 			  xmlns:s="library://ns.adobe.com/flex/spark"
+		 			  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:StoreOverview="components.StoreOverview.*"
+					  initialize="init(event)">
+
+	<fx:Style>
+		.title {
+			color: #FFFFFF;
+			font-size: 96px;
+			font-weight: bold;
+			font-family: "Soopafresh";
+		}
+
+	</fx:Style>
+
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.DataTimer;
+			import assets.Images;
+
+			import mx.effects.Sequence;
+			import mx.events.FlexEvent;
+
+			import spark.effects.Animate;
+
+			import utils.DebugHelper;
+			import utils.MathHelper;
+
+			public static const JACKPOT_BET_PERCENTAGE:Number = 0.02;
+			private static const SET_BALANCE_THRESHOLD:int = 25;
+			private static const SET_BALANCE_DURATION:int = 300;
+
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( SOProgressiveJackpot );
+
+			private var titleText:String = "";
+			private var initBalance:int = 0;
+			private var difference:int = 0;
+			private var balance:int = 0;
+			private var spinning:int = 0;
+			private var spinStopTimer:DataTimer;
+			private var numbers:Vector.<SOProgressiveNumber> = new Vector.<SOProgressiveNumber>();
+			private var mods:Vector.<int> = new Vector.<int>();
+			private var steps:int = 0;
+			private var seq:Sequence;
+			private var pulseTitleTimeout:uint = uint.MIN_VALUE;
+			private var fontSize:int;
+			private var fontSize2:int;
+			private var i:int = 0;
+
+			public function set title( value:String ):void
+			{
+				this.titleText = value;
+			}
+
+			public function showTitle( show:Boolean ):void
+			{
+				grpTitle.visible = grpTitle.includeInLayout = show;
+
+				if( !show && pulseTitleTimeout != uint.MIN_VALUE )
+				{
+					clearTimeout( pulseTitleTimeout );
+					pulseTitleTimeout = uint.MIN_VALUE;
+				}
+			}
+
+			public function getVisibleBalance():int
+			{
+				return number0.currentNumber +
+					( number1.currentNumber * 10 ) +
+					( number2.currentNumber * 100 ) +
+					( number3.currentNumber * 1000 ) +
+					( number4.currentNumber * 10000 ) +
+					( number5.currentNumber * 100000 );
+			}
+
+			public function displayBalance( newBalance:int, animationDuration:int ):void
+			{
+				// Log Acivity
+				logger.pushContext( "displayBalance", arguments );
+				logger.debug( "previousBalance", balance, "visibleBalance", getVisibleBalance() );
+
+				if( balance != newBalance )
+				{
+					// If we're still spinning, stop
+					for( i = 0; i < numbers.length; i++ ) {
+						if( numbers[i].isSpinning ) {
+							numbers[i].stop();
+							break;
+						}
+					}
+
+					// If our new balance is less than current balance, start over at 0
+					if( newBalance < balance )
+					{
+						balance = 0;
+						setBalance( 0 );
+					}
+
+					// Calculate our difference and duration
+					initBalance = getVisibleBalance();
+					difference = newBalance - initBalance;
+
+					if( numbers.length == 0 )
+					{
+						numbers.push(number0, number1, number2, number3, number4, number5);
+					}
+
+					for( i = 0; i < 6; i++ ) {
+						if( difference >= mods[i] ) {
+							steps = Math.floor( ( difference + ( initBalance % mods[i] ) ) / mods[i] );
+							if( steps > SET_BALANCE_THRESHOLD )
+							{
+								numbers[i].fakeSpin( Math.ceil( animationDuration / steps ) * 10 );
+							}
+							else
+							{
+								numbers[i].spin( Math.ceil( animationDuration / steps ), steps );
+								break;
+							}
+						}
+					}
+
+					balance = newBalance;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			public function setBalance( newBalance:int ):void
+			{
+				logger.pushContext( "setBalance", arguments );
+
+				// Update the balances immediately
+				balance = newBalance;
+
+				for( var i:int = 0; i < 6; i ++ )
+				{
+					if( numbers[i].isSpinning || numbers[i].isFakeSpinning )
+					{
+						numbers[i].stop();
+					}
+
+					if( balance >= mods[i] )
+					{
+						numbers[i].set( MathHelper.getDigitFromValue( balance, i ) );
+					}
+					else
+					{
+						numbers[i].set( 0 );
+					}
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			protected function init( event:FlexEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+
+				// Fill our numbers and mods arrays
+				numbers.push( number0, number1, number2, number3, number4, number5 );
+				mods.push( 1, 10, 100, 1000, 10000, 100000 );
+
+				// Set the number images
+				number5.numberReelImage = Images.soProgressiveJackpotNumbers;
+				number4.numberReelImage = Images.soProgressiveJackpotNumbers;
+				number3.numberReelImage = Images.soProgressiveJackpotNumbers;
+				number2.numberReelImage = Images.soProgressiveJackpotNumbers;
+				number1.numberReelImage = Images.soProgressiveJackpotNumbers;
+				number0.numberReelImage = Images.soProgressiveJackpotNumbers;
+
+				number5Shadow.source = Images.soProgressiveJackpotNumbersShadow;
+				number4Shadow.source = Images.soProgressiveJackpotNumbersShadow;
+				number3Shadow.source = Images.soProgressiveJackpotNumbersShadow;
+				number2Shadow.source = Images.soProgressiveJackpotNumbersShadow;
+				number1Shadow.source = Images.soProgressiveJackpotNumbersShadow;
+				number0Shadow.source = Images.soProgressiveJackpotNumbersShadow;
+
+				// Set the title
+				lblTitle.text = titleText;
+				pulseTitleTimeout = setTimeout( pulseTitle, 0 );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles a reel's stop event
+			protected function number_stoppedHandler( reel:SOProgressiveNumber ):void
+			{
+				// Log Activity
+				logger.pushContext( "number_stoppedHandler", arguments );
+
+				switch( reel.id )
+				{
+					case "number0":
+						break;
+
+					case "number1":
+						if( number0.isFakeSpinning ) { number0.set( MathHelper.getDigitFromValue( balance, 0 ) ) }
+						break;
+
+					case "number2":
+						if( number1.isFakeSpinning ) { number1.set( MathHelper.getDigitFromValue( balance, 1 ) ) }
+						break;
+
+					case "number3":
+						if( number2.isFakeSpinning ) { number2.set( MathHelper.getDigitFromValue( balance, 2 ) ) }
+						break;
+
+					case "number4":
+						if( number3.isFakeSpinning ) { number3.set( MathHelper.getDigitFromValue( balance, 3 ) ) }
+						break;
+
+					case "number5":
+						if( number4.isFakeSpinning ) { number4.set( MathHelper.getDigitFromValue( balance, 4 ) ) }
+						break;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles a reel's roll over event
+			protected function number_rollOverHandler( reel:SOProgressiveNumber, duration:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "number_rollOverHandler", arguments );
+
+				switch( reel.id )
+				{
+					case "number0":
+						number1.spin( duration, 1 );
+						break;
+
+					case "number1":
+						number2.spin( duration, 1 );
+						break;
+
+					case "number2":
+						number3.spin( duration, 1 );
+						break;
+
+					case "number3":
+						number4.spin( duration, 1 );
+						break;
+
+					case "number4":
+						number5.spin( duration, 1 );
+						break;
+
+					case "number5":
+						break;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles pulsing the title
+			private function pulseTitle():void
+			{
+				// Log Activity
+				logger.pushContext( "pulseTitle", arguments );
+
+				// Just in case, clear the timeout
+				clearTimeout( pulseTitleTimeout );
+				pulseTitleTimeout = uint.MIN_VALUE;
+
+				if( grpTitle.visible )
+				{
+					seq = new Sequence();
+					seq.addChild( assets.AnimationManager.getAnimatedItem( glowFilterTitle, "strength", 2000, 1, 2, 4 ) );
+					seq.addChild( assets.AnimationManager.getAnimatedItem( glowFilterTitle, "strength", 2000, 1, 4, 2 ) );
+					seq.play();
+
+					if( MathHelper.randomNumber( 0, 100 ) > 85 )
+					{
+						fontSize = int(styleManager.getStyleDeclaration( ".title" ).getStyle( "fontSize" ));
+						fontSize2 = fontSize * .9;
+
+						seq = new Sequence();
+						seq.addChild( assets.AnimationManager.getAnimatedItem( lblTitle, "fontSize", 200, 1, fontSize, fontSize2, null ) );
+						seq.addChild( assets.AnimationManager.getAnimatedItem( lblTitle, "fontSize", 200, 1, fontSize2, fontSize, null ) );
+						seq.addChild( assets.AnimationManager.getAnimatedItem( lblTitle, "fontSize", 200, 1, fontSize, fontSize2, null ) );
+						seq.addChild( assets.AnimationManager.getAnimatedItem( lblTitle, "fontSize", 200, 1, fontSize2, fontSize, null ) );
+						seq.play();
+					}
+
+					seq = null;
+					pulseTitleTimeout = setTimeout( pulseTitle, 4500 );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			override public function toString():String
+			{
+				return this.id.split( "." ).pop();
+			}
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser" />
+	</fx:Declarations>
+
+	<s:VGroup gap="20" horizontalCenter="0" verticalCenter="0" horizontalAlign="center" verticalAlign="middle">
+		<s:Group width="100%" id="grpTitle">
+			<s:Graphic maskType="alpha" horizontalCenter="0">
+				<s:Rect width="{lblTitle.width}" height="{lblTitle.height}">
+					<s:fill>
+						<s:LinearGradient rotation="90">
+							<s:entries>
+								<s:GradientEntry color="#FFF6AD" ratio="0.33"/>
+								<s:GradientEntry color="#FFC938" ratio="0.66"/>
+							</s:entries>
+						</s:LinearGradient>
+					</s:fill>
+				</s:Rect>
+				<s:mask>
+					<s:Label id="lblTitle" width="100%" textAlign="center" styleName="title" text="" />
+				</s:mask>
+			</s:Graphic>
+			<s:filters>
+				<s:GlowFilter id="glowFilterTitle" blurX="8" blurY="8" color="#FFA41C" strength="2" />
+			</s:filters>
+		</s:Group>
+
+		<s:Group width="100%" height="220" clipAndEnableScrolling="true">
+			<s:Group id="grpNumbers" height="220">
+				<s:HGroup gap="1" horizontalAlign="center" horizontalCenter="0">
+					<StoreOverview:SOProgressiveNumber id="number5" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></StoreOverview:SOProgressiveNumber>
+					<StoreOverview:SOProgressiveNumber id="number4" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></StoreOverview:SOProgressiveNumber>
+					<StoreOverview:SOProgressiveNumber id="number3" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></StoreOverview:SOProgressiveNumber>
+					<StoreOverview:SOProgressiveNumber id="number2" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></StoreOverview:SOProgressiveNumber>
+					<StoreOverview:SOProgressiveNumber id="number1" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></StoreOverview:SOProgressiveNumber>
+					<StoreOverview:SOProgressiveNumber id="number0" onRollOver="number_rollOverHandler" onStopped="number_stoppedHandler" backgroundColor="0xFFFFFF"></StoreOverview:SOProgressiveNumber>
+				</s:HGroup>
+
+				<s:HGroup gap="1" horizontalAlign="center" horizontalCenter="0">
+					<s:Image id="number5Shadow" width="160" height="200" />
+					<s:Image id="number4Shadow" width="160" height="200" />
+					<s:Image id="number3Shadow" width="160" height="200" />
+					<s:Image id="number2Shadow" width="160" height="200" />
+					<s:Image id="number1Shadow" width="160" height="200" />
+					<s:Image id="number0Shadow" width="160" height="200" />
+				</s:HGroup>
+			</s:Group>
+		</s:Group>
+	</s:VGroup>
+</s:SkinnableContainer>

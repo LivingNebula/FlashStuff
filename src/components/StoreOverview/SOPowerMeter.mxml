@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="640" height="640"
+		 initialize="group1_initializeHandler(event)">
+
+	<fx:Declarations>
+		<s:GlowFilter id="glowFilter" blurX="16" blurY="16" color="0xFFFFFF" alpha="1" />
+		<s:DropShadowFilter id="dropFilter" blurX="3" blurY="3" angle="180" distance="-5" color="0x000000" alpha="0.5" />
+	</fx:Declarations>
+
+	<fx:Script>
+		<![CDATA[
+			import assets.AnimationManager;
+			import assets.DataTimer;
+			import assets.Images;
+
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+
+			import spark.components.Image;
+			import spark.effects.Animate;
+			import spark.effects.Fade;
+			import spark.effects.Move;
+			import spark.effects.animation.RepeatBehavior;
+
+			import utils.MathHelper;
+
+			private var powerLevel:Number = 0;
+			private var len:int = 0;
+			private var repeatCount:int = 0;
+			private var incrementAmt:Number = 0;
+			private var changeTimer:DataTimer;
+			private var aniFilter:Animate;
+			private var aniFilterTimoutRef:uint = uint.MIN_VALUE;
+
+			private var grpLEDOff:Group;
+			private var grpLEDMask:Group;
+			private var imgLEDColors:Image;
+
+			private var arrLEDsRow1:Array;
+			private var arrLEDsRow2:Array;
+			private var arrLEDsRow3:Array;
+
+			public function get level():Number
+			{
+				return this.powerLevel;
+			}
+
+			public function get litLEDCount():int
+			{
+				return Math.ceil( arrLEDsRow1.length * powerLevel );
+			}
+
+			public function get totalLEDCount():int
+			{
+				return 64;
+			}
+
+			protected function group1_initializeHandler(event:FlexEvent):void
+			{
+				var i:int;
+
+				// Get the LED array
+				arrLEDsRow1 = MathHelper.getNPointsOnCircle( new Point( this.width / 2, this.height / 2 ), ( 600 / 2 ) - 95, totalLEDCount );
+				arrLEDsRow2 = MathHelper.getNPointsOnCircle( new Point( this.width / 2, this.height / 2 ), ( 600 / 2 ) - 75, totalLEDCount );
+				arrLEDsRow3 = MathHelper.getNPointsOnCircle( new Point( this.width / 2, this.height / 2 ), ( 600 / 2 ) - 5, totalLEDCount );
+				for( i; i < arrLEDsRow1.length / 4 - 1; i++ )
+				{
+					arrLEDsRow1.unshift( arrLEDsRow1.pop() );
+					arrLEDsRow2.unshift( arrLEDsRow2.pop() );
+					arrLEDsRow3.unshift( arrLEDsRow3.pop() );
+				}
+
+				// Create the turn off leds
+				grpLEDOff = new Group();
+				grpLEDOff.width = this.width;
+				grpLEDOff.height = this.height;
+				grpLEDOff.graphics.clear();
+				grpLEDOff.graphics.beginFill( 0x232323 );
+				for( i = 0; i < arrLEDsRow1.length; i++ )
+				{
+					grpLEDOff.graphics.drawCircle( arrLEDsRow1[i].x, arrLEDsRow1[i].y, 6 );
+					grpLEDOff.graphics.drawCircle( arrLEDsRow2[i].x, arrLEDsRow2[i].y, 7 );
+					grpLEDOff.graphics.drawCircle( arrLEDsRow3[i].x, arrLEDsRow3[i].y, 10 );
+				}
+				grpLEDOff.graphics.endFill();
+				this.addElement( grpLEDOff );
+
+				// Create the mask
+				grpLEDMask = new Group();
+				grpLEDMask.cacheAsBitmap = true;
+				grpLEDMask.width = this.width;
+				grpLEDMask.height = this.height;
+				grpLEDMask.filters = [ glowFilter, dropFilter ];
+				this.addElement( grpLEDMask );
+
+				// Create the meter itself
+				imgLEDColors = new Image();
+				imgLEDColors.cacheAsBitmap = true;
+				imgLEDColors.source = assets.Images.SOProgressivePowerMeter;
+				imgLEDColors.mask = grpLEDMask;
+				this.addElement( imgLEDColors );
+
+				// Animate the LEDs
+				aniFilter = AnimationManager.getFadeAnimation( imgLEDColors, 1, 0.7, 50, 0, 4, 0 );
+				aniFilter.repeatBehavior = RepeatBehavior.REVERSE;
+				aniFilter.addEventListener( EffectEvent.EFFECT_END, aniFilter_onEnd );
+				aniFilter.play();
+			}
+
+			// Handles the aniFilter's "EFFECT_END" event
+			protected function aniFilter_onEnd( event:EffectEvent ):void
+			{
+				aniFilter.duration = MathHelper.randomNumber( 50, 125 );
+				aniFilter.repeatCount = MathHelper.randomNumber( 1, 3 ) * 2;
+				aniFilterTimoutRef = setTimeout( aniFilter.play, MathHelper.randomNumber( 500, 4000 ) );
+			}
+
+			// Updates the power meter level immediately or based on an interval
+			public function setPowerLevel( level:Number, duration:int = 0 ):void
+			{
+				// Stop any existing timer
+				if( changeTimer != null && changeTimer.running )
+				{
+					changeTimer.stop();
+					changeTimer.removeEventListener( TimerEvent.TIMER, changeTimer_onTimer );
+					changeTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, changeTimer_onComplete );
+					changeTimer = null;
+				}
+
+				// Cap the power level
+				level = level < 0 ? 0 : level > 1 ? 1 : level;
+
+				// Set the power level immediately or over a duration
+				if( duration == 0 )
+				{
+					setPowerLevelInterval( level );
+				}
+				else
+				{
+					repeatCount = Math.ceil( duration / 2000 );
+					incrementAmt = ( level - powerLevel ) / repeatCount;
+
+					changeTimer = new DataTimer( 2000, 2000, repeatCount, incrementAmt );
+					changeTimer.addEventListener( TimerEvent.TIMER, changeTimer_onTimer );
+					changeTimer.addEventListener( TimerEvent.TIMER_COMPLETE, changeTimer_onComplete );
+					changeTimer.start();
+				}
+			}
+
+			// Handles the changeTimer's "TIMER" event
+			protected function changeTimer_onTimer( event:TimerEvent ):void
+			{
+				setPowerLevelInterval( powerLevel + Number( changeTimer.data ) );
+			}
+
+			// Handles the changeTimer's "TIMER_COMPLETE" event
+			protected function changeTimer_onComplete( event:TimerEvent ):void
+			{
+				changeTimer.removeEventListener( TimerEvent.TIMER, changeTimer_onTimer );
+				changeTimer.removeEventListener( TimerEvent.TIMER_COMPLETE, changeTimer_onComplete );
+				changeTimer = null;
+			}
+
+			// Updates the power meter level on an interval
+			private function setPowerLevelInterval( level:Number ):void
+			{
+				// Set the power level
+				powerLevel = level < 0 ? 0 : level > 1 ? 1 : level;
+
+				// Clear the LEDs
+				grpLEDMask.graphics.clear();
+
+				// Redraw the LEDs
+				grpLEDMask.graphics.beginFill( 0xFFFFFF );
+				len = this.litLEDCount;
+
+				for( var i:int = 0; i < len; i++ )
+				{
+					grpLEDMask.graphics.drawCircle( arrLEDsRow1[i].x, arrLEDsRow1[i].y, 6 );
+					grpLEDMask.graphics.drawCircle( arrLEDsRow2[i].x, arrLEDsRow2[i].y, 7 );
+					grpLEDMask.graphics.drawCircle( arrLEDsRow3[i].x, arrLEDsRow3[i].y, 10 );
+				}
+				grpLEDMask.graphics.endFill();
+			}
+
+			public function dispose():void
+			{
+				clearTimeout( aniFilterTimoutRef );
+				aniFilterTimoutRef = uint.MIN_VALUE;
+
+				aniFilter.removeEventListener( EffectEvent.EFFECT_END, aniFilter_onEnd );
+				aniFilter.end();
+				aniFilter = null;
+			}
+		]]>
+	</fx:Script>
+
+</s:Group>

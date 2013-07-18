@@ -1,0 +1,677 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VideoSlots:VideoSlotsBonusGame xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								xmlns:s="library://ns.adobe.com/flex/spark" 
+								xmlns:mx="library://ns.adobe.com/flex/mx" 
+								xmlns:cx="components.*"
+								xmlns:VideoSlots="components.VideoSlots.*"
+								width="800" height="560"
+								initialize="init(event)">
+	<fx:Declarations>
+		<s:Bounce id="bounceEaser"/>
+		<s:Linear id="linearEaser" easeInFraction="0" easeOutFraction="0"/>	
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Achievements.Rewards;
+			
+			import objects.ErrorMessage;
+			
+			import assets.AnimationManager;
+			import assets.SkinManager;
+			import assets.SoundManager;
+			
+			import components.BonusGameIconSWF;
+			
+			import flash.display.Loader;
+			
+			import mx.core.UIComponent;
+			import mx.effects.Glow;
+			import mx.effects.Sequence;
+			import mx.effects.Tween;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.SystemManager;
+			
+			import objects.AchievementReward;
+			import objects.Route;
+			
+			import services.SweepsAPI;
+			
+			import spark.effects.Animate;
+			import spark.effects.AnimateFilter;
+			import spark.effects.Fade;
+			import spark.effects.Move;
+			import spark.effects.Scale;
+			import spark.effects.animation.MotionPath;
+			import spark.effects.animation.SimpleMotionPath;
+			import spark.filters.GlowFilter;
+			
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( LuckyDucky_BonusGame );				
+			
+			private var introLoader:Loader;
+			private var introSound:SoundChannel;
+			private var ambienceSound:SoundChannel;
+			private var endSound:SoundChannel;
+			private var exitSound:SoundChannel;
+			private var mcIntroExit:MovieClip;
+			private var gameCompleted:Boolean = false;
+			private var gameIcons:Array;
+			private var lastFrame:int = 0;
+			private var revealingCount:int = 0;
+			private var revealedCount:int = 0;
+			private var animationIcon:Class;
+			private var exitIcon:Class;
+			private var freeSpinTimeout:uint = uint.MIN_VALUE;
+			private var rabbitsFootInProgress:Boolean = false;
+			private var previousBalance:int = 0;
+			private var win:Route;
+			
+			protected function init( event:FlexEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "init", arguments );
+				
+				// Get the icon and exit graphic
+				animationIcon = SkinManager.getSkinAsset( styleManager, "BonusGameIcon_Animation" );
+				exitIcon = SkinManager.getSkinAsset( styleManager, "BonusIconExit" );
+				
+				// Set the source of the background image
+				imgBG.source = SkinManager.getSkinAsset( styleManager, "BonusBG" );	
+				imgBonusDisplay.source = SkinManager.getSkinAsset( styleManager, "BonusWinDisplay" );
+				imgFreeSpins.source = SkinManager.getSkinAsset( styleManager, "FreeSpins" );
+				
+				// Set the Rabbit's Foot Image
+				imgRabbitsFoot.source = Rewards.rewardRabbitsFootMedium;
+				imgRabbitsFoot.visible = Sweeps.hasReward( AchievementReward.REWARD_RABBITS_FOOT );
+				imgRabbitsFoot.enabled = false;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override public function setParameters( betAmount:int, curLines:int, bonusWin:int, winAmount:int, startingAmount:int = 0 ):void
+			{
+				// Log Activity
+				logger.pushContext( "setParameters", arguments );
+				super.setParameters( betAmount, curLines, bonusWin, winAmount, startingAmount );
+				calculateRevealWinnings( Sweeps.hasReward( AchievementReward.REWARD_RABBITS_FOOT ) ? 15 : 20, false ); // Number of icons
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			override public function resetAndPlay():void
+			{
+				// Log Activity
+				logger.pushContext( "resetAndPlay", arguments );
+				
+				// Reset game completed
+				gameCompleted = false;				
+				rabbitsFootInProgress = false;				
+				revealedCount = 0;
+				previousBalance = 0;
+				ddWinAmount.displayAmount = 0;
+				ddWinAmountExit.displayAmount = 0;
+				mcIntroExit = null;
+				if( introLoader != null )
+				{
+					introLoader.unloadAndStop( true );
+				}
+				
+				// Put the rabbits foot back
+				if( Sweeps.hasReward( AchievementReward.REWARD_RABBITS_FOOT ) ) 
+				{
+					imgRabbitsFoot.buttonMode = false;
+					imgRabbitsFoot.enabled = false;
+					imgRabbitsFoot.x = 684;
+					imgRabbitsFoot.y = 24;
+					imgRabbitsFoot.visible = true;
+					imgRabbitsFoot.alpha = 1;				
+				}
+				else
+				{
+					imgRabbitsFoot.visible = imgRabbitsFoot.enabled = imgRabbitsFoot.buttonMode = false;
+				}
+				
+				// Remove any existing icons
+				grpIcons.removeAllElements();
+				
+				// Create the icons
+				gameIcons = 
+					[
+						[125, 264, 4],
+						[159, 356, 1],
+						[226, 69, 13],
+						[224, 243, 13],
+						[253, 160, 17],
+						[299, 365, 17],
+						[337, 214, 10],
+						[340, 99, 17],
+						[395, 334, 4],
+						[420, 104, 3],
+						[430, 230, 10],
+						[498, 180, 2],
+						[520, 361, 13],
+						[543, 72, 6],
+						[558, 264, 13],
+						[593, 135, 10],
+						[342, 19, 9],
+						[644, 355, 9],
+						[665, 250, 9],
+						[675, 145, 6],
+					];
+				
+				for( var i:int = 0; i < gameIcons.length; i++ )
+				{
+					var icon:BonusGameIconSWF = new BonusGameIconSWF( animationIcon, exitIcon, gameIcons[i][2], "bradyBunch", 36 );
+					icon.x = gameIcons[i][0] - grpIcons.x;
+					icon.y = gameIcons[i][1] - grpIcons.y;
+					
+					icon.onSelected = icon_clickHandler;
+					icon.onReveal = icon_revealHandler;
+					
+					grpIcons.addElement( icon );
+				}
+				
+				// Calculate the winnings and play the intro
+				playIntro();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the icon 'click' event
+			protected function icon_clickHandler( icon:BonusGameIconSWF ):void 
+			{
+				// Log Activity
+				logger.pushContext( "icon_clickHandler", arguments );
+				
+				if( gameCompleted || rabbitsFootInProgress )
+				{
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				revealingCount++;
+				icon.buttonMode = false;
+				icon.onSelected = null;
+				
+				if( revealWinnings.length == 0 && !gameCompleted )
+				{
+					logger.info( "Game is now completed." );
+					
+					gameCompleted = true;
+					icon.depth = 5;
+					icon.revealWin( "Fire", "Fire" );
+									
+					// Play the end audio
+					logger.info( "Playing end sound." );
+					endSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "End" ), 0, 1 );
+					if( endSound != null )
+					{
+						logger.info( "Adding sound transform." );
+						var soundTransform:SoundTransform = new SoundTransform( 0.25 );
+						endSound.soundTransform = soundTransform;
+					}
+					else
+					{
+						logger.warn( "SoundChannel endSound is null." );
+					}
+				}
+				else if( !gameCompleted )
+				{
+					win = revealWinnings.shift() as Route;
+					
+					switch( win.Func )
+					{
+						case "+":
+							SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Win1" ), 0, 1 );
+							icon.revealWin( win.Func, win.Display, win.TotalEndValue );	
+							break;
+						
+						case "*":
+							SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Win2" ), 0, 1 );
+							icon.revealWin( win.Func, win.Display, win.TotalEndValue );	
+							break;
+						
+						case "/":
+							SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Lose1" ), 0, 1 );							
+							icon.revealWin( win.Func, win.Display, win.TotalEndValue );	
+							break
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the icon 'reveal' event
+			protected function icon_revealHandler( icon:BonusGameIconSWF, winnings:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "icon_revealHandler", arguments );
+				
+				imgRabbitsFoot.buttonMode = imgRabbitsFoot.enabled = imgRabbitsFoot.visible;
+				revealedCount++;
+				revealingCount--;
+				
+				logger.info( "Disposing of the revealed icon." );
+				icon.dispose();
+				grpIcons.removeElement( icon );
+				
+				if( gameCompleted && revealingCount == 0 )
+				{
+					logger.info( "Game is completed, calling playFreeSpins." );
+					playFreeSpins( ddWinAmount.displayAmount );
+				}
+				else
+				{
+					previousBalance = ddWinAmount.displayAmount;
+					ddWinAmount.displayAmount = winnings;	
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles playing the intro
+			private function playIntro():void
+			{
+				// Log Activity
+				logger.pushContext( "playIntro", arguments );
+				
+				// Play the intro
+				lastFrame = 0;
+				introLoader = new Loader();
+				introLoader.contentLoaderInfo.addEventListener( Event.COMPLETE, introLoader_completeHandler );
+				introLoader.loadBytes( new ( SkinManager.getSkinAsset( styleManager, "BonusGameIntro_Animation" ) )() );
+				
+				var ui:UIComponent = new UIComponent();
+				ui.addChild( DisplayObject( introLoader ) );
+				grpLayer2.addElementAt( ui, 0 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'complete' event of introLoader when loading the intro animation
+			protected function introLoader_completeHandler( event:Event ):void
+			{
+				// Log Activity
+				logger.pushContext( "introLoader_completeHandler", arguments );
+				
+				// Cleanup the event listener
+				introLoader.contentLoaderInfo.removeEventListener( Event.COMPLETE, introLoader_completeHandler );
+				
+				// Show the intro
+				logger.info( "Setting layer visibility." );
+				grpLayer2.visible = true;
+				grpLayer1.visible = false;
+				grpLayer0.visible = false;
+				
+				// Play the intro audio
+				logger.info( "Playing intro sound." );
+				introSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Intro" ), 0, 1 );
+				if( introSound != null )
+				{
+					logger.info( "Adding intro sound complete listener." );
+					introSound.addEventListener( Event.SOUND_COMPLETE, introAudio_completeHandler );
+				}
+				else
+				{
+					logger.warn( "SoundChannel introSound is null." );
+				}				
+				
+				// Cast the loader.content in our movie clip and listen for the enter frame event
+				// so we can hide the intro when it's over
+				logger.info( "Casting introLoader.content to MovieClip" );
+				mcIntroExit = introLoader.content as MovieClip;	
+				if( mcIntroExit != null && mcIntroExit is MovieClip )
+				{
+					logger.info( "Adding mcIntroExit enter frame listener." );
+					mcIntroExit.addEventListener( Event.ENTER_FRAME, introAnimation_enterFrameHandler );
+					
+					// Start the intro
+					mcIntroExit.gotoAndPlay( 1 );
+				}
+				else
+				{	
+					var errMsg:ErrorMessage = new ErrorMessage( "LuckyDucky_BonusGame:Bonus Game Intro Loader Complete handler fired, but intro Movie Clip is not available.", "", "", "" );
+					if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API ) 
+					{
+						throw new Error( errMsg.toString() );
+					}
+					else
+					{
+						SweepsAPI.reportError( errMsg );
+						
+						mcIntroExit = null;
+						introLoader.unloadAndStop( true );
+						introLoader = null;
+						
+						grpLayer0.visible = true;
+						grpLayer1.visible = false;
+						grpLayer2.visible = false;
+						grpLayer2.removeElementAt( 0 );
+						
+						// Play the ambience sound
+						logger.info( "Playing ambient sound." );
+						ambienceSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Ambience" ), 50, int.MAX_VALUE );
+						
+						if( ambienceSound != null )
+						{
+							logger.info( "Adding sound transform." );
+							var soundTransform:SoundTransform = new SoundTransform( 0.25 );
+							ambienceSound.soundTransform = soundTransform;
+						}
+						else
+						{
+							logger.warn( "SoundChannel ambienceSound is null." );
+						}
+					}	
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'sound complete' event of introSound when loading the intro audio
+			protected function introAudio_completeHandler( event:Event ):void
+			{
+				// Log Activity
+				logger.pushContext( "introAudio_completeHandler", arguments );
+				
+				// Cleanup the event listener
+				introSound.removeEventListener( Event.SOUND_COMPLETE, introAudio_completeHandler );
+				
+				if( introSound != null )
+				{
+					introSound.stop();
+					introSound = null;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "enter frame" event of the intro animation
+			private function introAnimation_enterFrameHandler( event:Event ):void 
+			{			
+				if( mcIntroExit.currentFrame == mcIntroExit.totalFrames || lastFrame > mcIntroExit.currentFrame )
+				{
+					logger.pushContext( "introAnimation_enterFrameHandler", arguments );
+					logger.info( "Removing mcIntroExit enter frame listener." );
+					
+					mcIntroExit.removeEventListener( Event.ENTER_FRAME, introAnimation_enterFrameHandler );
+					mcIntroExit = null;
+					
+					logger.info( "Unloading intro loader." );
+					introLoader.unloadAndStop( true );
+					introLoader = null;
+					
+					logger.info( "Setting group visibility." );
+					grpLayer0.visible = true;
+					grpLayer1.visible = false;
+					grpLayer2.visible = false;
+					grpLayer2.removeElementAt( 0 );									
+										
+					// Play the ambience sound
+					logger.info( "Playing ambient sound." );
+					ambienceSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Ambience" ), 50, int.MAX_VALUE );					
+					if( ambienceSound != null )
+					{
+						logger.info( "Adding sound transform." );
+						var soundTransform:SoundTransform = new SoundTransform( 0.25 );
+						ambienceSound.soundTransform = soundTransform;
+					}
+					else
+					{
+						logger.warn( "SoundChannel ambienceSound is null." );
+					}
+					
+					// Clear Context
+					logger.popContext();					
+					return;
+				}		
+				
+				lastFrame = mcIntroExit.currentFrame;				
+			}
+			
+			// Handles playing the free spins transition animation
+			private function playFreeSpins( freeSpinCount:int ):void
+			{
+				// Log Activity
+				logger.pushContext( "playFreeSpins", arguments );
+				
+				// Set the free spin count
+				ddFreeSpins.displayAmount = freeSpinCount;
+				
+				// Remove the ambience audio
+				if( ambienceSound != null )
+				{
+					ambienceSound.stop();
+					ambienceSound = null;
+				}
+				
+				// Play the transition animation
+				grpLayer1.alpha = 0;
+				grpLayer0.visible = true;
+				grpLayer1.visible = true;
+				grpLayer2.visible = false;
+				
+				var obj:Object = new Object();
+				obj.onTweenUpdate = function( i:Number ):void {
+					grpLayer1.alpha = i;
+				};
+				
+				obj.onTweenEnd = function( i:Number ):void {
+					freeSpinTimeout = setTimeout( freeSpinTimeoutHandler, 1500 );
+				};
+				
+				var twn:Tween = new Tween( obj, 0, 1, 1500 );
+				
+				// Clear Context
+				logger.popContext();				
+			}					
+			
+			// Handles the freeSpinTimeout
+			private function freeSpinTimeoutHandler():void
+			{
+				// Log Activity
+				logger.pushContext( "freeSpinTimeoutHandler", arguments );							
+				clearTimeout( freeSpinTimeout );
+				_onPlayFreeSpins( this );
+				grpLayer1.visible = false;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles playing the exit
+			override public function playExit( winAmount:int, isCurrency:Boolean ):void
+			{
+				// Log Activity
+				logger.pushContext( "playExit", arguments );
+				
+				// Set the exit win amount
+				logger.info( "Setting the win amount display." );
+				ddWinAmountExit.displayAmount = winAmount;
+				ddWinAmountExit.isCurrency = isCurrency;							
+				
+				// Play the exit
+				logger.info( "Play the exit animation." );
+				lastFrame = 0;
+				introLoader = new Loader();
+				introLoader.contentLoaderInfo.addEventListener( Event.COMPLETE, exitLoader_completeHandler );
+				introLoader.loadBytes( new ( SkinManager.getSkinAsset( styleManager, "BonusGameExit_Animation" ) )() );							
+				
+				// Play the exit audio
+				logger.info( "Play the exit audio." );
+				exitSound = SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Exit" ), 0, 1 );
+				
+				logger.info( "Adding the exit animation to the display list." );
+				var ui:UIComponent = new UIComponent();
+				ui.addChild( DisplayObject( introLoader ) );
+				grpLayer2.addElementAt( ui, 0 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'complete' event of introLoader when loading the exit animation
+			protected function exitLoader_completeHandler( event:Event ):void
+			{
+				// Log Activity
+				logger.pushContext( "exitLoader_completeHandler", arguments );
+				
+				// Cleanup the event listener and show the exit animation				
+				introLoader.contentLoaderInfo.removeEventListener( Event.COMPLETE, exitLoader_completeHandler );
+				grpLayer2.visible = true;
+				grpLayer1.visible = false;
+				grpLayer0.visible = false;
+				for( var i:int = 0; i < grpIcons.numElements; i++ )
+				{
+					var icon:BonusGameIconSWF = grpIcons.getElementAt( 0 ) as BonusGameIconSWF;
+					icon.dispose();
+					grpIcons.removeElement( icon );					
+				}
+				
+				// Cast the loader.content in our movie clip and listen for the enter frame event
+				// so we can hide the exit when it's over		
+				mcIntroExit = introLoader.content as MovieClip;	
+				mcIntroExit.addEventListener( Event.ENTER_FRAME, exitAnimation_enterFrameHandler );	
+				
+				// Start the intro
+				mcIntroExit.gotoAndPlay( 1 );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function exitAnimation_enterFrameHandler( event:Event ):void
+			{
+				ddWinAmountExit.visible = mcIntroExit.currentFrame >= 40 && mcIntroExit.currentFrame <= 60;	
+				
+				if( mcIntroExit.currentFrame == mcIntroExit.totalFrames || lastFrame > mcIntroExit.currentFrame )
+				{
+					mcIntroExit.removeEventListener( Event.ENTER_FRAME, exitAnimation_enterFrameHandler );
+					mcIntroExit = null;
+					introLoader.unloadAndStop( true );
+					introLoader = null;
+					grpLayer2.removeElementAt( 0 );
+					
+					// Remove the end audio
+					if( endSound != null )
+					{
+						endSound.stop();
+						endSound = null;
+					}
+					
+					// Remove the exit audio
+					if( exitSound != null )
+					{
+						exitSound.stop();
+						exitSound = null;
+					}
+					
+					// Call the game finished event
+					GameFinished();
+					return;
+				}		
+				
+				lastFrame = mcIntroExit.currentFrame;
+			}
+
+			protected function imgRabbitsFoot_clickHandler(event:MouseEvent):void
+			{
+				// Log Activity
+				logger.pushContext( "imgRabbitsFoot_clickHandler", arguments );
+				
+				// Make sure we're in the proper state to actually click the rabbit's icon
+				if( revealingCount > 0 || gameCompleted || rabbitsFootInProgress )
+				{
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				// Set the state so we can't click this more than once
+				rabbitsFootInProgress = true;
+				imgRabbitsFoot.removeEventListener( MouseEvent.CLICK, imgRabbitsFoot_clickHandler );
+				imgRabbitsFoot.buttonMode = false;
+				
+				// Recalculate the route
+				super.setParameters( betAmount, curLines, bonusWin, winAmount, previousBalance );
+				super.calculateRevealWinnings( 20 - revealedCount, false );	
+				
+				// If our new route starts off with the same step we just undid, redo the route
+				while( revealWinnings[0].Func == win.Func && revealWinnings[0].TotalEndValue == win.TotalEndValue ) 
+				{
+					super.calculateRevealWinnings( 20 - revealedCount, false );	
+				}
+				
+				// Setup the animation & listeners
+				var anim1:Scale = assets.AnimationManager.getScaleAnimation( imgRabbitsFoot, 1, 1, .05, .05, 600, 0, 1, 0, bounceEaser );
+				var anim2:Move = assets.AnimationManager.getMoveAnimation( imgRabbitsFoot, imgRabbitsFoot.x, imgRabbitsFoot.y, 50, 140, 50, 0, 1, 0, null );
+				var anim3:Scale = assets.AnimationManager.getScaleAnimation( imgRabbitsFoot, .05, .05, 1, 1, 600, 0, 1, 0, bounceEaser );
+				var anim4:Move = assets.AnimationManager.getMoveAnimation( imgRabbitsFoot, 50, 140, 220, 140, 2000, 0, 1, 0, null );
+				anim4.addEventListener( EffectEvent.EFFECT_UPDATE, imgRabbitsFoot_moveUpdateHandler );
+				var anim5:Fade = assets.AnimationManager.getFadeAnimation( imgRabbitsFoot, 1, 0, 1000, 0, 1, 0, null );
+				anim5.addEventListener( EffectEvent.EFFECT_END, imgRabbitsFoot_fadeEndHandler );
+								
+				var seq:Sequence = new Sequence();
+				seq.addChild( anim1 );
+				seq.addChild( anim2 );
+				seq.addChild( anim3 );
+				seq.addChild( anim4 );
+				seq.addChild( anim5 );
+				seq.play();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function imgRabbitsFoot_moveUpdateHandler( event:EffectEvent ):void
+			{
+				if( imgRabbitsFoot.x > 150 ) 
+				{
+					Move( event.target ).removeEventListener( EffectEvent.EFFECT_UPDATE, imgRabbitsFoot_moveUpdateHandler );
+					ddWinAmount.displayAmount = previousBalance;
+				}
+			}
+
+			protected function imgRabbitsFoot_fadeEndHandler( event:EffectEvent ):void
+			{
+				Fade( event.target ).removeEventListener( EffectEvent.EFFECT_END, imgRabbitsFoot_fadeEndHandler );
+				imgRabbitsFoot.visible = imgRabbitsFoot.buttonMode = imgRabbitsFoot.enabled = false;
+				rabbitsFootInProgress = false;
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Group id="grpLayer0" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" visible="false" depth="0">
+		<s:BitmapImage id="imgBG" width="800" height="560" x="0" y="0"></s:BitmapImage>
+		<s:BitmapImage id="imgBonusDisplay" width="250" height="250" x="19" y="20"></s:BitmapImage>
+		
+		<cx:DigitDisplay id="ddWinAmount" x="92" y="185" width="103" displayAmount="0" fontSize="36" isCurrency="false" />
+		
+		<s:Group id="grpIcons" width="757" height="454" x="22" y="16" clipAndEnableScrolling="true"></s:Group>
+		
+		<mx:Image id="imgRabbitsFoot" width="85" height="85" x="684" y="24" depth="3" buttonMode="true" click="imgRabbitsFoot_clickHandler(event)" />
+	</s:Group>
+	
+	<s:Group id="grpLayer1" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" depth="1" visible="false">
+		<mx:Image id="imgFreeSpins" width="800" height="560" x="0" y="0"></mx:Image>
+		<cx:DigitDisplay id="ddFreeSpins" x="376" y="285" width="48" displayAmount="0" fontSize="48" depth="2" color="0xFFFFFF" isCurrency="false" />
+	</s:Group>
+	
+	<s:Group id="grpLayer2" width="800" height="560" x="0" y="0" clipAndEnableScrolling="true" depth="2">
+		<cx:DigitDisplay id="ddWinAmountExit" x="275" y="370" width="288" displayAmount="0" fontSize="48" depth="2" color="0xFFFFFF" isCurrency="true" visible="false" />
+	</s:Group>	
+</VideoSlots:VideoSlotsBonusGame>

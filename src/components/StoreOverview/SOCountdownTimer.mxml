@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:StoreOverview="components.StoreOverview.*"
+		 creationComplete="creationCompleteHandler(event)">
+
+	<fx:Declarations>
+		<s:Sequence id="glowSequence" repeatCount="1" duration="500">
+			<s:Animate target="{countDownTimerDisplay}"><s:SimpleMotionPath property="alpha" valueFrom="1" valueTo="0.75"/></s:Animate>
+			<s:Animate target="{countDownTimerDisplay}"><s:SimpleMotionPath property="alpha" valueFrom="0.75" valueTo="1"/></s:Animate>
+		</s:Sequence>
+
+		<s:GlowFilter id="glowFilter" color="0xFF0000" strength="1" alpha="1" blurX="16" blurY="16" />
+	</fx:Declarations>
+
+	<fx:Script>
+		<![CDATA[
+			import assets.Fonts;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+
+			import flash.events.TimerEvent;
+			import flash.filters.GlowFilter;
+			import flash.utils.Timer;
+
+			import mx.events.FlexEvent;
+
+			import utils.DebugHelper;
+			import utils.MathHelper;
+
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( SOCountdownTimer );
+
+			private var countdownTimer:Timer;
+			private var countdownSeconds:int = 0;
+			private var countdownFormat:int = 0;
+			private var countdownStart:int = 0;
+			private var timerTickSound:SoundChannel;
+			private var creationCompletedCallback:Function = null;
+			private var countdownAlmostCompletedCallback:Function = null;
+			private var countdownCompletedCallback:Function = null;
+
+			private var seconds:Number = 0;
+			private var minutes:Number = 0;
+			private var hours:Number = 0;
+			private var days:Number = 0;
+
+			private var s:String = "";
+			private var m:String = "";
+			private var h:String = "";
+			private var d:String = "";
+
+			private var dayString:String = "";
+			private var hourString:String = "";
+			private var minuteString:String = "";
+			private var secondString:String = "";
+
+			private const WORD_ARRAY:Array = ["one","two","three","four","five","six","seven","eight","nine","ten"];
+
+			// Timer format options
+			public const DAYS:int = 3;
+			public const HOURS:int = 2;
+			public const MINUTES:int = 1;
+			public const SECONDS:int = 0;
+
+			// Timer start options
+			public const NONE:int = 0;
+			public const IMMEDIATELY:int = 1;
+
+			// Sets the countdown timer's creation completed callback function
+			public function set setCreationCompletedCallback( value:Function ):void
+			{
+				creationCompletedCallback = value;
+			}
+
+			// Sets the countdown timer's almost completed callback function
+			public function set setCountdownAlmostCompletedCallback( value:Function ):void
+			{
+				countdownAlmostCompletedCallback = value;
+			}
+
+			// Sets the countdown timer's completed callback function
+			public function set setCountdownCompletedCallback( value:Function ):void
+			{
+				countdownCompletedCallback = value;
+			}
+
+			// Sets the countdown timer's time (in seconds)
+			public function set setCountdownSeconds( value:int ):void
+			{
+				countdownSeconds = value;
+			}
+
+			// Sets the countdown timer's display format
+			// Days|Hours|Minutes|Seconds
+			public function set setCountdownFormat( value:int ):void
+			{
+				countdownFormat = value;
+			}
+
+			// Sets the countdown timer's start time
+			public function set setCountdownStart( value:int ):void
+			{
+				countdownStart = value;
+			}
+
+			// Starts the countdown timer
+			public function startTimer():void
+			{
+				logger.pushContext( "startTimer", arguments );
+
+				if( countdownTimer == null )
+				{
+					// Set up a timer to handle the countdown
+					countdownTimer = new Timer(1000, countdownSeconds);
+					countdownTimer.addEventListener( TimerEvent.TIMER, timerHandler );
+					countdownTimer.start();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Stops the countdown timer
+			public function stopTimer():void
+			{
+				logger.pushContext( "stopTimer", arguments );
+
+				if( countdownTimer != null )
+				{
+					// Clear the countdown timer
+					countdownTimer = null;
+				}
+
+				// Stop the display blink
+				stopBlink();
+
+				// Fire the callback
+				if( countdownCompletedCallback != null )
+				{
+					countdownCompletedCallback();
+					countdownCompletedCallback = null;
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Starts the blink timer
+			protected function startBlink():void
+			{
+				logger.pushContext( "startBlink", arguments );
+
+				// Start the blink indicator
+				glowSequence.play();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Stops the blink timer
+			protected function stopBlink():void
+			{
+				logger.pushContext( "stopBlink", arguments );
+
+				// Reset the coundown timer display
+				countDownTimerDisplay.alpha = 1.0
+
+				// Stop the blink indicator
+				glowSequence.stop();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the creation complete event
+			protected function creationCompleteHandler( event:FlexEvent ):void
+			{
+				logger.pushContext( "creationCompleteHandler", arguments );
+
+				// Display the countdown timer
+				displayCounter();
+
+				// Fire the creation complete callback
+				if( creationCompletedCallback != null )
+				{
+					creationCompletedCallback();
+					creationCompletedCallback = null;
+				}
+
+				// Check if to start the countdown immediately
+				if( countdownStart == IMMEDIATELY )
+				{
+					startTimer();
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Displays the countdown timer
+			private function displayCounter( secs:Number = 0 ):void
+			{
+				logger.pushContext( "displayCounter", arguments );
+
+				// Display the countdown timer in the requested format
+				countDownTimerDisplay.text = formatTime( secs * 1000, countdownFormat );
+				countDownTimerDisplayOff.text = countDownTimerDisplay.text.replace( /[^:]/gi, "8" );
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the timer event of the countdown timer
+			protected function timerHandler( event:TimerEvent ):void
+			{
+				// Log Activty
+				logger.pushContext( "timerHandler", arguments );
+
+				// Update the remaining seconds in the countdown
+				countdownSeconds = countdownSeconds - 1;
+
+				// Log the seconds remaining
+				logger.debug( countdownSeconds );
+
+				// Check if the timer has reached 0
+				if( countdownSeconds <= 0 )
+				{
+					// Clear the almost complete callback
+					countdownAlmostCompletedCallback = null;
+
+					// Update the countdown timer display to show no time remaining
+					countDownTimerDisplay.text = formatTime( 0, countdownFormat );
+
+					// Stop the countdown timer
+					if( countdownTimer != null )
+					{
+						countdownTimer.removeEventListener( TimerEvent.TIMER, timerHandler );
+						countdownTimer.stop();
+					}
+
+					// Play an audio indicator
+					timerTickSound = SoundManager.playSound( assets.Sounds.buzzer, 0, 0 );
+					timerTickSound.addEventListener( Event.SOUND_COMPLETE, timerSoundComplete );
+
+					// Clear Context
+					logger.popContext();
+					return;
+				}
+				else
+				{
+					if( countdownSeconds <= 10 ) // Check if 10 seconds remain
+					{
+						// Fire the almost complete callback
+						if( countdownAlmostCompletedCallback != null )
+						{
+							countdownAlmostCompletedCallback( countdownSeconds );
+						}
+
+						// Play the countdown audio indicator(s)
+						timerTickSound = SoundManager.playSound( assets.Sounds[getWordFromNumber( countdownSeconds )], 0, 1 );
+
+						// Show the timer in red and blink
+						countDownTimerDisplay.setStyle( "color", "0xFF0000" );
+						countDownTimerDisplay.filters = [glowFilter];
+						startBlink();
+					}
+					else
+					{
+						// Play an audio indicator
+						timerTickSound = SoundManager.playSound( assets.Sounds.timerTick, 0, 0 );
+					}
+
+					// Update the countdown timer display
+					displayCounter( countdownSeconds );
+				}
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Handles the complete event of the countdown timer sound
+			protected function timerSoundComplete( event:Event ):void
+			{
+				logger.pushContext( "timerSoundComplete", arguments );
+
+				// Remove the timer sound
+				timerTickSound.removeEventListener( Event.SOUND_COMPLETE, timerSoundComplete );
+				timerTickSound = null;
+
+				// Stop the countdown timer
+				stopTimer();
+
+				// Clear Context
+				logger.popContext();
+			}
+
+			// Formats the countdown timer
+			private function formatTime( milliseconds:Number, detailLevel:uint = 1 ):String
+			{
+				seconds = Math.round(milliseconds / 1000);
+				minutes = Math.floor(seconds / 60);
+				hours = Math.floor(minutes / 60);
+				days = Math.floor(hours / 24);
+
+				s = String( seconds % 60 );
+				m = String( minutes % 60 );
+				h = String( hours % 24 );
+				d = String( days );
+
+				if( detailLevel == DAYS )
+				{
+					if( d.length < 2 )
+					{
+						d = "00" + d;
+					}
+					else if( d.length < 3 )
+					{
+						d = "0" + d;
+					}
+
+					dayString = d + ".";
+				}
+
+				if( detailLevel >= HOURS )
+				{
+					if( h.length < 2 )
+					{
+						h = "0" + h;
+					}
+
+					hourString = h + ":";
+				}
+
+				if( detailLevel >= MINUTES )
+				{
+					if( m.length < 2 )
+					{
+						m = "0" + m;
+					}
+
+					minuteString = m + ":";
+				}
+
+				if( detailLevel >= SECONDS )
+				{
+					if( s.length < 2 )
+					{
+						s = "0" + s;
+					}
+
+					secondString = s + "";
+				}
+
+				return dayString + hourString + minuteString + secondString;
+			}
+
+			// Returns the number in word format
+			private function getWordFromNumber( number:Number ):String
+			{
+				return WORD_ARRAY[number - 1];
+			}
+		]]>
+	</fx:Script>
+
+	<s:Group horizontalCenter="0" verticalCenter="0">
+		<s:Label horizontalCenter="0" verticalCenter="0" id="countDownTimerDisplayOff" fontFamily="digital7" fontSize="110" scaleY="1.5" scaleX="1.15" color="0x212121"></s:Label>
+		<s:Label horizontalCenter="0" verticalCenter="0" id="countDownTimerDisplay" fontFamily="digital7" fontSize="110" scaleY="1.5" scaleX="1.15" color="0xFFFFFF"></s:Label>
+	</s:Group>
+
+</s:Group>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  xmlns:cx="components.*"
+					  width="800" height="600"
+					  backgroundColor="#000000"
+					  creationComplete="init( event )">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Fonts;
+			import assets.Images;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import mx.core.UIComponent;
+			
+			import mx.events.FlexEvent;
+			
+			import utils.FormatHelper;
+			
+			private var uiProgressiveWin:UIComponent;
+			private var balance:int = 0;
+			
+			// Initializes the control
+			private function init( event:FlexEvent ):void
+			{			
+				// Set the page focus
+				btnOk.setFocus();
+			}
+			
+			// Sets the winning balance
+			public function setBalance( newBalance:int ):void
+			{
+				balance = newBalance;	
+				
+				// Load the animation
+				var loader:Loader = new Loader();
+				loader.load( new URLRequest( Sweeps.AssetsLocation + "/Images/ProgressiveJackpotWin.swf?winAmount=" + FormatHelper.formatEntriesAndWinnings( balance ) ) );
+				
+				// Display the animation
+				uiProgressiveWin = new UIComponent();
+				uiProgressiveWin.addChild( DisplayObject( loader ) );
+				uiProgressiveWin.x = 25;
+				uiProgressiveWin.y = 75;
+				grpProgressiveWin.addElement( uiProgressiveWin );				
+			}
+			
+			// Handles the OK button click
+			private function closePopUp():void 
+			{				
+				// Remove all the elements
+				removeAllElements();
+				
+				// Remove the current control
+				Sweeps.getInstance().removeProgressiveWin();
+				
+				this.visible = false; // Hide the current control
+			}
+			
+			// Handles the mouse down event of the button
+			protected function mouseDownHandler( event:MouseEvent ):void
+			{						
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+			}
+		]]>		
+	</fx:Script>
+	
+	<s:Group id="grpProgressiveWin" width="800" height="600" top="0" clipAndEnableScrolling="true">
+		<cx:ImageButton id="btnOk" label="OK" click="closePopUp();" skinClass="skins.ButtonSkin" imageSkin="{Images.btnLarge_up}" imageSkinOver="{Images.btnLarge_over}" imageSkinDown="{Images.btnLarge_down}" imageSkinDisabled="{Images.btnLarge_disabled}" horizontalCenter="0" bottom="25" mouseDown="mouseDownHandler(event)"/>
+	</s:Group>
+	
+</s:SkinnableContainer>

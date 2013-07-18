@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Label xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 x="1" y="1" width="100%" height="100%" 
+		 textAlign="right" 
+		 fontFamily="digital7" 
+		 fontSize="26"
+		 color="#F48784">
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Image;
+			import mx.effects.Tween;
+			import mx.events.FlexEvent;
+			
+			import utils.FormatHelper;
+			
+			private var _displayAmount:int = 0;
+			private var _isCurrency:Boolean = true;
+			private var _targetAmount:int = 0;
+			private var _twn:Tween;
+			private var _animationCallback:Function;
+			private var _isAnimating:Boolean = false;
+			
+			public function set displayAmount( newAmount:int ):void
+			{
+				_displayAmount = newAmount;
+				updateDisplay();
+			}	
+			
+			public function get displayAmount():int
+			{
+				return _displayAmount;
+			}
+			
+			public function set isCurrency( value:Boolean ):void
+			{
+				_isCurrency = value;
+				updateDisplay();
+			}
+			
+			public function get isCurrency():Boolean
+			{
+				return _isCurrency;
+			}
+			
+			public function get isAnimating():Boolean
+			{
+				return _isAnimating;
+			}
+			
+			public function animateDisplayAmount( newAmount:int, duration:Number, callback:Function = null ):void
+			{
+				_animationCallback = callback;
+				_targetAmount = newAmount;
+				_isAnimating = true;
+				_twn = new Tween( this, displayAmount, newAmount, duration );
+			}
+			
+			public function endAnimation():void
+			{
+				if( _twn != null && _twn.listener != null )
+				{
+					_twn.endTween();
+				}
+			}
+			
+			private function updateDisplay():void
+			{
+				text = _isCurrency ? FormatHelper.formatEntriesAndWinnings( _displayAmount ) : _displayAmount.toString();
+			}
+			
+			public function onTweenUpdate( i:Number ):void
+			{
+				// Update the display amount
+				displayAmount = i < 1.00 ? i : Math.round( i );
+			}
+			
+			public function onTweenEnd( i:Number ):void
+			{
+				// Cleanup the tween
+				_twn.listener = null;
+				_twn = null;
+				_isAnimating = false;
+				
+				// Update the display amount
+				displayAmount = _targetAmount;
+				
+				// Execute the animation callback
+				if( _animationCallback != null )
+				{
+					_animationCallback( this );
+					_animationCallback = null;
+				}
+			}
+		]]>
+	</fx:Script>
+</s:Label>

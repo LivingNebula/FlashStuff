@@ -1,0 +1,304 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* Animations */
+	Intro_Animation: Embed(source="/../../../assets/VideoSlots/SharkAttack/animations/Intro.flv", mimeType="application/octet-stream");
+	BonusGameIntro_Animation: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/BonusGame_Intro.flv", mimeType="application/octet-stream");	
+	BonusGameIcon_Animation: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/BonusGame_Icon.swf", mimeType="application/octet-stream");
+	BonusGameExit_Animation: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/BonusGame_Exit.flv", mimeType="application/octet-stream");
+		
+	/* Sprites */
+	Sprite_C: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_C.png");		
+	Sprite_C_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_C_1.png");		
+	Sprite_C_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_C_2.png");
+	Sprite_C_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_C_3.png");
+	Sprite_C_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_C_4.png");		
+	Sprite_C_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_C_5.png");
+	Sprite_C_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_C_6.png");
+	
+	Sprite_D_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_1.png");		
+	Sprite_D_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_2.png");
+	Sprite_D_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_3.png");
+	Sprite_D_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_4.png");	
+	Sprite_D_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_5.png");
+	Sprite_D_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_6.png");
+	Sprite_D_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_7.png");
+	Sprite_D_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_D_8.png"); 		
+	
+	Sprite_E: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_E.png");
+	Sprite_E_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_E_1.png");
+	Sprite_E_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_E_2.png");
+	Sprite_E_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_E_3.png");
+	Sprite_E_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_E_4.png");
+	Sprite_E_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_E_5.png");
+	Sprite_E_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Sprite_E_6.png");
+	
+	/* Images */
+	Skin: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Skin.png");
+	Skin1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Skin1.png");
+	SkinFreeSpins: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/SkinFreeSpins.png");
+	LineNumbersLeft: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/LineNumbers_Left.png");
+	LineNumbersRight: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/LineNumbers_Right.png");
+	InfoSkin: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/InfoSkin.png");	
+	InfoPaytableTitle: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/InfoPaytableTitle.png");
+	InfoNavigator: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/InfoNavigator.png");
+	InfoNext: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/InfoNext.png");		
+	InfoPrevious: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/InfoPrevious.png");
+	InfoBetLines: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/InfoBetLines.png");
+	InfoBonusGame: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/InfoBonusGame.png");
+	BackToGame: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/BackToGame.png");
+	BackToGame_over: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/BackToGame_over.png");
+	Transparent: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Transparent.png");	
+	Bonus2xBig: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Bonus2xBig.png");
+	Bonus2xSmall: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/Bonus2xSmall.png");	
+	
+	/* Images - Reel Icons*/
+	ReelIcon_A: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A.png");
+	ReelIcon_A_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_01.png"); 		
+	ReelIcon_A_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_02.png");
+	ReelIcon_A_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_03.png");		
+	ReelIcon_A_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_04.png");		
+	ReelIcon_A_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_05.png");		
+	ReelIcon_A_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_06.png");		
+	ReelIcon_A_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_07.png");		
+	ReelIcon_A_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_08.png");
+	ReelIcon_A_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_09.png");
+	ReelIcon_A_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_10.png");
+	ReelIcon_A_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_11.png");
+	
+	ReelIcon_A_Vertical: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical.png");
+	ReelIcon_A_Vertical_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_01.png"); 		
+	ReelIcon_A_Vertical_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_02.png");
+	ReelIcon_A_Vertical_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_03.png");		
+	ReelIcon_A_Vertical_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_04.png");		
+	ReelIcon_A_Vertical_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_05.png");		
+	ReelIcon_A_Vertical_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_06.png");		
+	ReelIcon_A_Vertical_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_07.png");	
+	ReelIcon_A_Vertical_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_08.png");
+	ReelIcon_A_Vertical_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_09.png");
+	ReelIcon_A_Vertical_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_10.png");
+	ReelIcon_A_Vertical_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_11.png");
+	ReelIcon_A_Vertical_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_12.png");
+	
+	ReelIcon_A_Vertical_NonWin: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin.png");
+	ReelIcon_A_Vertical_NonWin_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_01.png"); 		
+	ReelIcon_A_Vertical_NonWin_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_02.png");
+	ReelIcon_A_Vertical_NonWin_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_03.png");		
+	ReelIcon_A_Vertical_NonWin_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_04.png");		
+	ReelIcon_A_Vertical_NonWin_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_05.png");		
+	ReelIcon_A_Vertical_NonWin_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_06.png");
+	ReelIcon_A_Vertical_NonWin_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_07.png");	
+	ReelIcon_A_Vertical_NonWin_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_08.png");
+	ReelIcon_A_Vertical_NonWin_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_09.png");
+	ReelIcon_A_Vertical_NonWin_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_10.png");
+	ReelIcon_A_Vertical_NonWin_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_11.png");
+	ReelIcon_A_Vertical_NonWin_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_A_Vertical_NonWin_12.png");
+	
+	ReelIcon_B: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B.png");	
+	ReelIcon_B_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_01.png"); 		
+	ReelIcon_B_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_02.png");		
+	ReelIcon_B_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_03.png");		
+	ReelIcon_B_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_04.png");		
+	ReelIcon_B_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_05.png");		
+	ReelIcon_B_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_06.png");		
+	ReelIcon_B_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_07.png");		
+	ReelIcon_B_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_08.png");
+	ReelIcon_B_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_09.png");		
+	ReelIcon_B_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_10.png"); 		
+	ReelIcon_B_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_11.png");		
+	ReelIcon_B_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_B_12.png");
+	
+	ReelIcon_C: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C.png");	
+	ReelIcon_C_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_01.png");
+	ReelIcon_C_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_02.png");		
+	ReelIcon_C_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_03.png");		
+	ReelIcon_C_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_04.png");		
+	ReelIcon_C_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_05.png");		
+	ReelIcon_C_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_06.png");		
+	ReelIcon_C_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_07.png");		
+	ReelIcon_C_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_08.png");
+	ReelIcon_C_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_09.png");		
+	ReelIcon_C_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_10.png"); 		
+	ReelIcon_C_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_11.png");		
+	ReelIcon_C_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_C_12.png");
+	
+	ReelIcon_D: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D.png");	
+	ReelIcon_D_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_01.png"); 		
+	ReelIcon_D_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_02.png"); 		
+	ReelIcon_D_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_03.png");		
+	ReelIcon_D_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_04.png");
+	ReelIcon_D_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_05.png");
+	ReelIcon_D_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_06.png");		
+	ReelIcon_D_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_07.png");		
+	ReelIcon_D_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_08.png");
+	ReelIcon_D_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_09.png");		
+	ReelIcon_D_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_10.png"); 		
+	ReelIcon_D_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_11.png");		
+	ReelIcon_D_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_D_12.png");
+	
+	ReelIcon_E: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E.png");	
+	ReelIcon_E_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_01.png"); 		
+	ReelIcon_E_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_02.png");		
+	ReelIcon_E_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_03.png");		
+	ReelIcon_E_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_04.png");
+	ReelIcon_E_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_05.png");		
+	ReelIcon_E_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_06.png");
+	ReelIcon_E_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_07.png");		
+	ReelIcon_E_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_08.png");
+	ReelIcon_E_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_09.png");		
+	ReelIcon_E_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_10.png"); 		
+	ReelIcon_E_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_11.png");		
+	ReelIcon_E_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_E_12.png");
+	
+	ReelIcon_F: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F.png");	
+	ReelIcon_F_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_01.png"); 		
+	ReelIcon_F_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_02.png");		
+	ReelIcon_F_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_03.png");		
+	ReelIcon_F_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_04.png");
+	ReelIcon_F_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_05.png");		
+	ReelIcon_F_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_06.png");
+	ReelIcon_F_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_07.png");		
+	ReelIcon_F_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_08.png");
+	ReelIcon_F_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_09.png");		
+	ReelIcon_F_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_10.png"); 		
+	ReelIcon_F_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_11.png");		
+	ReelIcon_F_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_F_12.png");
+	
+	ReelIcon_G: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G.png");	
+	ReelIcon_G_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_01.png");
+	ReelIcon_G_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_02.png");		
+	ReelIcon_G_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_03.png");		
+	ReelIcon_G_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_04.png");
+	ReelIcon_G_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_05.png");		
+	ReelIcon_G_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_06.png");
+	ReelIcon_G_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_07.png");		
+	ReelIcon_G_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_08.png");
+	ReelIcon_G_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_09.png");		
+	ReelIcon_G_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_10.png"); 		
+	ReelIcon_G_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_11.png");		
+	ReelIcon_G_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_G_12.png");
+	
+	ReelIcon_H: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H.png");	
+	ReelIcon_H_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_01.png"); 		
+	ReelIcon_H_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_02.png"); 		
+	ReelIcon_H_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_03.png");
+	ReelIcon_H_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_04.png");
+	ReelIcon_H_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_05.png");		
+	ReelIcon_H_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_06.png");		
+	ReelIcon_H_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_07.png");		
+	ReelIcon_H_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_08.png");
+	ReelIcon_H_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_09.png");		
+	ReelIcon_H_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_10.png"); 		
+	ReelIcon_H_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_11.png");		
+	ReelIcon_H_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_H_12.png");
+	
+	ReelIcon_I: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I.png");	
+	ReelIcon_I_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_01.png");
+	ReelIcon_I_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_02.png");		
+	ReelIcon_I_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_03.png");		
+	ReelIcon_I_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_04.png");
+	ReelIcon_I_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_05.png");		
+	ReelIcon_I_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_06.png");		
+	ReelIcon_I_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_07.png");
+	ReelIcon_I_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_08.png");	
+	ReelIcon_I_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_09.png");		
+	ReelIcon_I_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_10.png"); 		
+	ReelIcon_I_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_11.png");		
+	ReelIcon_I_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_I_12.png");	
+	
+	ReelIcon_J: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J.png");	
+	ReelIcon_J_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_01.png");
+	ReelIcon_J_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_02.png");		
+	ReelIcon_J_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_03.png");		
+	ReelIcon_J_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_04.png");
+	ReelIcon_J_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_05.png");		
+	ReelIcon_J_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_06.png");		
+	ReelIcon_J_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_07.png");
+	ReelIcon_J_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_08.png");
+	ReelIcon_J_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_09.png");		
+	ReelIcon_J_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_10.png"); 		
+	ReelIcon_J_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_11.png");		
+	ReelIcon_J_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_J_12.png");
+	
+	ReelIcon_K: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K.png");
+	ReelIcon_K_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_01.png");
+	ReelIcon_K_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_02.png");		
+	ReelIcon_K_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_03.png");		
+	ReelIcon_K_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_04.png");		
+	ReelIcon_K_5: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_05.png");		
+	ReelIcon_K_6: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_06.png");		
+	ReelIcon_K_7: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_07.png");
+	ReelIcon_K_8: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_08.png");
+	ReelIcon_K_9: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_09.png");
+	ReelIcon_K_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_10.png"); 
+	ReelIcon_K_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_11.png"); 
+	ReelIcon_K_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/images/ReelIcon_K_12.png"); 
+	
+	/* Bonus Images */
+	BonusBG: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/BonusBG.jpg");
+	BonusWinDisplay: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/BonusWinDisplay.png");			
+	BonusIconExit: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/BonusIconExit.png");
+	FreeSpins: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/FreeSpins.png");
+	
+	/* Sounds */
+	Background_Audio: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/BackgroundAudio.mp3");
+	Bonus_Audio: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/BonusAudio.mp3");
+	Spin_Start: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Spin_Start.mp3");		
+	Spin_Stop: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Spin_Stop.mp3");			
+	
+	/* Winning Lines */
+	LineWin_A: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_A.mp3"); /* Played for ReelIcon_A */	
+	LineWin_B: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_B.mp3"); /* Played for ReelIcon_B */
+	LineWin_C: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_C.mp3"); /* Played for ReelIcon_C */	
+	LineWin_D: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_D.mp3"); /* Played for ReelIcon_D */
+	LineWin_E: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_E.mp3"); /* Played for ReelIcon_E */
+	LineWin_F: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_F.mp3"); /* Played for ReelIcon_F */
+	LineWin_G: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_G.mp3"); /* Played for ReelIcon_G */
+	LineWin_H: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_H.mp3"); /* Played for ReelIcon_H */
+	LineWin_I: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_I.mp3"); /* Played for ReelIcon_I */
+	LineWin_J: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_J.mp3"); /* Played for ReelIcon_J */	
+	LineWin_High: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_High.mp3"); /* Played for ReelIcon_D, E, F */ 				
+	LineWin_Low: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/LineWin_Low.mp3"); /* Played for ReelIcon_G, H, I, J */						
+						
+	/* Scatter Icons */
+	Scatter_Anticipation: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Scatter_Anticipation.mp3");
+	Scatter_Win: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Scatter_Win.mp3");
+	Scatter_0: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Scatter_0.mp3");	
+	Scatter_1: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Scatter_1.mp3");	
+	Scatter_2: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Scatter_2.mp3");	
+	Scatter_3: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Scatter_3.mp3");	
+	Scatter_4: Embed(source="/../../../assets/VideoSlots/SharkAttack/sounds/Scatter_4.mp3");	
+	
+	/* Bonus Sounds */
+	Intro: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/sounds/Intro.mp3");
+	End: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/sounds/End.mp3");
+	Exit: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/sounds/Exit.mp3");
+	Ambience: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/sounds/Ambience.mp3");
+	Win1: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/sounds/Win1.mp3");
+	Win2: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/sounds/Win2.mp3");
+	Lose1: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/sounds/Lose1.mp3");	
+	
+	/* Fonts */
+	chunkyBlock: Embed( source='/../../../assets/VideoSlots/SharkAttack/fonts/LHFChunkyBlock.ttf', fontFamily='chunkyBlock', mimeType='application/x-font' );
+	quadrex: Embed( source='/../../../assets/VideoSlots/SharkAttack/fonts/LHFQuadrex.otf', fontFamily='quadrex', mimeType='application/x-font' );
+	splashItalic: Embed( source='/../../../assets/VideoSlots/SharkAttack/fonts/LHFSplashItalic.ttf', fontFamily='splashItalic', mimeType='application/x-font' );
+	
+	/* Skin Specific */
+	Shark_Swim_00: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_00.png");
+	Shark_Swim_01: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_01.png");
+	Shark_Swim_02: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_02.png");
+	Shark_Swim_03: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_03.png");
+	Shark_Swim_04: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_04.png");
+	Shark_Swim_05: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_05.png");
+	Shark_Swim_06: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_06.png");
+	Shark_Swim_07: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_07.png");
+	Shark_Swim_08: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_08.png");
+	Shark_Swim_09: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_09.png");
+	Shark_Swim_10: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_10.png");
+	Shark_Swim_11: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_11.png");
+	Shark_Swim_12: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_12.png");
+	Shark_Swim_13: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_13.png");
+	Shark_Swim_14: Embed(source="/../../../assets/VideoSlots/SharkAttack/BonusGame/images/Shark_Swim_14.png");
+}

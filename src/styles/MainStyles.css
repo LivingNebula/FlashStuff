@@ -1,0 +1,93 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+
+.Title {
+	color: #FFFFFF;
+	font-size: 11;
+	font-weight: bold;	
+}
+
+.Label {
+	color: #FFFFFF;
+}
+
+.LabelYellow {
+	color: #FFFF00;
+}
+
+.LabelBlack {
+	color: #000000;
+}
+
+.LabelMagenta {
+	color: #F52C70;	
+}
+
+.LabelWhite {
+	color: #FFFFFF;	
+	font-family: Verdana;
+	font-size: 12px;	
+}
+
+.LabelMenuItem {
+	color: #1C1E1D;
+}
+
+.LabelMenuLink {
+	color: #98AA2C;
+	font-family: Verdana;
+	font-size: 14px;
+	font-weight: bold;
+}
+
+.LabelMainPanel {
+	color: #1C1E1D;
+	font-family: Verdana;
+	font-size: 12px;
+	font-weight: bold;	
+}
+
+.LabelBadgeName {
+	color: #FFFFFF;	
+	font-family: Verdana;
+	font-size: 14px;
+	font-weight: bold;		
+}
+
+.LabelRedeem {
+	font-family: Verdana;
+	font-size: 14px;
+	font-weight: bold;	
+}
+
+.LabelTimerWhite {
+	color: #FFFFFF;	
+	font-family: digital7;
+	font-size: 160px;
+	font-weight: bold;
+}
+
+.LabelTimerRed {
+	color: #FF0000;	
+	font-family: digital7;
+	font-size: 160px;
+	font-weight: bold;
+}
+
+.LabelDemo {
+	color: #FFFFFF;	
+	font-family: Verdana;
+	font-size: 10px;
+	font-weight: bold;
+}
+
+.TextBox {
+	font-family: Verdana;
+	font-weight: bold;
+}
+
+.Error {
+	color: #FF0000;
+}

@@ -1,0 +1,1939 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:cx="components.*"
+					  xmlns:VideoBlackjack="components.VideoBlackjack.*"
+					  minWidth="800" minHeight="600" width="800" height="600" 
+					  backgroundColor="#000000"
+					  creationComplete="creationComplete( event )" 
+					  implements="interfaces.IDisposable"
+					  creationPolicy="none" xmlns:local="*">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Config;
+			import assets.DataTimer;
+			import assets.SkinManager;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import components.Progress;
+			import components.ProgressiveJackpot;
+			
+			import mx.events.FlexEvent;
+			import mx.events.StyleEvent;
+			
+			import objects.BlackjackLogic;
+			import objects.Card;
+			import objects.Deck;
+			import objects.Hand;
+			import objects.Pile;
+			import objects.PlayGameResponse;
+			
+			import services.SweepsAPI;
+			
+			import utils.DebugHelper;
+			import utils.MathHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( VideoBlackjack );			
+			
+			private var betAmounts:Array = [20, 30, 50, 100, 200, 300, 500];
+			private var betAmountStep:int = 0;
+			private var winHands:Array = 
+				[
+					[2.5, BlackjackLogic.RESULT_BLACKJACK],
+					[2.0, BlackjackLogic.RESULT_WIN],
+					[1.0, BlackjackLogic.RESULT_PUSH],
+					[0.0, BlackjackLogic.RESULT_LOSE]
+				];
+			private var targetWinMultiplier:Number = 0;
+			private var targetResults:Array = [];
+			private var splitResults:Array = [];
+			private var curHands:int = 1;
+			private var maxHands:int = 3;
+			private var deck:Deck;			
+			private var dealerHand:Hand;
+			private var dealerValue:int;
+			private var playerHands:Array = [];
+			private var playerValues:Array = [];
+			private var activeBJHand:BlackjackHand = null;
+			private var activeHand:Hand = null;
+			private var serverEntries:int;
+			private var serverWinnings:int;
+			private var achievementsEarned:Array;
+				
+			private var inAction:Boolean = false;
+			
+			private var autoPlay:Boolean = false;
+			private var flasher:Timer;
+			private var bonusFlasher:Timer;
+			private var autoDealTimeout:uint = uint.MIN_VALUE;	
+			private var nextHandTimeout:uint = uint.MIN_VALUE;
+			
+			private var achievementsLoaded:Boolean = false;
+			private var assetsLoaded:Boolean = false;	
+			private var gameLoaded:Boolean = false;
+			
+			private var dealStartTimer:DataTimer;
+			
+			private var image_skin:Class;
+			private var image_header:Class;
+			private var image_bonus:Class;		
+			private var image_cardBack:Class;
+			private var image_inPlay:Class;
+			private var image_score:Class;
+			private var image_win:Class;
+			private var image_lose:Class;
+			private var image_push:Class;
+			private var image_blackjack:Class;
+			private var image_bust:Class;
+			private var image_playAgain:Class;
+			
+			private var cssStyleDispatcher:IEventDispatcher;			
+			
+			// Handles the 'creation complete' event
+			private function creationComplete( event:FlexEvent ):void
+			{		
+				// Log Activity
+				logger.pushContext( "creationComplete", arguments );
+				
+				// Start the progress meter
+				Sweeps.getInstance().startProgressMeter();
+				
+				// Load the application skin
+				cssStyleDispatcher = styleManager.loadStyleDeclarations( Sweeps.AssetsLocation + "/VideoBlackjack/" + Sweeps.GameAsset, false );
+				cssStyleDispatcher.addEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.addEventListener( StyleEvent.COMPLETE, stylesLoaded );
+				cssStyleDispatcher.addEventListener( StyleEvent.ERROR, stylesError );
+				
+				// Clear Context
+				logger.popContext();
+			}			
+			
+			// Handles the 'progress' event of the style SWF
+			private function stylesProgress( event:StyleEvent ):void
+			{
+				Sweeps.getInstance().updateProgressMeter( Math.floor(100 * event.bytesLoaded/event.bytesTotal) );
+			}
+			
+			// Handles the 'complete' event of the style SWF
+			private function stylesLoaded( event:StyleEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "stylesLoaded", arguments );
+				
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );
+				assetsLoaded = true;
+				
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Notifies the game our achivements have loaded
+			public function setAchievementsLoaded():void
+			{
+				// Log Activity
+				logger.pushContext( "setAchievementsLoaded", arguments );	
+				
+				achievementsLoaded = true;
+				
+				if( achievementsLoaded && assetsLoaded && !gameLoaded )
+				{
+					continueLoadingGame();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Loades the deffered content and starts the game
+			private function continueLoadingGame():void
+			{			
+				// Log Activity
+				logger.pushContext( "continueLoadingGame", arguments );
+				
+				if( gameLoaded ) 
+				{
+					// Clear Context
+					logger.popContext();					
+					return; 
+				}
+				gameLoaded = true;
+				
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();
+				
+				// Create any deffered components
+				createDeferredContent();
+				
+				// Setup a listener to display the prize amount
+				flasher = new Timer( 500, 0 );
+				flasher.addEventListener( TimerEvent.TIMER, flasherFired );	
+				
+				// Setup a listener to display the bonus amount
+				bonusFlasher = new Timer( 250, 0 );
+				bonusFlasher.addEventListener( TimerEvent.TIMER, bonusFlasherFired );
+				
+				// Default win amount and current bet amount
+				resetPrize();
+				displayBetAmount();				
+				
+				image_skin = SkinManager.getSkinAsset( styleManager, "Skin" );
+				image_header = SkinManager.getSkinAsset( styleManager, "Header" );
+				image_bonus = SkinManager.getSkinAsset( styleManager, "BonusBG" );
+				image_cardBack = SkinManager.getSkinAsset( styleManager, "CardBack" );
+				image_inPlay = SkinManager.getSkinAsset( styleManager, "InPlay" );
+				image_score = SkinManager.getSkinAsset( styleManager, "ScoreBG" );				
+				image_win = SkinManager.getSkinAsset( styleManager, "Win" );
+				image_lose = SkinManager.getSkinAsset( styleManager, "Lose" );
+				image_bust = SkinManager.getSkinAsset( styleManager, "Bust" );
+				image_blackjack = SkinManager.getSkinAsset( styleManager, "Blackjack" );
+				image_push = SkinManager.getSkinAsset( styleManager, "Push" );
+				image_playAgain = SkinManager.getSkinAsset( styleManager, "PlayAgain" );
+				
+				// Set the UI images' sources to their proper classes
+				imgSkin.source = image_skin;
+				imgHeader.source = image_header;
+				imgBonus.source = image_bonus;		
+				imgPlayAgain.source = image_playAgain;
+				
+				// Init the player and dealer hands
+				bjHandDealer.cardBack = image_cardBack;				
+				bjHandPlayer1.srcInPlay = image_inPlay;
+				bjHandPlayer2.srcInPlay = image_inPlay;
+				bjHandPlayer3.srcInPlay = image_inPlay;
+				bjHandPlayer4.srcInPlay = image_inPlay;	
+				bjHandPlayer5.srcInPlay = image_inPlay;	
+				bjHandPlayer6.srcInPlay = image_inPlay;					
+				
+				bjHandDealer.srcScore = image_score;
+				bjHandPlayer1.srcScore = image_score;
+				bjHandPlayer2.srcScore = image_score;
+				bjHandPlayer3.srcScore = image_score;
+				bjHandPlayer4.srcScore = image_score;	
+				bjHandPlayer5.srcScore = image_score;	
+				bjHandPlayer6.srcScore = image_score;	
+
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );
+				
+				// Clear Context
+				logger.popContext();				
+			}		
+			
+			// Handles the 'error' event of the style SWF
+			private function stylesError( event:StyleEvent ):void
+			{				
+				// Log Activity
+				logger.pushContext( "stylesError" ).error.apply( null, arguments );
+				
+				// Remove the event listeners
+				cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+				cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+
+				// Remove the progress meter
+				Sweeps.getInstance().stopProgressMeter();					
+				
+				// Display a popup indicating an error occurred
+				Sweeps.getInstance().createPopUp( "Oops!", "We're sorry, but there was an error while trying to complete this request.\n\nPlease try again.", false, false );
+				
+				// Enable the main panel
+				Sweeps.getInstance().setInAction( false );				
+				
+				// Return to the main menu
+				Sweeps.getInstance().quit();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Returns the hand result based on the win amount
+			private function getHandByWinAmount( winAmount:Number, closestMatch:Boolean = false ):String
+			{
+				// Log Activity
+				logger.pushContext( "getHandByWinAmount", arguments );
+				
+				var i:int;
+				var retHand:String;
+				
+				// Find our which hand pays the target win amount
+				for( i = 0; i < winHands.length; i++ )
+				{
+					if( winHands[i][0] == winAmount )
+					{						
+						retHand = winHands[i][1];
+						break;
+					}
+				}				
+				
+				// If we didn't find an exact result that pays our win amount, get the closest one that pays less
+				if( retHand == null && closestMatch )
+				{
+					for( i = 0; i < winHands.length; i++ )
+					{
+						if( winAmount < winHands[i][0] ) { continue; }
+						
+						retHand = winHands[i][1];
+						break;
+					}
+				}
+				
+				// If we didn't find a closest match for some reason, set us to losing
+				if( retHand == null || retHand == "" )
+				{
+					retHand = BlackjackLogic.RESULT_LOSE;
+				}
+				
+				// Clear Context
+				logger.popContext();
+				
+				return retHand;
+			}
+			
+			// Returns the win amount based on the hand
+			private function getWinAmountByHand( hand:String ):Number
+			{
+				// Log Activity
+				logger.pushContext( "getWinAmountByHand", arguments );
+				
+				var winAmount:Number = 0;
+				
+				for( var i:int = 0; i < winHands.length; i++ )
+				{
+					if( winHands[i][1] == hand )
+					{
+						winAmount = winHands[i][0];
+						break;
+					}
+				}				
+				
+				// Clear Context
+				logger.popContext();
+				
+				return winAmount;
+			}
+			
+			// Returns the bet amount
+			private function getBetAmount():int
+			{
+				return betAmounts[betAmountStep];
+			}	
+			
+			// Returns the total bet amount
+			private function getTotalBet():int
+			{
+				return getBetAmount() * curHands;
+			}
+			
+			// Displays the current bet amount in the "Bet" box
+			private function displayBetAmount():void
+			{
+				// Log Activity
+				logger.pushContext( "displayBetAmount", arguments );
+				
+				ddBetAmount.displayAmount = getBetAmount() * curHands;
+				
+				bjHandPlayer1.betAmount = getBetAmount();
+				bjHandPlayer2.betAmount = getBetAmount();
+				bjHandPlayer3.betAmount = getBetAmount();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Displays the hands you're playing
+			private function displayBetHands():void
+			{
+				// Log Activity
+				logger.pushContext( "displayBetHands", arguments );
+				
+				bjHandPlayer2.visible = curHands >= 2;
+				bjHandPlayer3.visible = curHands == 3;
+				
+				// This is a quick hack so that when betting more than 1 hand, hand 1 is pushed to the left of the screen
+				// This was much easier than trying to change the logic to deal hand 2 before hand 1.
+				if( curHands == 1 )
+				{
+					bjHandPlayer1.x = 321;
+					bjHandPlayer1.y = 280;
+					
+					bjHandPlayer4.x = 241;
+					bjHandPlayer4.y = 280;
+				}
+				else
+				{
+					bjHandPlayer1.x = 66;
+					bjHandPlayer1.y = 220;
+					
+					bjHandPlayer4.x = 66;
+					bjHandPlayer4.y = 100;		
+					
+					bjHandPlayer2.x = 321;
+					bjHandPlayer2.y = 280;
+					
+					bjHandPlayer3.x = 582;
+					bjHandPlayer3.y = 220;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+					
+			// Stops auto play
+			private function stopAutoPlay():void
+			{
+				// Log Activity
+				logger.pushContext( "stopAutoPlay", arguments );
+				
+				autoPlay = false;
+				btnPanel.stopAutoPlay();
+				
+				// Clear Context
+				logger.popContext();				
+			}		
+			
+			// Checks to see if we should auto deal again
+			private function checkAutoDeal():void
+			{
+				// Log Activity
+				logger.pushContext( "checkAutoDeal", arguments );
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoDealTimeout );
+				autoDealTimeout = uint.MIN_VALUE;
+				
+				if( autoPlay )
+				{
+					if( !inAction )
+					{
+						inAction = true;
+						imgPlayAgain.visible = false;
+						btnPanel.toggleEnabled( false );
+						deal();
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			// Handles the 'firing' event of flasherFired timer
+			private function flasherFired( event:TimerEvent ):void
+			{
+				imgHeader.visible = !imgHeader.visible;
+			}
+			
+			// Handles the 'firing' event of bonusFlasherFired timer
+			private function bonusFlasherFired( event:TimerEvent ):void
+			{
+				imgBonus.visible = !imgBonus.visible;
+			}		
+			
+			private function callPlay( betAmount:int, betCount:int, onSuccess:Function, onError:Function ):void
+			{
+				// Log Activity
+				logger.pushContext( "callPlay", arguments );
+				
+				// Check if in DEBUG Mode
+				if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+				{
+					// Update our progressive jackpot
+					SweepsAPI.progressiveBalanceDemo += Math.ceil( betAmount * betCount * ProgressiveJackpot.JACKPOT_BET_PERCENTAGE );
+										
+					// Save our achievements earned for this spin
+					achievementsEarned = null;					
+					
+					// Default our current win amount
+					serverEntries = Sweeps.Entries;
+					serverWinnings = Sweeps.Winnings;						
+					
+					// Generate our results
+					var results:Array = [];
+					var tmp:Array = BlackjackLogic.getPossibleResults();
+					var tmpResult:String;
+					
+					targetWinMultiplier = 0;
+					for( var i:int = 0; i < curHands; i++ )
+					{
+						tmpResult = tmp[MathHelper.randomNumber(0, tmp.length - 1)] ;
+						results.push( tmpResult );
+						targetWinMultiplier += getWinAmountByHand( tmpResult );
+					}
+					
+					onSuccess( 
+						new PlayGameResponse( { 
+							ReelOutput: results, 
+							WinMount: targetWinMultiplier, 
+							BonusAmount: 0, 
+							ScatterAmount: 0, 
+							LineWins: 0, 
+							FreeSpins: [],  
+							Entries: Sweeps.Entries, 
+							Winnings: Sweeps.Winnings, 
+							Hand: results, 
+							ProgressiveBalance: { 
+								balance : SweepsAPI.progressiveBalanceDemo 
+							}, 
+							ProgressWin: {
+								win_amount: -1
+							},
+							Achievements: []
+						} ) 
+					);
+				}
+				else
+				{
+					// Call the 'Play Game' API event to get our results
+					SweepsAPI.playGame( 
+						Sweeps.Username,
+						Sweeps.Password,
+						Sweeps.GameID,
+						Sweeps.GameType,
+						betAmount, 
+						betCount, 
+						0,
+						onSuccess,
+						onError
+					);					
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Starts a round
+			private function deal():void
+			{
+				// Log Activity
+				logger.pushContext( "deal", arguments );
+				
+				var i:int;
+				var h:int;
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoDealTimeout );
+				autoDealTimeout = uint.MIN_VALUE;				
+				
+				// Initialize the timers
+				dealStartTimer = new DataTimer( 500, 500, 2 * ( 1 + curHands ), null, dealStartTimer_Listener ); 	// 0ms start delay, 100ms card delay
+				
+				// Reset the prize displays
+				resetPrize();
+				
+				// Reset the cards
+				resetHands();				
+				
+				// Check to see if we have enough credits to pay for this deal/bet
+				if( getTotalBet() <= Sweeps.Entries )
+				{
+					// Decrement our entries amount
+					Sweeps.getInstance().displayBalance( Sweeps.Entries - getTotalBet(), Sweeps.Winnings );
+					
+					// Call the round start handler to disable buttons, etc
+					roundStarted();							
+					
+					// Call the play function
+					callPlay( 
+						getBetAmount(),
+						curHands,
+						handlePlayGameSuccess, 
+						handlePlayGameError 
+					);	
+				}
+				else
+				{
+					// If we're on auto play, make sure to stop it.
+					stopAutoPlay();													
+					
+					// Check to see if we have enough winnings that we could redeem to complete this hand
+					if( getTotalBet() <= ( Sweeps.Entries + Sweeps.Winnings ) )
+					{
+						// Check to see if auto-redeem enabled
+						if( Sweeps.AutoRedeemEnabled && Sweeps.Winnings >= 100 )
+						{							
+							var redeemAmount:int = ((getTotalBet() - Sweeps.Entries) <= 100) ? 100 : getTotalBet() - Sweeps.Entries;
+							
+							// Send the request to the service API and handle response
+							SweepsAPI.redeemEntries( Sweeps.Username, Sweeps.Password, Sweeps.Entries, Sweeps.Winnings, redeemAmount, handleRedeemSuccess, handleRedeemError );
+						}
+						else
+						{
+							// Reset the button panel
+							roundEnded();
+							
+							Sweeps.getInstance().loadRedeemQuick();
+						}
+					}
+					else
+					{
+						// Reset the button panel
+						roundEnded();
+						
+						Sweeps.getInstance().createPopUp( "Insufficient Entries", "You do not have enough entries to complete this hand.", false, false );
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles success for the SweepsAPI.redeemEntries call
+			private function handleRedeemSuccess( entries:int, winnings:int ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemSuccess", arguments );
+				
+				// Refresh the account balances
+				Sweeps.getInstance().displayBalance( entries, winnings );
+				
+				// Re-deal
+				deal();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles error for the SweepsAPI.redeemEntries call
+			private function handleRedeemError( errorCode:int, error:String ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handleRedeemError" ).error.apply( null, arguments );
+				
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean = false;
+				var pIsError:Boolean = false;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsError = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this request.\n\nPlease try again.";
+						pIsError = true;
+						break;
+				}
+				
+				// Reset the button panel
+				roundEnded();
+				
+				// Create a popup
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, pIsError, pIsLogout );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles "splitting" a hand
+			private function split( bjHand:BlackjackHand, playerHand:Hand ):void 
+			{
+				// Log Activity
+				logger.pushContext( "split", arguments );
+				
+				activeBJHand = bjHand;
+				activeHand = playerHand;
+				
+				if( getBetAmount() <= Sweeps.Entries )
+				{
+					// Decrement our entries amount
+					Sweeps.getInstance().displayBalance( Sweeps.Entries - getBetAmount(), Sweeps.Winnings );					
+					
+					// Update the local bet amount
+					ddBetAmount.displayAmount += getBetAmount();					
+					
+					// Disable the buttons temporarily
+					bjHand.toggleEnabled( false );
+					
+					// Call the play function
+					callPlay(
+						getBetAmount(),
+						1,
+						handlePlayGameSplitSuccess,
+						handlePlayGameError
+					);
+				}
+				else
+				{
+					Sweeps.getInstance().createPopUp( "Insufficient Entries", "You do not have enough entries to split this hand.", false, false );				
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles "double downing" a hand
+			private function double( bjHand:BlackjackHand, playerHand:Hand ):void
+			{
+				// Log Activity
+				logger.pushContext( "double", arguments );
+				
+				activeBJHand = bjHand;
+				activeHand = playerHand;
+				
+				if( getBetAmount() <= Sweeps.Entries )
+				{
+					// Decrement our entries amount
+					Sweeps.getInstance().displayBalance( Sweeps.Entries - getBetAmount(), Sweeps.Winnings );
+					
+					// Update the local bet amount
+					ddBetAmount.displayAmount += getBetAmount();
+					
+					// Disable the buttons temporarily
+					bjHand.toggleEnabled( false );					
+					
+					// Set the handle to a doubled state
+					bjHand.isDouble = true;
+					
+					// Call the play function
+					callPlay(
+						getBetAmount(),
+						1,
+						handlePlayGameDoubleSuccess,
+						handlePlayGameError
+					);					
+				}
+				else
+				{
+					Sweeps.getInstance().createPopUp( "Insufficient Entries", "You do not have enough entries to double this hand.", false, false );			
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles success for the SweepsAPI.playGame call
+			private function handlePlayGameSuccess( response:PlayGameResponse ):void 
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameSuccess", arguments );
+				
+				// Validate response
+				if( response.ReelOutput == null )
+				{
+					handlePlayGameError( SweepsAPI.ERROR_CODE_UNKNOWN, "Invalid Reel Output" );
+					
+					// Clear Context
+					logger.popContext();
+					
+					return;
+				}
+				
+				// Updates the progressive balance && spins the reel
+				Sweeps.getInstance().displayProgressiveBalance( response.ProgressiveBalance, response.ProgressiveWin <= 0 );
+				Sweeps.getInstance().spinProgressiveReel( response.ProgressiveWin );
+				
+				// Stop auto play if we've won the progressive
+				if( response.ProgressiveWin > 0 )
+				{
+					stopAutoPlay();
+				}	
+				
+				// Save our achievements earned for this spin
+				achievementsEarned = response.Achievements;				
+				
+				var i:int = 0;
+				var h:int = 0;
+				
+				// Set our current win amount
+				targetWinMultiplier = response.WinAmount;
+				serverEntries = response.Entries;
+				serverWinnings = response.Winnings;
+				
+				// Get dealer and player hands that satisfy our results
+				targetResults = response.Hand;
+				splitResults = [null, null, null];
+				var gameHands:Object = BlackjackLogic.satisfyResults( response.Hand );
+				dealerHand = gameHands.dealerHand;
+				dealerValue = gameHands.dealerValue;
+				playerHands = gameHands.playerHands;
+				playerValues = gameHands.playerValues;
+				
+				// Create a holder for the timer data
+				var timerData:Array = [];	
+				
+				// Fill the timer data with the deal order of cards
+				for( i = 0; i < 2; i++ )
+				{
+					for( h = 0; h < curHands; h++ )
+					{
+						logger.debug( "Player[" + h + "]: Play: " + playerHands[h].playCards.toString() + ", Draw: " + playerHands[h].drawCards.toString() );
+						timerData.push( [ h == 0 ? bjHandPlayer1 : h == 1 ? bjHandPlayer2 : bjHandPlayer3, playerHands[h].playCards.getCard( i ).toString(), false ] );
+					}
+					
+					logger.debug( "Dealer: Play: " + dealerHand.playCards.toString() + ", Draw: " + dealerHand.drawCards.toString() );
+					timerData.push( [ bjHandDealer, dealerHand.playCards.getCard( i ).toString(), i == 1 ] );
+				}
+				
+				// Setup the cards to reveal themselves										
+				dealStartTimer.startDelay = 0;
+				dealStartTimer.data = timerData;
+				dealStartTimer.start();	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles success for the SweepsAPI.playGame call when splitting			
+			private function handlePlayGameSplitSuccess( response:PlayGameResponse ):void
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameSplitSuccess", arguments );
+				
+				// Validate response
+				if( response.ReelOutput == null )
+				{
+					handlePlayGameError( SweepsAPI.ERROR_CODE_UNKNOWN, "Invalid Reel Output" );
+					
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				// Updates the progressive balance && spins the reel
+				Sweeps.getInstance().displayProgressiveBalance( response.ProgressiveBalance, response.ProgressiveWin <= 0 );
+				Sweeps.getInstance().spinProgressiveReel( response.ProgressiveWin );
+				
+				// Stop auto play if we've won the progressive
+				if( response.ProgressiveWin > 0 )
+				{
+					stopAutoPlay();
+				}
+				
+				// Save our achievements earned for this spin
+				achievementsEarned = response.Achievements;				
+				
+				// Update our current win event
+				targetWinMultiplier += response.WinAmount;
+				serverEntries = response.Entries;
+				serverWinnings = response.Winnings;
+				
+				var handIndex:int = ["bjHandPlayer1", "bjHandPlayer2", "bjHandPlayer3"].indexOf( activeBJHand.id );
+				var currentTargetResult:String = targetResults[handIndex];
+				var splitTargetResult:String = splitResults[handIndex] = response.Hand[0];
+				
+				// Get two new hands to satisfy our split
+				var gameHands:Object = BlackjackLogic.satisfySplit( dealerValue, activeHand, currentTargetResult, splitTargetResult );							
+				playerHands[handIndex] = gameHands.playerHands[0];
+				playerHands[handIndex + 3] = gameHands.playerHands[1];							
+				playerValues[handIndex] = gameHands.playerValues[0];
+				playerValues[handIndex + 3] = gameHands.playerValues[1];
+				
+				// Clear our hands and put them in play
+				activeBJHand.clear();
+				activeBJHand.toggleEnabled( false, false, false );
+				activeBJHand.hit( SkinManager.getSkinAsset( styleManager, playerHands[handIndex].playCards.getCard( 0 ).toString() ), false );
+				activeBJHand.setValue( playerHands[handIndex].playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK ) );
+				activeBJHand.isSplit = true;
+				
+				var bjHandSplit:BlackjackHand = [bjHandPlayer4, bjHandPlayer5, bjHandPlayer6][handIndex];
+				bjHandSplit.clear();
+				bjHandSplit.toggleEnabled( true, false, false );
+				bjHandSplit.hit( SkinManager.getSkinAsset( styleManager, playerHands[handIndex + 3].playCards.getCard( 0 ).toString() ), false );
+				bjHandSplit.setValue( playerHands[handIndex + 3].playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK ) );
+				bjHandSplit.isSplit = true;
+				bjHandSplit.visible = true;
+				
+				switch( activeBJHand )
+				{
+					case bjHandPlayer1:
+						if( curHands == 1 ) {
+							activeBJHand.x += 80;
+						}
+						else
+						{
+							activeBJHand.y += 30;
+						}
+						break;
+					
+					case bjHandPlayer2:
+						activeBJHand.x += 80;
+						break;
+					
+					case bjHandPlayer3:
+						activeBJHand.y += 30;
+						break;
+				}
+				
+				activeBJHand = bjHandSplit;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles success for the SweepsAPI.playGame call when doubling				
+			private function handlePlayGameDoubleSuccess( response:PlayGameResponse ):void
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameDoubleSuccess", arguments );
+				
+				// Validate response
+				if( response.ReelOutput == null )
+				{
+					handlePlayGameError( SweepsAPI.ERROR_CODE_UNKNOWN, "Invalid Reel Output" );
+					
+					// Clear Context
+					logger.popContext();					
+					return;
+				}
+				
+				// Updates the progressive balance && spins the reel
+				Sweeps.getInstance().displayProgressiveBalance( response.ProgressiveBalance, response.ProgressiveWin <= 0 );
+				Sweeps.getInstance().spinProgressiveReel( response.ProgressiveWin );
+				
+				// Stop auto play if we've won the progressive
+				if( response.ProgressiveWin > 0 )
+				{
+					stopAutoPlay();
+				}	
+				
+				// Save our achievements earned for this spin
+				achievementsEarned = response.Achievements;				
+				
+				// Update our current win event
+				targetWinMultiplier += response.WinAmount;
+				serverEntries = response.Entries;
+				serverWinnings = response.Winnings;	
+				
+				// Determine what hand we should target based on our current hand and the new hand merged
+				var handIndex:int = ["bjHandPlayer1", "bjHandPlayer2", "bjHandPlayer3"].indexOf( activeBJHand.id );
+				var currentTargetHand:String = targetResults[handIndex];
+				var averageWinMultiplier:Number = ( getWinAmountByHand( currentTargetHand ) + getWinAmountByHand( response.Hand[0] ) ) / 2;
+				
+				// Determine target hand based on averaged win amount
+				targetResults[handIndex] = getHandByWinAmount( averageWinMultiplier, true );
+				
+				// Update our hand to satisfy our double
+				activeHand = BlackjackLogic.satisfyDouble( dealerValue, activeHand, targetResults[handIndex] );
+				
+				// "HIT" our last card
+				var card:Card = activeHand.drawCards.drawCard();
+				var value:int;
+				
+				activeHand.playCards.addCard( card );
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Card_Flip" ), 0, 1 );
+				activeBJHand.hit( SkinManager.getSkinAsset( styleManager, card.toString() ), false );
+				
+				value = activeHand.playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK );
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Value_" + value.toString() ), 0, 1 );
+				activeBJHand.setValue( value );	
+				
+				activeBJHand.toggleEnabled( false );
+				nextHandTimeout = setTimeout( activateNextHand, 1000 );	
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles errors for the SweepsAPI.playGame call
+			private function handlePlayGameError( errorCode:int, error:String ):void
+			{
+				// Log Activity
+				logger.pushContext( "handlePlayGameError" ).error.apply( null, arguments );
+				
+				// We've likely had an error and need to alert the player
+				var pTitle:String;
+				var pMessage:String;
+				var pIsLogout:Boolean;
+				
+				switch( errorCode )
+				{
+					case SweepsAPI.ERROR_CODE_UNAUTHORIZED:
+						pTitle = "Unauthorized";
+						pMessage = "We're sorry, but your account can only be logged in to one computer at a time.";
+						pIsLogout = true;
+						break;
+					
+					case SweepsAPI.ERROR_CODE_INSUFFICIENT_ENTRIES:
+						pTitle = "Insufficient Entries";
+						pMessage = "We're sorry, but it appears your entries were out of sync with the server.\n\nWe have updated your balances and you may continue playing.";
+						pIsLogout = true;
+						break;					
+					
+					default:
+						pTitle = "Oops!";
+						pMessage = "We're sorry, but there was an issue while trying to complete this hand.\n\nPlease try again.";
+						pIsLogout = true;
+						break;
+				}
+				
+				Sweeps.getInstance().createPopUp( pTitle, pMessage, false, pIsLogout );
+				
+				// If we're on auto play, make sure to stop it.
+				stopAutoPlay();									
+				
+				// Reset the button panel
+				roundEnded();
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Sets the next player's hand to active, for hit or stay
+			private function activateNextHand():void
+			{
+				// Log Activity
+				logger.pushContext( "activateNextHand", arguments );
+				
+				if( nextHandTimeout > uint.MIN_VALUE )
+				{
+					clearTimeout( nextHandTimeout );
+					nextHandTimeout = uint.MIN_VALUE;
+				}
+				
+				if( activeBJHand != null )
+				{
+					activeBJHand.toggleEnabled( false );
+				}
+				
+				switch( activeBJHand )
+				{
+					case null:
+						activeBJHand = bjHandPlayer1;
+						break;								
+					
+					// Normal hands
+					case bjHandPlayer1:
+						if( curHands > 1 ) 
+						{
+							activeBJHand = bjHandPlayer2;
+						}
+						else { activeBJHand = null; }
+						break;
+					
+					case bjHandPlayer2:
+						if( curHands > 2 ) 
+						{
+							activeBJHand = bjHandPlayer3;
+						}
+						else { activeBJHand = null; }
+						break;
+					
+					case bjHandPlayer3:
+						//Check Win?
+						activeBJHand = null;
+						break;
+					
+					// Split hands 
+					case bjHandPlayer4:
+						activeBJHand = bjHandPlayer1;
+						break;
+					
+					case bjHandPlayer5:
+						activeBJHand = bjHandPlayer2;
+						break;
+					
+					case bjHandPlayer6:
+						activeBJHand = bjHandPlayer3;
+						break;						
+				}
+				
+				if( activeBJHand != null )
+				{
+					activeHand = playerHands[ ["bjHandPlayer1", "bjHandPlayer2", "bjHandPlayer3", "bjHandPlayer4", "bjHandPlayer5", "bjHandPlayer6"].indexOf( activeBJHand.id ) ];
+					var value:int = activeHand.playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK );
+					var cardCount:int = activeHand.playCards.cardCount;
+					var canSplit:Boolean = !activeBJHand.isSplit && cardCount == 2 && ( activeHand.playCards.getCard( 0 ).getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK ) == activeHand.playCards.getCard( 1 ).getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK ) );
+					var canDouble:Boolean = !activeBJHand.isSplit && cardCount == 2 && [9, 10, 11].indexOf( value ) >= 0;
+					
+					activeBJHand.setValue( value );
+					SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Value_" + value ), 0, 1 );
+					
+					if( value == 21 ) 
+					{
+						if( activeHand.playCards.cardCount == 2 )
+						{
+							activeBJHand.displayResult( image_blackjack );
+						}
+						nextHandTimeout = setTimeout( activateNextHand, 1000 );
+					}
+					else
+					{
+						activeBJHand.toggleEnabled( true, canSplit, canDouble );
+					}
+				}
+				else
+				{
+					activeHand = null;
+					activateDealer();
+				}
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			private function activateDealer():void
+			{
+				// Log Activity
+				logger.pushContext( "activateDealer", arguments );
+				
+				if( !bjHandDealer.isRevealed )
+				{
+					bjHandDealer.reveal();
+				}
+				else
+				{
+					// If we're already at our target value, skip to CheckWin
+					var value:int = dealerHand.playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK );
+					if( value > BlackjackLogic.HIT_MAX )
+					{
+						if( value == 21 && dealerHand.playCards.cardCount == 2 )
+						{
+							bjHandDealer.displayResult( image_blackjack );				
+						}
+						
+						if( achievementsEarned == null )
+						{
+							checkWin();
+						}
+						else
+						{
+							Sweeps.getInstance().addNewBadges( achievementsEarned, checkWin );
+						}
+						
+						// Clear Context
+						logger.popContext();						
+						return;
+					}
+					
+					// Start a timer to simulate the dealer drawing cards
+					dealStartTimer.dispose();
+					dealStartTimer = new DataTimer( 1000, 1000, dealerHand.drawCards.cardCount, null, dealerStartTimer_Listener );
+					dealStartTimer.start();
+				}
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the 'COMPLETE' event of the dealerStartTimer
+			private function dealerStartTimer_Listener( event:TimerEvent ):void 
+			{
+				// Log Activity
+				logger.pushContext( "dealerStartTimer_Listener", arguments );
+				
+				var value:int; 
+				var card:Card;				
+				
+				card = dealerHand.drawCards.drawCard();
+				dealerHand.playCards.addCard( card );
+				bjHandDealer.hit( SkinManager.getSkinAsset( styleManager, card.toString() ) );
+				
+				value = dealerHand.playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK );
+				bjHandDealer.setValue( value );
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Value_" + value ), 0, 1 );
+				
+				// Make sure the dealer stops if they're higher than HIT_MAX or if we're out of cards (which should be the same thing)
+				if( value > BlackjackLogic.HIT_MAX || dealStartTimer.currentCount == dealStartTimer.repeatCount )
+				{
+					dealStartTimer.stop();
+					dealStartTimer.dispose();
+					if( value > 21 )
+					{
+						bjHandDealer.displayResult( image_bust );
+					}
+					
+					if( achievementsEarned == null )
+					{
+						checkWin();
+					}
+					else
+					{
+						Sweeps.getInstance().addNewBadges( achievementsEarned, checkWin );
+					}
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Called when the round is started to handle audio and notification events
+			private function roundStarted():void
+			{				
+				// Log Activity
+				logger.pushContext( "roundStarted", arguments );
+				
+				// Disable our button panel
+				imgPlayAgain.visible = false;
+				btnPanel.toggleEnabled( false );
+				
+				// Set our Sweeps inAction value
+				Sweeps.getInstance().setInAction( true );	
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Called when the round is completed to handle audio and notification events
+			private function roundEnded():void
+			{				
+				// Log Activity
+				logger.pushContext( "roundEnded", arguments );
+								
+				// Clear some variables
+				inAction = false;
+				
+				// Re-enable our button panel
+				if( !autoPlay ) 
+				{ 
+					imgPlayAgain.visible = true;
+					btnPanel.toggleEnabled( true );
+					
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( false );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}		
+			
+			// Checks to see if a given round was a winner
+			private function checkWin():void
+			{				
+				// Log Activity
+				logger.pushContext( "checkWin", arguments );
+				
+				// Call displayBetAmount to reset our entries since we have doubled/split
+				displayBetAmount();
+				
+				// Calculate what the dealer received
+				var actualWinMultiplier:Number = 0;
+				var handWinMultiplier:Number = 0;
+				var bjHand:BlackjackHand;
+				var targetResult:String;
+				var actualValue:int;
+				var actualResult:String;
+				var errorResult:Boolean;		
+				
+				for( var i:int = 0; i < 6; i++ )
+				{
+					bjHand =  [bjHandPlayer1, bjHandPlayer2, bjHandPlayer3, bjHandPlayer4, bjHandPlayer5, bjHandPlayer6][i]; // Get a reference to current player hand UI object
+					
+					if( bjHand.visible )
+					{
+						targetResult = i < 3 ? targetResults[i] : splitResults[i - 3]; // What should this hand's result have been
+						actualValue = playerHands[i].playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK ); // Our hand's value
+						actualResult = BlackjackLogic.getResult( dealerHand.playCards, playerHands[i].playCards, bjHand.isSplit ); // What we ended up with
+						errorResult = false; // Is this an error
+						
+						// Figure out our winnings and see if there are any BIG errors
+						switch( actualResult )
+						{							
+							case BlackjackLogic.RESULT_WIN:
+								handWinMultiplier = getWinAmountByHand( actualResult ) * ( bjHand.isDouble ? 2 : 1 );
+								bjHand.displayResult( image_win, getBetAmount() * handWinMultiplier );
+								actualWinMultiplier += handWinMultiplier;
+								if( bjHand.isSplit || bjHand.isDouble )
+								{
+									// If the hand is a split or double, only error if we WON and were supposed to LOSE/PUSH
+									errorResult = targetResult == BlackjackLogic.RESULT_LOSE || targetResult == BlackjackLogic.RESULT_PUSH;
+								}
+								else
+								{
+									// It's an error if we were supposed to LOSE, PUSH or Blackjack
+									errorResult = targetResult != actualResult; 	
+								}
+								break;
+							
+							case BlackjackLogic.RESULT_LOSE:
+								handWinMultiplier = getWinAmountByHand( actualResult ) * ( bjHand.isDouble ? 2 : 1 );
+								bjHand.displayResult( actualValue <= 21 ? image_lose : image_bust );
+								actualWinMultiplier += handWinMultiplier;
+								if( bjHand.isSplit || bjHand.isDouble )
+								{
+									// If the hand is a split or double, do not error
+									errorResult = false;
+								}
+								else
+								{
+									// It's only an error if we were supposed to Blackjack
+									errorResult = targetResult == BlackjackLogic.RESULT_BLACKJACK;
+								}
+								break;							
+							
+							case BlackjackLogic.RESULT_PUSH:
+								handWinMultiplier = getWinAmountByHand( actualResult ) * ( bjHand.isDouble ? 2 : 1 );
+								bjHand.displayResult( image_push, getBetAmount() * handWinMultiplier );
+								actualWinMultiplier += handWinMultiplier;
+								if( bjHand.isSplit || bjHand.isDouble )
+								{
+									// If the hand is a split or double, only error if we PUSHED and were supposed to LOSE
+									errorResult = targetResult == BlackjackLogic.RESULT_LOSE;
+								}
+								else
+								{					
+									// It's an error if we were supposed to LOSE or Blackjack
+									errorResult = targetResult == BlackjackLogic.RESULT_LOSE || targetResult == BlackjackLogic.RESULT_BLACKJACK;
+								}
+								break;
+							
+							case BlackjackLogic.RESULT_BLACKJACK:
+								handWinMultiplier = getWinAmountByHand( actualResult ) * ( bjHand.isDouble ? 2 : 1 );
+								bjHand.displayResult( image_blackjack, getBetAmount() * handWinMultiplier );
+								actualWinMultiplier += handWinMultiplier;
+								// It's an error if we got BLACKJACK but were supposed to WIN/PUSH/LOSE
+								errorResult = targetResult != actualResult;
+								break;
+						}						
+						
+						if( actualResult != targetResult )
+						{
+							logger.debug( "Oops! Player should've gotten " + targetResult + ", but got " + actualResult + " instead." );
+							if( errorResult )
+							{
+								throw new Error( "Oops! Player should've gotten " + targetResult + ", but got " + actualResult + " instead." );	
+							}							
+						}
+					}
+				}
+					
+				if( targetWinMultiplier > 0 || actualWinMultiplier > 0 )
+				{	
+					displayPrize( actualWinMultiplier, targetWinMultiplier - actualWinMultiplier );					
+				}
+				else
+				{
+					// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts
+					Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );
+					
+					// End the round
+					roundEnded();
+					autoDealTimeout = setTimeout( checkAutoDeal, 1000 );					
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Resets the "Hands"
+			private function resetHands():void
+			{
+				// Log Activity
+				logger.pushContext( "resetHands", arguments );
+				
+				// Reset the hands positions
+				displayBetHands();
+				
+				// Clear the UI hands
+				bjHandDealer.clear();
+				bjHandPlayer1.clear();
+				bjHandPlayer2.clear();
+				bjHandPlayer3.clear();
+				bjHandPlayer4.clear();
+				bjHandPlayer5.clear();
+				bjHandPlayer6.clear();
+				
+				// Hides the split hands
+				bjHandPlayer4.visible = false;
+				bjHandPlayer5.visible = false;
+				bjHandPlayer6.visible = false;						
+				
+				// Clear the logic hands
+				dealerHand = null;
+				dealerValue = 0;
+				playerHands = null;
+				playerValues = null;
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles displaying the prize in the "Win" box on the game
+			private function displayPrize( winMultiplier:Number, bonusMultiplier:Number = 0 ):void
+			{			
+				// Log Activity
+				logger.pushContext( "displayPrize", arguments );
+				
+				// Fill possible wins
+				var possibleWins:Array = new Array();
+				for( var i:int = 0; i < betAmounts.length; i++ )
+				{
+					for( var x:int = 1; x <= 3; x++ )
+					{
+						var possibleWin:int = betAmounts[i] * ( x * 1 );
+						if( possibleWins.indexOf( possibleWin ) < 0 )
+						{
+							possibleWins.push( possibleWin );
+						}
+						
+						possibleWin = betAmounts[i] * ( x * 2 );
+						if( possibleWins.indexOf( possibleWin ) < 0 )
+						{
+							possibleWins.push( possibleWin );
+						}
+						
+						possibleWin = betAmounts[i] * ( x * 2.5 );
+						if( possibleWins.indexOf( possibleWin ) < 0 )
+						{
+							possibleWins.push( possibleWin );
+						}						
+					}
+				}						
+				
+				var winAmount:int = winMultiplier * getBetAmount();
+				// Add win amount if it doesn't exist in possible wins
+				if( winAmount > 0 && possibleWins.indexOf( winAmount ) < 0 ) {
+					possibleWins.push( winAmount );
+					possibleWins.sort( Array.NUMERIC );
+				}			
+				
+				var bonusAmount:int = bonusMultiplier * getBetAmount();
+				// Add bonus amount if it doesn't exist in possible wins
+				if( bonusAmount > 0 && possibleWins.indexOf( bonusAmount ) < 0 ) {
+					possibleWins.push( bonusAmount );
+					possibleWins.sort( Array.NUMERIC );
+				}					
+				
+				// Sort the possible wins
+				possibleWins.sort( Array.NUMERIC );
+				
+				var baseWinnings:int = Sweeps.Winnings;						
+				var winPercentage:Number = ( possibleWins.indexOf( winAmount ) + 1 ) / possibleWins.length;
+				var bonusWinPercentage:Number = ( possibleWins.indexOf( bonusAmount ) + 1 ) / possibleWins.length;				
+				
+				// Play the winning sounds
+				var winningsChnl:SoundChannel = SoundManager.playSound( assets.Sounds["Add_Winnings"], 0, 0 );
+				var winningsBdChnl:SoundChannel = SoundManager.playSound( assets.Sounds["Add_Winnings_Backdrop"], 0, 0 );				
+				
+				// Animate the winning amount display
+				if( winAmount > 0 )
+				{
+					ddWinAmount.animateDisplayAmount( winAmount, 6 * 1000 * winPercentage, animateDisplaysEnded );
+				}
+				else
+				{
+					ddBonusAmount.animateDisplayAmount( bonusAmount, 6 * 1000 * bonusWinPercentage, animateDisplaysEnded );
+				}
+				
+				// Callback function
+				function animateDisplaysEnded( dd:DigitDisplay ):void 
+				{
+					// Stop the sounds
+					if( winningsChnl != null && winningsBdChnl != null )
+					{
+						winningsChnl.stop(); 
+						winningsBdChnl.stop();
+					}
+					
+					if( dd == ddBonusAmount || bonusAmount <= 0 )
+					{
+						roundEnded();
+						autoDealTimeout = setTimeout( checkAutoDeal, 1000 ); 
+						
+						// Reset the win amounts if in DEBUG mode
+						if( Sweeps.DEBUG && !Sweeps.DEBUG_W_API )
+						{ 
+							serverEntries = Sweeps.Entries;
+							serverWinnings = Sweeps.Winnings + winAmount + bonusAmount; 
+						}
+						
+						// The serverEntries/serverWinnings should contain the server's Winnings and Entries amounts
+						Sweeps.getInstance().displayBalance( serverEntries, serverWinnings );	
+					}
+					else
+					{
+						// Start the bonus flasher
+						bonusFlasher.start();
+						
+						// Play the winning sounds
+						winningsChnl = SoundManager.playSound( assets.Sounds["Add_Winnings"], 0, 0 );
+						winningsBdChnl = SoundManager.playSound( assets.Sounds["Add_Winnings_Backdrop"], 0, 0 );	
+						
+						ddBonusAmount.animateDisplayAmount( bonusAmount, 6 * 1000 * bonusWinPercentage, animateDisplaysEnded );						
+					}
+				};
+				
+				// Clear Context
+				logger.popContext();				
+			}				
+			
+			// Resets the "Win" box to 0 and hides the pay table highlight
+			private function resetPrize():void
+			{
+				// Log Activity
+				logger.pushContext( "resetPrize", arguments );		
+				
+				flasher.stop();
+				bonusFlasher.stop();
+				imgBonus.visible = false;
+				imgHeader.visible = false;
+				ddWinAmount.displayAmount = 0;
+				ddBonusAmount.displayAmount = 0;
+				
+				// Clear Context
+				logger.popContext();				
+			}	
+			
+			// Handles disposing of event listeners and clean up
+			public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				
+				// Remove the style dispatcher
+				if( cssStyleDispatcher != null )
+				{
+					cssStyleDispatcher.removeEventListener( StyleEvent.PROGRESS, stylesProgress );
+					cssStyleDispatcher.removeEventListener( StyleEvent.COMPLETE, stylesLoaded );
+					cssStyleDispatcher.removeEventListener( StyleEvent.ERROR, stylesError );
+					cssStyleDispatcher = null;
+				}
+
+				// Check to make sure the assets were loaded
+				if( assetsLoaded ) 
+				{
+					// Unload the styles
+					try
+					{
+						styleManager.unloadStyleDeclarations( Sweeps.AssetsLocation + "/VideoBlackjack/" + Sweeps.GameAsset, false );
+					}
+					catch( e:* ){ /* do nothing */ }
+				}
+				
+				// Check to make sure the game was loaded
+				if( gameLoaded )
+				{			
+					// Clear the prize win animations in case when quit on a win
+					resetPrize();
+				}
+				
+				if( bjHandDealer != null )
+				{
+					bjHandDealer.dispose();
+					bjHandDealer = null;
+				}
+				
+				if( bjHandPlayer1 != null )
+				{
+					bjHandPlayer1.dispose();
+					bjHandPlayer1 = null;
+				}
+				
+				if( bjHandPlayer2 != null )
+				{
+					bjHandPlayer2.dispose();
+					bjHandPlayer2 = null;
+				}
+				
+				if( bjHandPlayer3 != null )
+				{
+					bjHandPlayer3.dispose();
+					bjHandPlayer3 = null;
+				}
+				
+				if( bjHandPlayer4 != null )
+				{
+					bjHandPlayer4.dispose();
+					bjHandPlayer4 = null;
+				}
+				
+				if( bjHandPlayer5 != null )
+				{
+					bjHandPlayer5.dispose();
+					bjHandPlayer5 = null;
+				}
+				
+				if( bjHandPlayer6 != null )
+				{
+					bjHandPlayer6.dispose();
+					bjHandPlayer6 = null;
+				}				
+				
+				if( btnPanel != null )
+				{
+					btnPanel.dispose();
+					btnPanel = null;
+				}
+				
+				if( dealStartTimer != null )
+				{
+					dealStartTimer.removeEventListener( TimerEvent.TIMER, dealStartTimer_Listener );
+					dealStartTimer = null;
+				}
+				
+				if( flasher != null )
+				{
+					flasher.removeEventListener( TimerEvent.TIMER, flasherFired );
+					flasher = null;
+				}
+				
+				if( bonusFlasher != null )
+				{
+					bonusFlasher.removeEventListener( TimerEvent.TIMER, bonusFlasherFired );
+					bonusFlasher = null;
+				}
+				
+				if( autoDealTimeout != uint.MIN_VALUE )
+				{
+					clearTimeout( autoDealTimeout );
+					autoDealTimeout = uint.MIN_VALUE;
+				}
+				
+				if( grpLayer0 != null )
+				{
+					grpLayer0.removeAllElements();
+				}
+				
+				ddWinAmount = null;
+				ddBetAmount = null;
+				ddBonusAmount = null;
+				
+				if( grpLayer1 != null )
+				{
+					grpLayer1.removeAllElements();
+				}
+				
+				if( grpPlayerHands != null )
+				{
+					grpPlayerHands.removeAllElements();
+				}
+				
+				if( grpLayer2 != null )
+				{
+					grpLayer2.removeAllElements();
+				}
+				
+				removeAllElements();
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Handles the "deal start" event of the data timer
+			private function dealStartTimer_Listener( event:TimerEvent ):void 
+			{				
+				var timer:DataTimer = ( event.target as DataTimer );
+				var item:Array = timer.data[timer.currentCount - 1];
+				
+				var bjHand:BlackjackHand = item[0] as BlackjackHand;
+				var strCard:String = item[1] as String;
+				var isHidden:Boolean = item[2] as Boolean;
+				
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Card_Flip" ), 0, 1 );
+				bjHand.hit( SkinManager.getSkinAsset( styleManager, strCard ), isHidden );
+				
+				if( timer.currentCount == timer.repeatCount )
+				{
+					dealStartTimer.dispose();
+					nextHandTimeout = setTimeout( activateNextHand, 1000 );
+				}
+			}				
+			
+			// Handles the "On Reveal" event of the Dealer Hand
+			protected function bjHandDealer_onRevealHandler( bjHand:BlackjackHand ):void
+			{
+				// Log Activity
+				logger.pushContext( "bjHandDealer_onRevealHandler", arguments );
+				
+				var value:int = dealerHand.playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK );
+				bjHandDealer.setValue( value );
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Value_" + value.toString() ), 0, 1 );
+				
+				activateDealer();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Hit" event of Player Hands
+			protected function bjHandPlayer_onHitHandler( bjHand:BlackjackHand ):void
+			{
+				// Log Activity
+				logger.pushContext( "bjHandPlayer_onHitHandler", arguments );
+				
+				var hand:Hand = playerHands[ ["bjHandPlayer1", "bjHandPlayer2", "bjHandPlayer3", "bjHandPlayer4", "bjHandPlayer5", "bjHandPlayer6"].indexOf( bjHand.id ) ];
+				var card:Card = hand.drawCards.drawCard();
+				var value:int;
+				
+				hand.playCards.addCard( card );
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Card_Flip" ), 0, 1 );
+				bjHand.hit( SkinManager.getSkinAsset( styleManager, card.toString() ), false );
+				
+				value = hand.playCards.getFaceValue( Config.GAME_TYPE_VIDEO_BLACKJACK );
+				SoundManager.playSound( SkinManager.getSkinAsset( styleManager, "Value_" + value.toString() ), 0, 1 );
+				bjHand.setValue( value );
+				
+				if( value == 21 )
+				{
+					// Play 21 sound
+					bjHand.toggleEnabled( false );
+					nextHandTimeout = setTimeout( activateNextHand, 1000 );
+				}
+				else if( value > 21 )
+				{
+					// Play bust sound
+					bjHand.displayResult( image_bust );
+					bjHand.toggleEnabled( false );
+					nextHandTimeout = setTimeout( activateNextHand, 1000 );
+				}
+				else
+				{
+					// Remove the option to double or split
+					bjHand.toggleEnabled( true, false, false );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Stay" event of Player Hands
+			protected function bjHandPlayer_onStayHandler( bjHand:BlackjackHand ):void
+			{
+				// Log Activity
+				logger.pushContext( "bjHandPlayer_onStayHandler", arguments );
+				
+				activateNextHand();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Split" event of Player Hands
+			protected function bjHandPlayer_onSplitHandler( bjHand:BlackjackHand ):void
+			{
+				// Log Activity
+				logger.pushContext( "bjHandPlayer_onSplitHandler", arguments );
+				
+				var hand:Hand = playerHands[ ["bjHandPlayer1", "bjHandPlayer2", "bjHandPlayer3"].indexOf( bjHand.id ) ];
+				
+				split( bjHand, hand );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Double" event of Player Hands
+			protected function bjHandPlayer_onDoubleHandler( bjHand:BlackjackHand ):void
+			{
+				// Log Activity
+				logger.pushContext( "bjHandPlayer_onDoubleHandler", arguments );
+				
+				var hand:Hand = playerHands[ ["bjHandPlayer1", "bjHandPlayer2", "bjHandPlayer3"].indexOf( bjHand.id ) ];
+				
+				double( bjHand, hand );
+
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "Click" event of imgPlayAgan
+			protected function imgPlayAgain_clickHandler( event:MouseEvent ):void
+			{
+				// Log Activity
+				logger.pushContext( "imgPlayAgain_clickHandler", arguments );
+				
+				if( !inAction )
+				{
+					inAction = true;
+					imgPlayAgain.visible = false;					
+					btnPanel.toggleEnabled( false, true );
+					deal();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Auto Play" event of btnPanel
+			protected function btnPanel_onAutoPlayHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onAutoPlayHandler", arguments );
+				
+				autoPlay = true;
+				
+				// Clear any autoplay timeouts
+				clearTimeout( autoDealTimeout );
+				autoDealTimeout = uint.MIN_VALUE;
+				
+				// Execute a deal if we're not already playing
+				if( !inAction )
+				{
+					inAction = true;
+					btnPanel.toggleEnabled( false );
+					deal();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Stop" event of btnPanel
+			protected function btnPanel_onStopHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onStopHandler", arguments );
+				
+				autoPlay = false;
+				if( !inAction ) 
+				{ 
+					btnPanel.toggleEnabled( true ); 
+					
+					// Clear any autoplay timeouts
+					clearTimeout( autoDealTimeout );
+					autoDealTimeout = uint.MIN_VALUE;					
+					
+					// Set our Sweeps inAction value
+					Sweeps.getInstance().setInAction( false );
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Bet Sub" event of btnPanel
+			protected function btnPanel_onBetSubHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onBetSubHandler", arguments );
+				
+				resetPrize();
+				resetHands();
+				
+				if( betAmountStep > 0 )
+				{
+					betAmountStep--;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the "On Bet Add" event of btnPanel
+			protected function btnPanel_onBetAddHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onBetAddHandler", arguments );
+				
+				resetPrize();
+				resetHands();
+				
+				if( betAmountStep < ( betAmounts.length - 1 ) )
+				{
+					betAmountStep++;
+					btnPanel.betAmount = getBetAmount();
+					btnPanel.displayBetAmount();
+					displayBetAmount();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Handles the click event of the "Lines" button
+			protected function btnPanel_onLineAddHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onLineAddHandler", arguments );
+				
+				resetPrize();
+				resetHands();				
+
+				curHands++;
+				if( curHands > maxHands )
+				{
+					curHands = 1;
+				}
+				
+				btnPanel.displayBetLines( curHands );
+				displayBetHands();
+				displayBetAmount();
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+			
+			// Handles the "On Deal" event of btnPanel
+			protected function btnPanel_onDealHandler( buttonPanel:ButtonPanel ):void
+			{
+				// Log Activity
+				logger.pushContext( "btnPanel_onDealHandler", arguments );
+				
+				if( !inAction )
+				{
+					inAction = true;
+					imgPlayAgain.visible = false;
+					btnPanel.toggleEnabled( false, true );
+					deal();
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}			
+		]]>
+	</fx:Script>
+	
+	<s:Group id="grpLayer0">
+		<mx:Image id="imgSkin" width="800" height="560" x="0" y="0"></mx:Image>
+		<mx:Image id="imgHeader" width="800" height="120" x="0" y="0" visible="false"></mx:Image>
+		<cx:ButtonPanel id="btnPanel" x="0" y="470" 
+						defaultBetAmount="{getBetAmount()}"
+						menuType="{ ButtonPanel.MENU_TYPE_VIDEO_BLACKJACK }"
+						onAutoPlay="btnPanel_onAutoPlayHandler" 
+						onStop="btnPanel_onStopHandler"
+						onBetSub="btnPanel_onBetSubHandler"
+						onBetAdd="btnPanel_onBetAddHandler"
+						onLineAdd="btnPanel_onLineAddHandler"			
+						onDeal="btnPanel_onDealHandler">			
+		</cx:ButtonPanel>
+	</s:Group>	
+	
+	<s:Group id="grpLayer1">
+		<s:BitmapImage id="imgBonus" x="75" y="0" width="141" height="88" visible="false"></s:BitmapImage>
+				
+		<cx:DigitDisplay id="ddBetAmount" x="445" y="432" width="80" height="33" displayAmount="{getBetAmount()}" fontSize="36"></cx:DigitDisplay>
+		<cx:DigitDisplay id="ddWinAmount" x="626" y="432" width="130" height="33" displayAmount="0" fontSize="36"></cx:DigitDisplay>
+		<cx:DigitDisplay id="ddBonusAmount" x="77" y="51" width="130" height="33" displayAmount="0" fontSize="36"></cx:DigitDisplay>
+	</s:Group>	
+	
+	<s:Group id="grpLayer2">
+		<VideoBlackjack:BlackjackHand id="bjHandDealer" width="127" height="182" x="321" y="100" isDealerHand="true" onReveal="bjHandDealer_onRevealHandler" />
+
+		<s:Group id="grpPlayerHands">
+			<VideoBlackjack:BlackjackHand id="bjHandPlayer1" width="154" height="140" x="321" y="280" betAmount="{getBetAmount()}" 
+										  onHit="bjHandPlayer_onHitHandler" onStay="bjHandPlayer_onStayHandler"
+										  onSplit="bjHandPlayer_onSplitHandler" onDouble="bjHandPlayer_onDoubleHandler" />
+			<VideoBlackjack:BlackjackHand id="bjHandPlayer2" width="154" height="140" x="321" y="280" betAmount="{getBetAmount()}"  
+										  onHit="bjHandPlayer_onHitHandler" onStay="bjHandPlayer_onStayHandler"
+										  onSplit="bjHandPlayer_onSplitHandler" onDouble="bjHandPlayer_onDoubleHandler" visible="false" />
+			<VideoBlackjack:BlackjackHand id="bjHandPlayer3" width="154" height="140" x="582" y="220" betAmount="{getBetAmount()}"  
+										  onHit="bjHandPlayer_onHitHandler" onStay="bjHandPlayer_onStayHandler"
+										  onSplit="bjHandPlayer_onSplitHandler" onDouble="bjHandPlayer_onDoubleHandler" visible="false" />
+			
+			<VideoBlackjack:BlackjackHand id="bjHandPlayer4" width="154" height="140" x="241" y="280" betAmount="{getBetAmount()}" 
+										  onHit="bjHandPlayer_onHitHandler" onStay="bjHandPlayer_onStayHandler" visible="false" />
+			<VideoBlackjack:BlackjackHand id="bjHandPlayer5" width="154" height="140" x="241" y="280" betAmount="{getBetAmount()}"  
+										  onHit="bjHandPlayer_onHitHandler" onStay="bjHandPlayer_onStayHandler" visible="false" />
+			<VideoBlackjack:BlackjackHand id="bjHandPlayer6" width="154" height="140" x="582" y="100" betAmount="{getBetAmount()}"  
+										  onHit="bjHandPlayer_onHitHandler" onStay="bjHandPlayer_onStayHandler" visible="false" />			
+		</s:Group>
+	</s:Group>
+	
+	<mx:Image id="imgPlayAgain" width="154" height="39" x="0" y="385" horizontalCenter="0" visible="false" buttonMode="true" click="imgPlayAgain_clickHandler(event)"></mx:Image>
+	
+</s:SkinnableContainer>

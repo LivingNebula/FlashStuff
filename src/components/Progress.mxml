@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  width="800" height="560"
+					  initialize="init()">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.Images;
+			
+			import flash.display.MovieClip;
+			
+			public var backgroundImage:Class;
+			
+			public var title:String = "LOADING";
+			
+			// Handles the 'initialize' event
+			private function init():void
+			{
+				imgMessageBox.source = Images.messageBox;
+				
+				if( backgroundImage != null )
+				{
+					imgBackground.source = backgroundImage;
+					imgMessageBox.verticalCenter = undefined;
+					imgMessageBox.bottom = 50;
+					grpLoading.verticalCenter = undefined;
+					grpLoading.bottom = 50;
+					
+					imgMessageBox.alpha = 0.75;
+					imgMessageBox.height = 100;
+					imgMessageBox.width = 285;
+					grpLoading.height = 100;
+					lblWait.setStyle( "paddingTop", 10 );
+				}
+				else
+				{
+					// Display a default background image
+					if( Sweeps.SkilltopiaEnabled ) 
+					{
+						backgroundImage = Images.preloader_skilltopia;
+					}
+					else
+					{
+						backgroundImage = Images.preloader;
+					}
+					
+					imgBackground.source = backgroundImage;
+					imgMessageBox.verticalCenter = undefined;
+					imgMessageBox.bottom = 50;
+					grpLoading.verticalCenter = undefined;
+					grpLoading.bottom = 50;
+					
+					imgMessageBox.alpha = 0.75;
+					imgMessageBox.height = 100;
+					imgMessageBox.width = 285;
+					grpLoading.height = 100;
+					lblWait.setStyle( "paddingTop", 10 );				
+				}
+				
+				lblTitle.text = title;
+			}
+		]]>
+	</fx:Script>
+	
+	<s:BitmapImage id="imgBackground"></s:BitmapImage>
+	<s:BitmapImage id="imgMessageBox" horizontalCenter="0" verticalCenter="0"></s:BitmapImage>
+	<s:Group id="grpLoading" horizontalCenter="0" verticalCenter="0" width="375" height="225">
+		<s:layout>
+			<s:VerticalLayout horizontalAlign="center"/>
+		</s:layout>		
+		<s:Label id="lblTitle" text="Loading" styleName="Title" paddingTop="7"></s:Label>
+		<s:Label id="lblWait" styleName="LabelWhite" text="Please wait..." visible="true" paddingTop="50"></s:Label>
+		<mx:ProgressBar id="pbLoader" styleName="LabelWhite" mode="manual" minimum="0" maximum="100" width="250" trackHeight="15" label="Loading... %3%%" labelWidth="250" chromeColor="0xB4C044"></mx:ProgressBar>
+	</s:Group>
+	
+</s:SkinnableContainer>

@@ -1,0 +1,127 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+
+.skinDeclaration {
+	/* Animations */
+	Intro_Animation: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/animations/Intro.flv", mimeType="application/octet-stream");
+	BonusGameIntro_Animation: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/BonusGame_Intro.flv", mimeType="application/octet-stream");	
+	BonusGameExit_Animation: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/BonusGame_Exit.flv", mimeType="application/octet-stream");
+	
+	/* Sprites */
+	Sprite_A_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_A_1.png");
+	Sprite_A_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_A_2.png");
+	Sprite_A_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_A_3.png");
+	Sprite_A_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_A_4.png");
+	Sprite_A_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_A_5.png");
+	Sprite_A_6: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_A_6.png");
+	
+	Sprite_B_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_B_1.png");
+	Sprite_B_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_B_2.png");
+	Sprite_B_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_B_3.png");
+	Sprite_B_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_B_4.png");
+	Sprite_B_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_B_5.png");
+	Sprite_B_6: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_B_6.png");
+
+	Sprite_C_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_C_1.png");
+	Sprite_C_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_C_2.png");
+	Sprite_C_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_C_3.png");
+	Sprite_C_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_C_4.png");
+	Sprite_C_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_C_5.png");
+	Sprite_C_6: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_C_6.png");
+	
+	Sprite_D_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_D_1.png");
+	Sprite_D_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_D_2.png");
+	Sprite_D_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_D_3.png");
+	Sprite_D_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_D_4.png");
+	Sprite_D_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_D_5.png");
+	Sprite_D_6: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_D_6.png");
+	
+	Sprite_E_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_E_1.png");
+	Sprite_E_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_E_2.png");
+	Sprite_E_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_E_3.png");
+	Sprite_E_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_E_4.png");
+	Sprite_E_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_E_5.png");
+	Sprite_E_6: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_E_6.png");
+	
+	Sprite_F_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_F_1.png");
+	Sprite_F_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_F_2.png");
+	Sprite_F_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_F_3.png");
+	Sprite_F_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_F_4.png");
+	Sprite_F_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_F_5.png");
+	Sprite_F_6: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Sprite_F_6.png");	
+	
+	/* Images */
+	Skin: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/Skin.png");
+	SkinFreeSpins: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/SkinFreeSpins.png");
+	InfoSkin: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/InfoSkin.png");	
+	InfoPaytableTitle: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/InfoPaytableTitle.png");
+	BackToGame: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/BackToGame.png");
+	BackToGame_over: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/BackToGame_over.png");
+	
+	/* Images - Reel Icons*/
+	ReelIcon_A: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_A.png");
+	
+	ReelIcon_B: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_B.png");	
+	
+	ReelIcon_C: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_C.png");	
+	
+	ReelIcon_D: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_D.png");		
+	
+	ReelIcon_E: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_E.png");		
+	
+	ReelIcon_F: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_F.png");			
+	
+	ReelIcon_G: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_G.png");		
+	
+	ReelIcon_H: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_H.png");
+	
+	ReelIcon_Wild_2_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_2_1.png");
+	ReelIcon_Wild_2_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_2_2.png");
+	
+	ReelIcon_Wild_3_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_3_1.png");
+	ReelIcon_Wild_3_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_3_2.png");
+	ReelIcon_Wild_3_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_3_3.png");
+	
+	ReelIcon_Wild_4_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_4_1.png");
+	ReelIcon_Wild_4_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_4_2.png");
+	ReelIcon_Wild_4_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_4_3.png");
+	ReelIcon_Wild_4_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_4_4.png");
+	
+	ReelIcon_Wild_5_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_5_1.png");
+	ReelIcon_Wild_5_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_5_2.png");
+	ReelIcon_Wild_5_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_5_3.png");
+	ReelIcon_Wild_5_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_5_4.png");
+	ReelIcon_Wild_5_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/images/ReelIcon_Wild_5_5.png");
+	
+	/* Sounds */
+	Background_Audio: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/BackgroundAudio.mp3");
+	Freespins_Background_Audio: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/FreespinsBackgroundAudio.mp3");
+	Bonus_Audio: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/BonusAudio.mp3");
+	Spin_Start: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Spin_Start.mp3");		
+	Spin_Stop: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Spin_Stop.mp3");
+	Meter_Win: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Meter_Win2.mp3");
+	
+	/* Scatter Icons */
+	Scatter_Anticipation: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_Anticipation.mp3");
+	Scatter_Win: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_Win.mp3");
+	Scatter_0: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_0.mp3");	
+	Scatter_1: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_1.mp3");	
+	Scatter_2: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_2.mp3");	
+	Scatter_3: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_3.mp3");	
+	Scatter_4: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_4.mp3");
+	Scatter_5: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/sounds/Scatter_5.mp3");
+	
+	/* Bonus Images */
+	BonusBG: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/images/BonusBG.png");
+	BonusBorder: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/images/BonusBorder.png");
+	BonusWheel: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/images/Wheel.png");
+	BonusWheelStand: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/images/WheelStand.png");
+	BonusSpinButton: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/images/SpinButton.png");
+	BonusPowerMeter: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/images/PowerMeter.png");
+	Wheel_Click: Embed(source="/../../../assets/SuperVideoSlots/MountOlympus/BonusGame/sounds/Wheel_Click.mp3");
+	
+	/* Fonts */
+	bradyBunch: Embed( source='/../../../assets/SuperVideoSlots/MountOlympus/fonts/bradbunr.ttf', fontFamily='bradyBunch', mimeType='application/x-font' );
+	disneyHeroic: Embed( source='/../../../assets/SuperVideoSlots/MountOlympus/fonts/Disney-Heroic-Regular.ttf', fontFamily='disneyHeroic', mimeType='application/x-font', embedAsCFF='true' );
+}

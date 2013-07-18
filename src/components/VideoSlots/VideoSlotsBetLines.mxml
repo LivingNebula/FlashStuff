@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnableContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  width="800" height="560" 
+					  implements="interfaces.IDisposable">
+	
+	<fx:Script>
+		<![CDATA[
+			import assets.SkinManager;
+			import assets.SoundManager;
+			import assets.Sounds;
+			
+			import mx.events.FlexEvent;
+			import mx.graphics.GradientEntry;
+			import mx.graphics.GradientStroke;
+			import mx.graphics.LinearGradient;
+			import mx.graphics.LinearGradientStroke;
+			import mx.graphics.SolidColorStroke;
+			
+			import spark.filters.DropShadowFilter;
+			import spark.primitives.Path;
+			
+			import utils.DebugHelper;
+			
+			// Logging
+			private static const logger:DebugHelper = new DebugHelper( VideoSlotsBetLines );
+			
+			private var arrLineNumbersLeft:Array;
+			private var arrLineNumbersRight:Array;
+			private var curLines:Number;
+			private var maxLines:Number;
+			private var lineTimer:Timer;
+			private var _onLineAdd:Function;
+			
+			public function set onLineAdd( value:Function ):void
+			{
+				_onLineAdd = value;
+			}
+
+			private function createLine( id:String, data:String, color1:uint, color2:uint ):Path
+			{
+				var line:Path = new Path();
+				var solidColorStroke:SolidColorStroke = new SolidColorStroke( 0xFFFFFF, 1, 0.75, true, LineScaleMode.NORMAL, CapsStyle.SQUARE, JointStyle.MITER );
+				var linearGradient:LinearGradient = new LinearGradient();
+				linearGradient.entries = [ new GradientEntry( color2 ), new GradientEntry( color1 ), new GradientEntry( color2 ) ];
+				
+				var dropShadow:DropShadowFilter = new DropShadowFilter();				
+				dropShadow.alpha = 0.32;
+				dropShadow.blurX = dropShadow.blurY = dropShadow.distance = 4;
+				dropShadow.angle = 90;				
+				
+				line.stroke = solidColorStroke;
+				line.fill = linearGradient;
+				line.filters = [dropShadow];						
+				line.data = data;				
+				line.visible = false;
+				
+				return line;
+			}
+			
+			// Initializes the Bet Lines
+			public function initBetLines( lines:Number ):void
+			{
+				// Log Activity
+				logger.pushContext( "initBetLines", arguments );
+				
+				imgLineNumbersLeft.source = SkinManager.getSkinAsset( styleManager, "LineNumbersLeft" );
+				imgLineNumbersRight.source = SkinManager.getSkinAsset( styleManager, "LineNumbersRight" );
+				maxLines = lines;
+				
+				switch( maxLines )
+				{
+					case 20:
+						gphLineNumbersLeft.width = gphLineNumbersRight.width = 42;
+						gphLineNumbersLeft.height = gphLineNumbersRight.height = 345;
+						gphLineNumbersLeft.y = gphLineNumbersRight.y = 78;
+						gphLineNumbersLeft.x = 28;
+						gphLineNumbersRight.x = 730;
+						arrLineNumbersLeft = [4, 2, 20, 16, 10, 1, 11, 17, 3, 5];
+						arrLineNumbersRight = [14, 12, 9, 18, 6, 7, 19, 8, 13, 15];						
+						break;
+					
+					case 25:
+						gphLineNumbersLeft.width = gphLineNumbersRight.width = 42;
+						gphLineNumbersLeft.height = gphLineNumbersRight.height = 370;
+						gphLineNumbersLeft.y = gphLineNumbersRight.y = 67;
+						gphLineNumbersLeft.x = 28;
+						gphLineNumbersRight.x = 730;						
+						arrLineNumbersLeft = [22, 4, 2, 20, 16, 10, 1, 24, 11, 17, 3, 5, 21];
+						arrLineNumbersRight = [14, 12, 9, 18, 6, 25, 7, 19, 8, 13, 15, 23, 23];
+						break;
+				}
+				
+				// Draw the lines
+				grpLineGraphics.addElement( createLine( "line1", "M 0 186 L 645 186 L 645 194 L 0 194 Z", 0xf8f8f8, 0xd2d2d2 ) );
+				grpLineGraphics.addElement( createLine( "line2", "M 0 50 L 645 50 L 645 58 L 0 58 Z", 0xC996FD, 0xAC5EFC ) );
+				grpLineGraphics.addElement( createLine( "line3", "M 0 290 L 645 290 L 645 298 L 0 298 Z", 0x009200, 0x006C00 ) );
+				
+				grpLineGraphics.addElement( createLine( "line4", "M 0 13 L 30 13 L 318 307 L 607 13 L 645 13 L 645 21 L 611 21 L 318 319 L 26 21 L 0 21 Z", 0x25E222, 0x3DA733 ) );
+				grpLineGraphics.addElement( createLine( "line5", "M 0 323 L 30 323 L 318 41 L 607 323 L 645 323 L 645 331 L 603 331 L 318 53 L 34 331 L 0 331 Z", 0xF04800, 0xC21E00 ) );
+				
+				grpLineGraphics.addElement( createLine( "line6", "M 0 147 L 90 147 L 190 48 L 455 48 L 555 152 L 645 152 L 645 160 L 551 160 L 451 56 L 194 56 L 94 155 L 0 155 Z", 0x999999, 0x333333 ) );
+				grpLineGraphics.addElement( createLine( "line7", "M 0 184 L 94 184 L 194 288 L 451 288 L 551 185 L 645 185 L 645 193 L 555 193 L 455 296 L 190 296 L 90 192 L 0 192 Z", 0xA96262, 0x794040 ) );
+				
+				grpLineGraphics.addElement( createLine( "line8", "M 0 45 L 191 45 L 451 310 L 556 310 L 625 255 L 645 255 L 645 263 L 629 263 L 560 318 L 447 318 L 187 53 L 0 53 Z", 0x7B7BD2, 0x36369B ) );
+				grpLineGraphics.addElement( createLine( "line9", "M 0 290 L 187 290 L 447 26 L 560 26 L 629 81 L 645 81 L 645 88 L 625 88 L 556 32 L 451 32 L 191 298 L 0 298 Z", 0x3FB1FF, 0x2180FF ) );
+				
+				grpLineGraphics.addElement( createLine( "line10", "M 0 158 L 21 158 L 186 324 L 438 78 L 574 213 L 645 213 L 645 221 L 570 221 L 438 90 L 186 336 L 17 166 L 0 166 Z", 0xFF64FF, 0xFF64FF ) );
+				grpLineGraphics.addElement( createLine( "line11", "M 0 226 L 17 226 L 186 49 L 438 287 L 570 171 L 645 171 L 645 179 L 574 179 L 438 299 L 186 61 L 21 234 L 0 234 Z", 0xFFBB8E, 0xFF7B25 ) );
+				
+				grpLineGraphics.addElement( createLine( "line12", "M 0 42 L 85 42 L 188 146 L 447 146 L 550 42 L 645 42 L 645 50 L 554 50 L 451 154 L 184 154 L 81 50 L 0 50 Z", 0xFFE88D, 0xFFCC00 ) );
+				grpLineGraphics.addElement( createLine( "line13", "M 0 291 L 81 291 L 184 188 L 451 188 L 554 291 L 645 291 L 645 299 L 550 299 L 447 196 L 188 196 L 85 299 L 0 299 Z", 0xC4C49C, 0x6C6C0B ) );
+				
+				grpLineGraphics.addElement( createLine( "line14", "M 0 21 L 28 21 L 182 177 L 323 46 L 463 177 L 617 21 L 645 21 L 645 29 L 621 29 L 463 189 L 323 58 L 182 189 L 24 29 L 0 29 Z", 0xBFE5BA, 0x67BE59 ) );
+				grpLineGraphics.addElement( createLine( "line15", "M 0 324 L 24 324 L 182 177 L 323 299 L 463 177 L 621 324 L 645 324 L 645 332 L 617 332 L 463 189 L 323 311 L 182 189 L 28 332 L 0 332 Z", 0xEA99D7, 0xCD099C ) );
+				
+				grpLineGraphics.addElement( createLine( "line16", "M 0 120 L 15 120 L 67 172 L 190 172 L 316 48 L 442 172 L 645 172 L 645 180 L 438 180 L 316 60 L 194 180 L 63 180 L 11 128 L 0 128 Z", 0xAABAEE, 0x0E3DCF ) );
+				grpLineGraphics.addElement( createLine( "line17", "M 0 253 L 11 253 L 63 201 L 194 201 L 316 325 L 438 201 L 645 201 L 645 209 L 442 209 L 316 337 L 190 209 L 67 209 L 15 261 L 0 261 Z", 0xB8E3FF, 0x1CA3FF ) );
+				
+				grpLineGraphics.addElement( createLine( "line18", "M 0 58 L 167 58 L 327 317 L 487 58 L 607 58 L 630 118 L 645 118 L 645 126 L 626 126 L 603 66 L 491 66 L 327 329 L 163 66 L 0 66 Z", 0xF8F8FB, 0xE0E0EF ) );
+				grpLineGraphics.addElement( createLine( "line19", "M 0 281 L 163 281 L 327 25 L 491 281 L 603 281 L 626 221 L 645 221 L 645 229 L 630 229 L 607 289 L 487 289 L 327 37 L 167 289 L 0 289 Z", 0xFFA5D1, 0xFF399B ) );
+				
+				grpLineGraphics.addElement( createLine( "line20", "M 0 77 L 20 77 L 162 300 L 483 300 L 625 77 L 645 77 L 645 85 L 629 85 L 487 308 L 158 308 L 16 85 L 0 85 Z", 0xD3A690, 0x9E3F10 ) );
+				
+				if( maxLines == 25 )
+				{
+					grpLineGraphics.addElement( createLine( "line21", "M 0 323 L 20 323 L 162 33 L 483 33 L 625 323 L 645 323 L 645 331 L 621 331 L 479 41 L 166 41 L 24 331 L 0 331 Z", 0xD3A690, 0x9E3F10 ) );
+					
+					grpLineGraphics.addElement( createLine( "line22", "M 0 21 L 158 21 L 312 177 L 453 21 L 645 21 L 645 29 L 459 29 L 312 190 L 152 29 L 0 29 Z", 0xBFE5BA, 0x67BE59 ) );
+					grpLineGraphics.addElement( createLine( "line23", "M 0 316 L 158 316 L 312 165 L 453 316 L 645 316 L 645 324 L 451 324 L 312 178 L 160 324 L 0 324 Z", 0xEA99D7, 0xCD099C ) );
+					
+					grpLineGraphics.addElement( createLine( "line24", "M 0 226 L 17 226 L 186 49 L 322 226 L 459 49 L 628 226 L 645 226 L 645 234 L 624 234 L 459 61 L 322 238 L 186 61 L 21 234 L 0 234 Z", 0xFFBB8E, 0xFF7B25 ) );
+					grpLineGraphics.addElement( createLine( "line25", "M 0 138 L 21 138 L 186 315 L 322 138 L 459 315 L 624 138 L 645 138 L 645 146 L 628 146 L 459 327 L 322 150 L 186 327 L 17 146 L 0 146 Z", 0xFF64FF, 0xFF64FF ) );			
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Toggle the line numbers' visibility
+			public function set lineNumbersVisible( value:Boolean ):void
+			{
+				gphLineNumbersLeft.visible = gphLineNumbersRight.visible = value;
+			}
+			
+			// Toggle the line numbers' buttonMode
+			public function set gameInAction( value:Boolean ):void
+			{
+				gphLineNumbersLeft.buttonMode = gphLineNumbersRight.buttonMode = !value;
+			}
+			
+			// Allows hosting applications to set ( and then display ) the number of bet lines
+			public function displayBetLines( betLines:Number ):void
+			{
+				curLines = betLines;
+				displayBetLinesInternal();
+			}
+			
+			// Dispatches an event notifying any handlers that a line number was clicked and the amount of bet lines changed
+			private function dispatchBetLines():void
+			{
+				_onLineAdd( this, curLines );
+			}
+			
+			// Handles displaying and hiding the actual line graphics
+			private function displayBetLinesInternal():void
+			{
+				for( var l:Number = 1; l <= maxLines; l++ )
+				{
+					( grpLineGraphics.getElementAt( l - 1 ) as Path ).visible = ( l == curLines );
+				}	
+								
+				// Clear the timer if one already exists and init a new one to hide the lines after 1500ms
+				clearTimer();				
+				lineTimer = new Timer( 1500, 1 );
+				lineTimer.addEventListener( TimerEvent.TIMER, lineTimer_Timer );
+				lineTimer.start();
+			}
+			
+			// Handles the lineTimer 'Timer' event
+			private function lineTimer_Timer( event:TimerEvent ):void 
+			{
+				clearTimer();
+				hideAllLines();	
+			}
+			
+			// Clears the timer if one exists
+			private function clearTimer():void
+			{
+				if( lineTimer )
+				{
+					lineTimer.stop();
+					lineTimer.removeEventListener( TimerEvent.TIMER, lineTimer_Timer );
+					lineTimer = null;
+				}
+			}
+			
+			// Hides all lines
+			public function hideAllLines():void
+			{
+				// Log Activity
+				logger.pushContext( "hideAllLines", arguments );
+				
+				for( var l:Number = 1; l <= maxLines; l++ )
+				{
+					( grpLineGraphics.getElementAt( l - 1 ) as Path ).visible = false;
+				}
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			// Shows an array of lines
+			public function showLines( lineNumbers:Array ):void
+			{
+				// Log Activity
+				logger.pushContext( "showLines", arguments );
+				
+				hideAllLines();
+				lineNumbers.forEach( lineNumber );
+				
+				// Clear Context
+				logger.popContext();				
+			}
+			
+			protected function lineNumber( element:*, index:int, arr:Array ):void
+			{
+				var idx:int = element as int;
+				if( idx && idx >= 0 && idx <= maxLines )
+				{
+					( grpLineGraphics.getElementAt( idx - 1 ) as Path ).visible = true;	
+				}
+			}
+				
+			// Handles the 'click event' of the left line numbers
+			protected function gphLineNumbersLeft_clickHandler( event:MouseEvent ):void
+			{
+				// Return if buttonMode is false and we shouldn't be receiving click events
+				if( !gphLineNumbersLeft.buttonMode )
+				{
+					return;
+				}
+				
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+				
+				var numberHeight:Number = ( gphLineNumbersLeft.height / ( maxLines == 20 ? 10 : 13 ) );
+				curLines = arrLineNumbersLeft[ Math.floor( event.localY / numberHeight ) ];
+				dispatchBetLines();
+				displayBetLinesInternal();
+			}
+			
+			// Handles the 'click event' of the right line numbers
+			protected function gphLineNumbersRight_clickHandler( event:MouseEvent ):void
+			{
+				// Return if buttonMode is false and we shouldn't be receiving click events
+				if( !gphLineNumbersRight.buttonMode )
+				{
+					return;
+				}
+				
+				SoundManager.playSound( assets.Sounds["buttonClick"], 0, 0 ); // Play the button click sound
+				
+				var numberHeight:Number = ( gphLineNumbersRight.height / ( maxLines == 20 ? 10 : 13 ));				
+				curLines = arrLineNumbersRight[ Math.floor( event.localY / numberHeight ) ];	
+				dispatchBetLines();
+				displayBetLinesInternal();
+			}	
+			
+			public function dispose():void
+			{
+				// Log Activity
+				logger.pushContext( "dispose", arguments );
+				
+				// Cleanup callback references
+				_onLineAdd = null;
+				
+				// Cleanup timers
+				clearTimer();
+				
+				// Remove elements
+				removeAllElements();
+				
+				// Clear Context
+				logger.popContext();				
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Graphic id="gphLineNumbersLeft" buttonMode="true" click="gphLineNumbersLeft_clickHandler( event )">
+		<s:BitmapImage id="imgLineNumbersLeft" />
+	</s:Graphic>
+	<s:Graphic id="gphLineNumbersRight" buttonMode="true" click="gphLineNumbersRight_clickHandler( event )">
+		<s:BitmapImage id="imgLineNumbersRight" />	
+	</s:Graphic>
+	
+	<s:Group id="grpLineGraphics" width="645" height="345" x="76" y="76"></s:Group>	
+	
+</s:SkinnableContainer>
